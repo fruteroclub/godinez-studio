@@ -72,5 +72,15 @@ export const content = {
       title: "Agentes",
       empty: "No hay agentes disponibles.",
     },
+    hatching: {
+      title: "Tu agente está listo para nacer",
+      description:
+        "Al activar tu agente, tendrás una conversación donde él te conocerá y aprenderá sobre tu negocio.",
+      cta: "Activar agente",
+      creating: "Creando tu agente...",
+      capacityFull: "Todos los slots están ocupados. Intenta más tarde.",
+      gatewayOffline: "El servicio de agentes no está disponible.",
+      genericError: "Ocurrió un error al crear tu agente. Intenta de nuevo.",
+    },
   },
 };

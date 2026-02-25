@@ -17,3 +17,15 @@ export async function getAgentBySlug(slug: string) {
 export async function getAllAgents() {
   return db.query.agents.findMany();
 }
+
+export async function createAgent(data: {
+  name: string;
+  slug: string;
+  template: string;
+  status: string;
+  openclawId?: string;
+  config?: Record<string, unknown>;
+}) {
+  const [agent] = await db.insert(agents).values(data).returning();
+  return agent;
+}

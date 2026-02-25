@@ -2,6 +2,7 @@ import { useWorkspace } from "@/providers/WorkspaceProvider";
 import { useDashboard } from "@/hooks/use-workspace";
 import { content } from "@/lib/content";
 import { PageSkeleton } from "@/components/ui/Skeleton";
+import AgentHatching from "@/components/onboarding/AgentHatching";
 
 const { dashboard } = content.studio;
 
@@ -10,6 +11,11 @@ export default function Dashboard() {
   const { data: stats, isLoading } = useDashboard(workspace?.id);
 
   if (isLoading) return <PageSkeleton />;
+
+  // Show hatching UI if no agent assigned
+  if (!workspace?.agentSlot) {
+    return <AgentHatching />;
+  }
 
   const statCards = [
     { label: dashboard.activeProjects, value: stats?.activeProjects ?? 0 },

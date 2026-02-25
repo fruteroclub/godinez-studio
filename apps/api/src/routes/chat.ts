@@ -6,6 +6,7 @@ import type { AuthEnv } from "../types";
 import { requireAuth } from "../middleware/auth";
 import { resolveUser } from "../middleware/resolve-user";
 import { createMessage, getMessages } from "../dal/conversations";
+import { getWorkspaceById, activateWorkspace } from "../dal/workspaces";
 import { gateway } from "../services/gateway-relay";
 import { resolveAgentSession } from "../services/agent-mapping";
 import { createStubRun } from "../services/stub-agent";
@@ -129,6 +130,12 @@ app.get("/stream/:runId", async (c) => {
               metadata: { stub: true },
             });
 
+            // Activate workspace if still provisioning
+            const ws = await getWorkspaceById(stubEntry.workspaceId);
+            if (ws?.status === "provisioning") {
+              await activateWorkspace(stubEntry.workspaceId);
+            }
+
             await stream.writeSSE({
               event: "done",
               data: JSON.stringify({
@@ -164,8 +171,6 @@ app.get("/stream/:runId", async (c) => {
         },
         onFinal: async (text) => {
           try {
-            // We need conversationId/workspaceId — extract from pending context
-            // For real Gateway mode, the chat/send endpoint should store context
             const ctx = runContexts.get(runId);
             if (ctx) {
               const agentMessage = await createMessage({
@@ -174,6 +179,13 @@ app.get("/stream/:runId", async (c) => {
                 role: "agent",
                 content: text,
               });
+
+              // Activate workspace if still provisioning
+              const ws = await getWorkspaceById(ctx.workspaceId);
+              if (ws?.status === "provisioning") {
+                await activateWorkspace(ctx.workspaceId);
+              }
+
               await stream.writeSSE({
                 event: "done",
                 data: JSON.stringify({

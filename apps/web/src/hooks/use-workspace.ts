@@ -9,6 +9,7 @@ interface Workspace {
   tier: string;
   status: string;
   agentId: number | null;
+  agentSlot: string | null;
 }
 
 interface DashboardStats {

@@ -68,3 +68,24 @@ export async function updateWorkspace(
 export async function deleteWorkspace(id: number) {
   await db.delete(workspaces).where(eq(workspaces.id, id));
 }
+
+export async function linkAgentToWorkspace(
+  workspaceId: number,
+  data: { agentId: number; agentSlot: string },
+) {
+  const [workspace] = await db
+    .update(workspaces)
+    .set({ agentId: data.agentId, agentSlot: data.agentSlot, status: "provisioning" })
+    .where(eq(workspaces.id, workspaceId))
+    .returning();
+  return workspace;
+}
+
+export async function activateWorkspace(workspaceId: number) {
+  const [workspace] = await db
+    .update(workspaces)
+    .set({ status: "active" })
+    .where(eq(workspaces.id, workspaceId))
+    .returning();
+  return workspace;
+}
