@@ -21,7 +21,17 @@ import { gateway } from "./services/gateway-relay";
 const app = new Hono();
 
 app.use("*", logger());
-app.use("*", cors());
+app.use(
+  "*",
+  cors({
+    origin: process.env.CORS_ORIGIN?.split(",") ?? "*",
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization"],
+    exposeHeaders: ["Content-Type"],
+    credentials: true,
+    maxAge: 3600,
+  }),
+);
 
 app.route("/health", health);
 app.route("/api/workspaces", workspaces);

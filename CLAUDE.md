@@ -21,6 +21,7 @@ pnpm typecheck              # TypeScript check across all packages
 pnpm db:push                # Push Drizzle schema to database
 pnpm db:generate            # Generate Drizzle migrations
 pnpm db:studio              # Open Drizzle Studio GUI
+pnpm db:seed                # Seed 3 core agents (Lupita, Toño, Marisol)
 ```
 
 Run `pnpm dev:api` and `pnpm dev:web` in separate terminals for local development. The Vite dev server proxies `/api` requests to `:3001`.
@@ -56,9 +57,13 @@ Brand tokens defined in `apps/web/src/index.css` via Tailwind v4 `@theme inline`
 
 ### `apps/api/.env`
 
-- `DATABASE_URL` — PostgreSQL connection string
+- `DATABASE_URL` — PostgreSQL connection string (required)
 - `CLERK_SECRET_KEY` — Clerk backend secret
+- `CLERK_WEBHOOK_SECRET` — Clerk webhook signing secret
 - `PORT` — defaults to 3001
+- `CORS_ORIGIN` — comma-separated allowed origins (defaults to `*`)
+- `OPENCLAW_GATEWAY_URL` — WebSocket URL for OpenClaw Gateway (optional)
+- `OPENCLAW_GATEWAY_TOKEN` — Gateway auth token (optional)
 
 ### `apps/web/.env`
 
@@ -82,14 +87,35 @@ Brand tokens defined in `apps/web/src/index.css` via Tailwind v4 `@theme inline`
 5. **`@godinez/` scope** for all workspace packages.
 6. **Hono routes** export a `new Hono()` instance, mounted via `app.route()` in `apps/api/src/index.ts`.
 
-## Implementation Roadmap
+### API Routes
 
-Detailed phase specs in `docs/godinez-studio-monorepo-implementation/`:
+All routes mounted in `apps/api/src/index.ts`:
 
-- Phase 0: Monorepo scaffold (complete)
-- Phase 1: Database schema (10 tables) + API foundation
-- Phase 2: Clerk auth + workspace management
-- Phase 3: Chat + OpenClaw Gateway Relay + SSE streaming
-- Phase 4: Projects, tasks, files CRUD
-- Phase 5: Frontend SPA pages
-- Phase 6: Integration + deployment
+- `GET /health` — health check
+- `POST/GET/PUT/DELETE /api/workspaces` — workspace CRUD
+- `POST/GET/DELETE /api/workspaces/:id/members` — team management
+- `GET /api/workspaces/:id/dashboard` — aggregated stats
+- `GET /api/workspaces/:id/activity` — agent logs
+- `POST/GET /api/workspaces/:id/conversations` — conversations
+- `POST/GET/PUT/DELETE /api/projects` — projects CRUD
+- `POST/GET/PUT /api/tasks` — tasks CRUD with status transitions
+- `POST/GET/DELETE /api/files` — file upload/management
+- `GET /api/agents` — agent registry (read-only)
+- `POST /api/chat/send` — send message, returns `runId`
+- `GET /api/chat/stream/:runId` — SSE stream for agent responses
+- `POST /webhooks/clerk` — Clerk webhook handler
+
+### Chat Architecture
+
+1. Client sends message via `POST /api/chat/send` → gets `runId`
+2. Client opens SSE connection to `GET /api/chat/stream/:runId`
+3. API relays to OpenClaw Gateway (WebSocket JSON-RPC 2.0) or falls back to stub agent
+4. Events streamed: `delta` (text chunks), `done` (completion), `error`
+
+### Seed Data
+
+Three core agents seeded via `pnpm db:seed`:
+
+- **Lupita** (`lupita-pmo`) — PMO: project management, scheduling
+- **Toño** (`tono-cto`) — CTO: code review, architecture, devops
+- **Marisol** (`marisol-influencer`) — Influencer: content creation, social media
