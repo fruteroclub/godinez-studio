@@ -1,0 +1,27 @@
+{
+  "name": "@godinez/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Godinez Studio API — Hono + Drizzle + PostgreSQL",
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts",
+    "build": "bun build src/index.ts --outdir dist --target bun",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@clerk/backend": "^1.20.0",
+    "@godinez/db": "workspace:*",
+    "@godinez/types": "workspace:*",
+    "hono": "^4.7.0",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "drizzle-kit": "^0.30.0",
+    "typescript": "^5.7.0"
+  }
+}

@@ -1,0 +1,183 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────────
+   Godinez Studio — Design System Tokens (Tailwind v4)
+   ───────────────────────────────────────────── */
+@theme inline {
+  /* Brand Colors */
+  --color-magenta: #E91E8C;
+  --color-magenta-light: #FF4DA6;
+  --color-magenta-dark: #C4177A;
+  --color-violet: #8B5CF6;
+  --color-violet-light: #A78BFA;
+  --color-violet-dark: #7C3AED;
+  --color-gold: #FFB800;
+  --color-gold-light: #FFF0C2;
+  --color-dark: #0A0A0A;
+  --color-charcoal: #1A1A1A;
+  --color-charcoal-light: #3A3A3A;
+  --color-cream: #FFF9F5;
+  --color-cream-dark: #FFF0E8;
+
+  /* Typography */
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-sans: "Plus Jakarta Sans", system-ui, sans-serif;
+
+  /* Animations */
+  --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
+  --animate-gradient-shift: gradient-shift 4s ease infinite;
+  --animate-fade-in-up: fadeInUp 0.6s ease-out forwards;
+}
+
+/* ─────────────────────────────────────────────
+   shadcn/ui CSS Variables (mapped to brand)
+   ───────────────────────────────────────────── */
+:root {
+  --background: 0 0% 4%;
+  --foreground: 0 0% 95%;
+  --card: 0 0% 10%;
+  --card-foreground: 0 0% 95%;
+  --popover: 0 0% 10%;
+  --popover-foreground: 0 0% 95%;
+  --primary: 328 82% 54%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 258 89% 66%;
+  --secondary-foreground: 0 0% 100%;
+  --muted: 0 0% 15%;
+  --muted-foreground: 0 0% 64%;
+  --accent: 43 100% 50%;
+  --accent-foreground: 0 0% 4%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 0 0% 18%;
+  --input: 0 0% 18%;
+  --ring: 328 82% 54%;
+  --radius: 0.5rem;
+  --sidebar-background: 0 0% 7%;
+  --sidebar-foreground: 0 0% 95%;
+  --sidebar-primary: 328 82% 54%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 0 0% 13%;
+  --sidebar-accent-foreground: 0 0% 95%;
+  --sidebar-border: 0 0% 15%;
+  --sidebar-ring: 328 82% 54%;
+}
+
+/* ─────────────────────────────────────────────
+   Base Styles
+   ───────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-charcoal);
+  background: var(--color-dark);
+}
+
+/* ─────────────────────────────────────────────
+   Keyframes — pulse-glow
+   ───────────────────────────────────────────── */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(233, 30, 140, 0.3),
+                0 0 24px rgba(233, 30, 140, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(233, 30, 140, 0.5),
+                0 0 48px rgba(233, 30, 140, 0.2);
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Keyframes — gradient-shift
+   ───────────────────────────────────────────── */
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ─────────────────────────────────────────────
+   Keyframes — fadeInUp
+   ───────────────────────────────────────────── */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Utility — Gradient Backgrounds
+   ───────────────────────────────────────────── */
+.bg-gradient-brand {
+  background: linear-gradient(135deg, var(--color-magenta), var(--color-violet));
+}
+
+.bg-gradient-brand-wide {
+  background: linear-gradient(135deg, var(--color-magenta), var(--color-violet), var(--color-gold));
+  background-size: 200% 200%;
+}
+
+.bg-gradient-dark {
+  background: linear-gradient(180deg, var(--color-dark) 0%, var(--color-charcoal) 100%);
+}
+
+/* ─────────────────────────────────────────────
+   Utility — Gradient Text
+   ───────────────────────────────────────────── */
+.text-gradient-brand {
+  background: linear-gradient(135deg, var(--color-magenta), var(--color-violet));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-gradient-gold {
+  background: linear-gradient(135deg, var(--color-gold), var(--color-gold-light));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─────────────────────────────────────────────
+   Utility — Gradient Borders
+   ───────────────────────────────────────────── */
+.border-gradient-brand {
+  border: 1px solid transparent;
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  background-image:
+    linear-gradient(var(--color-dark), var(--color-dark)),
+    linear-gradient(135deg, var(--color-magenta), var(--color-violet));
+}
+
+/* ─────────────────────────────────────────────
+   Utility — Glow Effects
+   ───────────────────────────────────────────── */
+.glow-magenta {
+  box-shadow: 0 0 20px rgba(233, 30, 140, 0.3);
+}
+
+.glow-violet {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);
+}
+
+.glow-gold {
+  box-shadow: 0 0 20px rgba(255, 184, 0, 0.3);
+}
+
+/* ─────────────────────────────────────────────
+   Staggered Animation Delays
+   ───────────────────────────────────────────── */
+.delay-100 { animation-delay: 0.1s; }
+.delay-200 { animation-delay: 0.2s; }
+.delay-300 { animation-delay: 0.3s; }
+.delay-400 { animation-delay: 0.4s; }
+.delay-500 { animation-delay: 0.5s; }

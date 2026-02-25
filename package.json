@@ -1,0 +1,20 @@
+{
+  "name": "godinez-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Godinez Studio — AI workspace for Latin American SMBs",
+  "scripts": {
+    "dev:api": "pnpm --filter @godinez/api dev",
+    "dev:web": "pnpm --filter @godinez/web dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "db:push": "pnpm --filter @godinez/api db:push",
+    "db:generate": "pnpm --filter @godinez/api db:generate",
+    "db:studio": "pnpm --filter @godinez/api db:studio"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0",
+    "typescript": "^5.7.0"
+  },
+  "packageManager": "pnpm@9.15.0"
+}

@@ -1,0 +1,35 @@
+{
+  "name": "@godinez/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Godinez Studio — Vite + React SPA",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b"
+  },
+  "dependencies": {
+    "@clerk/clerk-react": "^5.20.0",
+    "@godinez/types": "workspace:*",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@tanstack/react-query": "^5.64.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.575.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.1.0",
+    "tailwind-merge": "^3.5.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.1.0"
+  }
+}
