@@ -1,0 +1,76 @@
+export const content = {
+  studio: {
+    sidebar: {
+      dashboard: "Dashboard",
+      chat: "Chat",
+      projects: "Proyectos",
+      agent: "Agente",
+      tasks: "Tareas",
+      files: "Archivos",
+      activity: "Actividad",
+      team: "Equipo",
+      settings: "Configuración",
+    },
+    dashboard: {
+      title: "Dashboard",
+      welcome: "Bienvenido a tu espacio de trabajo",
+      activeProjects: "Proyectos activos",
+      pendingTasks: "Tareas pendientes",
+      recentMessages: "Mensajes recientes",
+      agentStatus: "Estado del agente",
+    },
+    chat: {
+      title: "Chat",
+      placeholder: "Escribe un mensaje...",
+      send: "Enviar",
+      newConversation: "Nueva conversación",
+    },
+    projects: {
+      title: "Proyectos",
+      create: "Nuevo proyecto",
+      empty: "No tienes proyectos aún. Crea uno para empezar.",
+    },
+    tasks: {
+      title: "Tareas",
+      create: "Nueva tarea",
+      empty: "No hay tareas pendientes.",
+      columnPending: "Pendiente",
+      columnInProgress: "En progreso",
+      columnCompleted: "Completada",
+    },
+    files: {
+      title: "Archivos",
+      upload: "Subir archivo",
+      empty: "No hay archivos aún.",
+    },
+    activity: {
+      title: "Actividad",
+      empty: "No hay actividad reciente.",
+    },
+    team: {
+      title: "Equipo",
+      invite: "Invitar miembro",
+      roleOwner: "Propietario",
+      roleAdmin: "Administrador",
+      roleMember: "Miembro",
+      roleViewer: "Observador",
+    },
+    settings: {
+      title: "Configuración",
+      general: "General",
+      danger: "Zona de peligro",
+      deleteCta: "Eliminar espacio de trabajo",
+      deleteConfirm: "Escribe el slug del espacio para confirmar:",
+      save: "Guardar cambios",
+    },
+    workspaceSelector: {
+      title: "Tus espacios de trabajo",
+      create: "Crear espacio de trabajo",
+      empty: "No tienes espacios de trabajo. Crea uno para empezar.",
+    },
+    agents: {
+      title: "Agentes",
+      empty: "No hay agentes disponibles.",
+    },
+  },
+};

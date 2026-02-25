@@ -1,10 +1,19 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { ClerkProvider } from "@clerk/clerk-react";
+import { RouterProvider } from "react-router-dom";
+import QueryProvider from "./providers/QueryProvider";
+import { router } from "./App";
 import "./index.css";
-import App from "./App";
+
+const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <ClerkProvider publishableKey={clerkKey}>
+      <QueryProvider>
+        <RouterProvider router={router} />
+      </QueryProvider>
+    </ClerkProvider>
   </StrictMode>,
 );
