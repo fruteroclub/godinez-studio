@@ -9,6 +9,8 @@ import projects from "./routes/projects";
 import tasks from "./routes/tasks";
 import files from "./routes/files";
 import agents from "./routes/agents";
+import webhooks from "./routes/webhooks";
+import dashboard from "./routes/dashboard";
 
 const app = new Hono();
 
@@ -18,10 +20,12 @@ app.use("*", cors());
 app.route("/health", health);
 app.route("/api/workspaces", workspaces);
 app.route("/api/workspaces", team);
+app.route("/api/workspaces", dashboard);
 app.route("/api/projects", projects);
 app.route("/api/tasks", tasks);
 app.route("/api/files", files);
 app.route("/api/agents", agents);
+app.route("/webhooks", webhooks);
 
 app.get("/", (c) => {
   return c.json({

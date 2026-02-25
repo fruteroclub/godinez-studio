@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun run --hot src/index.ts",
     "start": "node dist/index.js",
-    "build": "tsc",
+    "build": "tsup",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:push": "drizzle-kit push",
@@ -17,14 +17,17 @@
     "@godinez/db": "workspace:*",
     "@godinez/types": "workspace:*",
     "@hono/node-server": "^1.19.9",
+    "@hono/zod-validator": "^0.7.6",
     "drizzle-orm": "^0.38.0",
     "hono": "^4.7.0",
     "postgres": "^3.4.0",
+    "svix": "^1.86.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "drizzle-kit": "^0.30.0",
+    "tsup": "^8.5.1",
     "typescript": "^5.7.0"
   }
 }
