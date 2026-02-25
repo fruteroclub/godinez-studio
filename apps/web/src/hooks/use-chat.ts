@@ -77,41 +77,45 @@ export function useChat(conversationId: number, workspaceId: number) {
       ]);
       setIsStreaming(true);
 
-      // Connect SSE
-      connectSSE(runId, {
-        onDelta: (text) => {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === tempAgentId ? { ...m, content: text } : m,
-            ),
-          );
+      // Connect SSE (pass token via query param — EventSource can't send headers)
+      connectSSE(
+        runId,
+        {
+          onDelta: (text) => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === tempAgentId ? { ...m, content: text } : m,
+              ),
+            );
+          },
+          onDone: (text, agentMessageId) => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === tempAgentId
+                  ? {
+                      ...m,
+                      id: agentMessageId ?? tempAgentId,
+                      content: text,
+                      streaming: false,
+                    }
+                  : m,
+              ),
+            );
+            setIsStreaming(false);
+          },
+          onError: () => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === tempAgentId
+                  ? { ...m, content: "Error al obtener respuesta", streaming: false }
+                  : m,
+              ),
+            );
+            setIsStreaming(false);
+          },
         },
-        onDone: (text, agentMessageId) => {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === tempAgentId
-                ? {
-                    ...m,
-                    id: agentMessageId ?? tempAgentId,
-                    content: text,
-                    streaming: false,
-                  }
-                : m,
-            ),
-          );
-          setIsStreaming(false);
-        },
-        onError: () => {
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === tempAgentId
-                ? { ...m, content: "Error al obtener respuesta", streaming: false }
-                : m,
-            ),
-          );
-          setIsStreaming(false);
-        },
-      });
+        token,
+      );
     },
     [conversationId, workspaceId, getToken],
   );

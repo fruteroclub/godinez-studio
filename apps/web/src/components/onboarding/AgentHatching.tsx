@@ -1,7 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
 import { useProvision } from "@/hooks/use-provision";
-import { Button } from "@/components/ui/button";
 import { content } from "@/lib/content";
 
 const { hatching } = content.studio;
@@ -76,10 +75,10 @@ export default function AgentHatching() {
           {hatching.description}
         </p>
 
-        <Button
-          size="lg"
+        <button
           onClick={handleProvision}
           disabled={provision.isPending}
+          className="inline-flex items-center justify-center gap-2 rounded-md bg-magenta px-8 py-3 text-base font-semibold text-white hover:bg-magenta/90 transition-colors disabled:opacity-50"
         >
           {provision.isPending ? (
             <>
@@ -107,7 +106,7 @@ export default function AgentHatching() {
           ) : (
             hatching.cta
           )}
-        </Button>
+        </button>
 
         {errorMessage && (
           <p className="mt-4 text-sm text-[hsl(var(--destructive))]">

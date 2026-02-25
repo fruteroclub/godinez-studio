@@ -6,8 +6,11 @@ export interface SSEHandlers {
   onError?: (error: string) => void;
 }
 
-export function connectSSE(runId: string, handlers: SSEHandlers): () => void {
-  const es = new EventSource(`${API_URL}/api/chat/stream/${runId}`);
+export function connectSSE(runId: string, handlers: SSEHandlers, token?: string | null): () => void {
+  const url = token
+    ? `${API_URL}/api/chat/stream/${runId}?token=${encodeURIComponent(token)}`
+    : `${API_URL}/api/chat/stream/${runId}`;
+  const es = new EventSource(url);
 
   es.addEventListener("delta", (e) => {
     const { text } = JSON.parse(e.data);

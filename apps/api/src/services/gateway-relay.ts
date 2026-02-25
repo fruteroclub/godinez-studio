@@ -1,4 +1,5 @@
 import WebSocket from "ws";
+import crypto from "node:crypto";
 
 // ─── Protocol types (matching OpenClaw protocol v3) ─────────────────
 
@@ -33,18 +34,55 @@ interface HelloOk {
   features: { methods: string[]; events: string[] };
 }
 
-interface ConnectParams {
-  minProtocol: number;
-  maxProtocol: number;
-  client: {
-    id: string;
-    displayName?: string;
-    version: string;
-    platform: string;
-    mode: "node";
+// ─── Device identity (Ed25519 challenge-response auth) ──────────────
+
+const ED25519_SPKI_PREFIX = Buffer.from(
+  "302a300506032b6570032100",
+  "hex",
+);
+
+function base64UrlEncode(buf: Buffer): string {
+  return buf.toString("base64url");
+}
+
+function generateDeviceIdentity() {
+  const { publicKey, privateKey } = crypto.generateKeyPairSync("ed25519");
+  const rawPub = publicKey.export({ type: "spki", format: "der" }).subarray(12);
+  const deviceId = crypto.createHash("sha256").update(rawPub).digest("hex");
+  return {
+    deviceId,
+    publicKeyB64: base64UrlEncode(rawPub),
+    privateKeyPem: privateKey.export({ type: "pkcs8", format: "pem" }) as string,
   };
-  auth?: { token?: string };
-  scopes?: string[];
+}
+
+function buildDeviceAuthPayload(params: {
+  deviceId: string;
+  clientId: string;
+  clientMode: string;
+  role: string;
+  scopes: string[];
+  signedAtMs: number;
+  token: string;
+  nonce: string;
+}): string {
+  return [
+    "v2",
+    params.deviceId,
+    params.clientId,
+    params.clientMode,
+    params.role,
+    params.scopes.join(","),
+    String(params.signedAtMs),
+    params.token,
+    params.nonce,
+  ].join("|");
+}
+
+function signPayload(privateKeyPem: string, payload: string): string {
+  const key = crypto.createPrivateKey(privateKeyPem);
+  const sig = crypto.sign(null, Buffer.from(payload, "utf8"), key);
+  return base64UrlEncode(sig);
 }
 
 // ─── Chat event types ───────────────────────────────────────────────
@@ -124,6 +162,7 @@ class GatewayRelay {
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private serverInfo: { version: string; connId: string } | null = null;
+  private device = generateDeviceIdentity();
 
   get isConnected(): boolean {
     return this._connected;
@@ -136,24 +175,6 @@ class GatewayRelay {
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(url);
 
-      this.ws.on("open", () => {
-        // Send connect handshake
-        const connectParams: ConnectParams = {
-          minProtocol: 3,
-          maxProtocol: 3,
-          client: {
-            id: "godinez-studio",
-            displayName: "Godinez Studio",
-            version: "0.1.0",
-            platform: "node",
-            mode: "node",
-          },
-          auth: { token },
-          scopes: ["chat", "agents"],
-        };
-        this.ws!.send(JSON.stringify(connectParams));
-      });
-
       this.ws.on("error", (err) => {
         if (!this._connected) {
           reject(err);
@@ -162,27 +183,96 @@ class GatewayRelay {
         }
       });
 
-      // Wait for hello-ok as first message, then switch to normal frame handling
       let handshakeDone = false;
 
       this.ws.on("message", (data) => {
         try {
           const frame = JSON.parse(data.toString());
 
-          // First message should be hello-ok
-          if (!handshakeDone && frame.type === "hello-ok") {
-            handshakeDone = true;
-            this._connected = true;
-            this.reconnectAttempt = 0;
-            this.serverInfo = frame.server;
-            console.log(
-              `[Gateway] Connected to OpenClaw v${frame.server.version} (conn: ${frame.server.connId})`,
-            );
-            resolve(frame as HelloOk);
+          // Step 1: Wait for connect.challenge event
+          if (
+            !handshakeDone &&
+            frame.type === "event" &&
+            frame.event === "connect.challenge"
+          ) {
+            const { nonce } = frame.payload as { nonce: string; ts: number };
+            console.log("[Gateway] Received challenge, sending auth...");
+
+            const signedAt = Date.now();
+            const scopes = ["operator.admin", "operator.read", "operator.write"];
+            const payload = buildDeviceAuthPayload({
+              deviceId: this.device.deviceId,
+              clientId: "gateway-client",
+              clientMode: "node",
+              role: "operator",
+              scopes,
+              signedAtMs: signedAt,
+              token,
+              nonce,
+            });
+            const signature = signPayload(this.device.privateKeyPem, payload);
+
+            // Send connect request (proper req frame, not raw params)
+            const connectReq: RequestFrame = {
+              type: "req",
+              id: String(++this.reqId),
+              method: "connect",
+              params: {
+                minProtocol: 3,
+                maxProtocol: 3,
+                client: {
+                  id: "gateway-client",
+                  displayName: "Godinez Studio",
+                  version: "0.1.0",
+                  platform: "node",
+                  mode: "node",
+                },
+                role: "operator",
+                scopes,
+                device: {
+                  id: this.device.deviceId,
+                  publicKey: this.device.publicKeyB64,
+                  signature,
+                  signedAt,
+                  nonce,
+                },
+                auth: { token },
+              },
+            };
+            this.ws!.send(JSON.stringify(connectReq));
             return;
           }
 
-          this.handleFrame(frame as GatewayFrame);
+          // Step 2: hello-ok comes as a response to the connect request
+          if (!handshakeDone && frame.type === "res" && frame.ok) {
+            const p = frame.payload as Record<string, unknown> | undefined;
+            if (p?.type === "hello-ok") {
+              handshakeDone = true;
+              this._connected = true;
+              this.reconnectAttempt = 0;
+              const server = p.server as { version: string; connId: string };
+              this.serverInfo = server;
+              console.log(
+                `[Gateway] Connected to OpenClaw v${server.version} (conn: ${server.connId})`,
+              );
+              resolve(p as unknown as HelloOk);
+              return;
+            }
+          }
+
+          // Step 2b: auth rejected
+          if (!handshakeDone && frame.type === "res" && !frame.ok) {
+            handshakeDone = true;
+            const msg = frame.error?.message ?? "connect rejected";
+            console.error("[Gateway] Auth failed:", msg);
+            this.ws?.close();
+            reject(new Error(msg));
+            return;
+          }
+
+          if (handshakeDone) {
+            this.handleFrame(frame as GatewayFrame);
+          }
         } catch {
           console.error("[Gateway] Failed to parse message");
         }
@@ -191,16 +281,18 @@ class GatewayRelay {
       this.ws.on("close", () => {
         this._connected = false;
         this.serverInfo = null;
-        this.scheduleReconnect();
+        if (handshakeDone) {
+          this.scheduleReconnect();
+        }
       });
 
-      // Timeout handshake after 10s
+      // Timeout handshake after 15s
       setTimeout(() => {
         if (!handshakeDone) {
           this.ws?.close();
           reject(new Error("Handshake timeout"));
         }
-      }, 10_000);
+      }, 15_000);
     });
   }
 

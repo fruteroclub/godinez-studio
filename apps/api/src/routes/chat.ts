@@ -156,20 +156,23 @@ app.get("/stream/:runId", async (c) => {
     }
 
     // Real Gateway mode — register handlers
+    let streamClosed = false;
+
     await new Promise<void>((resolve) => {
       gateway.onRun(runId, {
         onDelta: async (text) => {
+          if (streamClosed) return;
           try {
             await stream.writeSSE({
               event: "delta",
               data: JSON.stringify({ type: "delta", text }),
             });
           } catch {
-            cleanup();
-            resolve();
+            streamClosed = true;
           }
         },
         onFinal: async (text) => {
+          // Always save to DB, even if stream is closed (user navigated away)
           try {
             const ctx = runContexts.get(runId);
             if (ctx) {
@@ -186,42 +189,46 @@ app.get("/stream/:runId", async (c) => {
                 await activateWorkspace(ctx.workspaceId);
               }
 
-              await stream.writeSSE({
-                event: "done",
-                data: JSON.stringify({
-                  type: "done",
-                  text,
-                  messageId: agentMessage.id,
-                }),
-              });
+              if (!streamClosed) {
+                await stream.writeSSE({
+                  event: "done",
+                  data: JSON.stringify({
+                    type: "done",
+                    text,
+                    messageId: agentMessage.id,
+                  }),
+                });
+              }
               runContexts.delete(runId);
-            } else {
+            } else if (!streamClosed) {
               await stream.writeSSE({
                 event: "done",
                 data: JSON.stringify({ type: "done", text }),
               });
             }
           } catch {
-            // stream closed
+            // DB or stream error
           } finally {
             cleanup();
             resolve();
-            await stream.close();
+            try { await stream.close(); } catch { /* already closed */ }
           }
         },
         onError: async (error) => {
           try {
-            await stream.writeSSE({
-              event: "error",
-              data: JSON.stringify({ type: "error", error }),
-            });
+            if (!streamClosed) {
+              await stream.writeSSE({
+                event: "error",
+                data: JSON.stringify({ type: "error", error }),
+              });
+            }
           } catch {
             // stream closed
           } finally {
             cleanup();
             runContexts.delete(runId);
             resolve();
-            await stream.close();
+            try { await stream.close(); } catch { /* already closed */ }
           }
         },
       });

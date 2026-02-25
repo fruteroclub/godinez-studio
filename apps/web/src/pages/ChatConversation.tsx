@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
 import { useChat } from "@/hooks/use-chat";
 import { content } from "@/lib/content";
@@ -14,11 +15,20 @@ export default function ChatConversation() {
     workspace?.id ?? 0,
   );
   const bottomRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Auto-resize textarea
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [input]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -28,8 +38,24 @@ export default function ChatConversation() {
     sendMessage(value);
   }
 
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  }
+
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col">
+      {/* Typing indicator */}
+      {isStreaming && (
+        <div className="border-b border-[hsl(var(--border))] px-4 py-1.5">
+          <p className="text-xs text-magenta animate-pulse">
+            Agente está escribiendo...
+          </p>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {isLoading && (
           <div className="flex justify-center py-8">
@@ -43,17 +69,18 @@ export default function ChatConversation() {
             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap ${
+              className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
                 msg.role === "user"
-                  ? "bg-magenta text-white rounded-br-md"
+                  ? "bg-magenta text-white rounded-br-md whitespace-pre-wrap"
                   : msg.role === "agent"
-                    ? "bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded-bl-md"
-                    : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] text-xs italic"
+                    ? "bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded-bl-md prose prose-invert prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2 prose-pre:my-2"
+                    : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] text-xs italic whitespace-pre-wrap"
               }`}
             >
-              {msg.content}
-              {msg.streaming && (
-                <span className="ml-1 inline-block h-4 w-1 animate-pulse bg-magenta" />
+              {msg.role === "agent" ? (
+                <ReactMarkdown>{msg.content}</ReactMarkdown>
+              ) : (
+                msg.content
               )}
             </div>
           </div>
@@ -61,7 +88,7 @@ export default function ChatConversation() {
 
         {messages.length === 0 && !isLoading && (
           <p className="text-center text-sm text-[hsl(var(--muted-foreground))] py-8">
-            Envia un mensaje para empezar la conversacion
+            Envía un mensaje para empezar la conversación
           </p>
         )}
 
@@ -72,14 +99,16 @@ export default function ChatConversation() {
         onSubmit={handleSubmit}
         className="border-t border-[hsl(var(--border))] p-4"
       >
-        <div className="flex gap-2">
-          <input
-            type="text"
+        <div className="flex gap-2 items-end">
+          <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
             placeholder={chat.placeholder}
             disabled={isStreaming}
-            className="flex-1 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-4 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20 disabled:opacity-50"
+            rows={1}
+            className="flex-1 resize-none rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-4 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20 disabled:opacity-50"
           />
           <button
             type="submit"

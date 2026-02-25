@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
+import PageLayout from "./components/layout/PageLayout";
 import Shell from "./components/layout/Shell";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
@@ -18,20 +19,25 @@ import Settings from "./pages/Settings";
 
 export const router = createBrowserRouter([
   {
-    path: "/sign-in/*",
-    element: <SignIn />,
-  },
-  {
-    path: "/sign-up/*",
-    element: <SignUp />,
-  },
-  {
-    path: "/studio",
-    element: (
-      <ProtectedRoute>
-        <WorkspaceSelector />
-      </ProtectedRoute>
-    ),
+    element: <PageLayout />,
+    children: [
+      {
+        path: "/sign-in/*",
+        element: <SignIn />,
+      },
+      {
+        path: "/sign-up/*",
+        element: <SignUp />,
+      },
+      {
+        path: "/studio",
+        element: (
+          <ProtectedRoute>
+            <WorkspaceSelector />
+          </ProtectedRoute>
+        ),
+      },
+    ],
   },
   {
     path: "/studio/:slug",

@@ -56,9 +56,12 @@ app.post(
     // 5. Find available slot
     let agents;
     try {
+      console.log("[Provision] Listing agents...");
       agents = await gateway.agentsList();
+      console.log("[Provision] Agents:", JSON.stringify(agents.agents.map((a) => a.name)));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "agents.list failed";
+      console.error("[Provision] agents.list failed:", msg);
       return c.json({ error: "GATEWAY_ERROR", message: msg }, 502);
     }
 
@@ -83,18 +86,22 @@ app.post(
 
     // 6. Create agent on OpenClaw
     const slotName = `godin-slot-${slotNumber}`;
+    console.log("[Provision] Creating agent:", slotName);
     let agentResult;
     try {
       agentResult = await gateway.agentsCreate({
         name: slotName,
         workspace: `${WORKSPACE_BASE}/${slotName}`,
       });
+      console.log("[Provision] Agent created:", agentResult.agentId);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "agents.create failed";
+      console.error("[Provision] agents.create failed:", msg);
       return c.json({ error: "PROVISION_FAILED", message: msg }, 502);
     }
 
     // 7. Insert DB agent
+    console.log("[Provision] Inserting DB agent...");
     const slug = `${workspace.slug}-agent`;
     const dbAgent = await createAgent({
       name: `${workspace.name} Agent`,
