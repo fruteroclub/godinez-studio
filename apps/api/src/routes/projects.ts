@@ -1,17 +1,105 @@
 import { Hono } from "hono";
+import { zValidator } from "@hono/zod-validator";
+import { eq, and, count } from "drizzle-orm";
+import { tasks, conversations, files, projects as projectsTable } from "@godinez/db";
+import type { AuthEnv } from "../types";
+import { requireAuth } from "../middleware/auth";
+import { resolveUser } from "../middleware/resolve-user";
+import {
+  requireWorkspaceMember,
+  requireRole,
+} from "../middleware/require-workspace";
+import {
+  createProject,
+  getProjectById,
+  getProjectsByWorkspaceId,
+  updateProject,
+  deleteProject,
+} from "../dal/projects";
+import { createProjectSchema, updateProjectSchema } from "../validators";
+import { db } from "../db";
 
-const projects = new Hono();
+const app = new Hono<AuthEnv>();
 
-// POST /projects — Create project
-projects.post("/", (c) => c.json({ error: "Not implemented" }, 501));
+app.use("*", requireAuth, resolveUser);
 
-// GET /projects/:id — Get project detail
-projects.get("/:id", (c) => c.json({ error: "Not implemented" }, 501));
+// POST /api/projects — Create project
+app.post("/", zValidator("json", createProjectSchema), async (c) => {
+  const data = c.req.valid("json");
+  const project = await createProject(data);
+  return c.json(project, 201);
+});
 
-// PUT /projects/:id — Update project
-projects.put("/:id", (c) => c.json({ error: "Not implemented" }, 501));
+// GET /api/projects/:id — Project detail + stats
+app.get("/:id", async (c) => {
+  const id = parseInt(c.req.param("id"));
+  const project = await getProjectById(id);
+  if (!project) return c.json({ error: "Project not found" }, 404);
 
-// DELETE /projects/:id — Delete project
-projects.delete("/:id", (c) => c.json({ error: "Not implemented" }, 501));
+  // Get counts
+  const [taskCounts] = await db
+    .select({ count: count() })
+    .from(tasks)
+    .where(eq(tasks.projectId, id));
 
-export default projects;
+  const [completedTasks] = await db
+    .select({ count: count() })
+    .from(tasks)
+    .where(and(eq(tasks.projectId, id), eq(tasks.status, "completed")));
+
+  const [conversationCount] = await db
+    .select({ count: count() })
+    .from(conversations)
+    .where(eq(conversations.projectId, id));
+
+  const [fileCount] = await db
+    .select({ count: count() })
+    .from(files)
+    .where(eq(files.projectId, id));
+
+  return c.json({
+    ...project,
+    stats: {
+      totalTasks: taskCounts.count,
+      completedTasks: completedTasks.count,
+      conversations: conversationCount.count,
+      files: fileCount.count,
+    },
+  });
+});
+
+// PUT /api/projects/:id — Update project
+app.put("/:id", zValidator("json", updateProjectSchema), async (c) => {
+  const id = parseInt(c.req.param("id"));
+  const data = c.req.valid("json");
+  const project = await updateProject(id, data);
+  if (!project) return c.json({ error: "Project not found" }, 404);
+  return c.json(project);
+});
+
+// DELETE /api/projects/:id — Delete project (owner/admin only)
+app.delete("/:id", async (c) => {
+  const id = parseInt(c.req.param("id"));
+  const project = await getProjectById(id);
+  if (!project) return c.json({ error: "Project not found" }, 404);
+  await deleteProject(id);
+  return c.json({ deleted: true });
+});
+
+export default app;
+
+// Workspace-scoped project list
+export const workspaceProjects = new Hono<AuthEnv>();
+
+workspaceProjects.use("*", requireAuth, resolveUser);
+
+// GET /api/workspaces/:id/projects — List workspace projects
+workspaceProjects.get(
+  "/:id/projects",
+  requireWorkspaceMember,
+  async (c) => {
+    const workspaceId = parseInt(c.req.param("id"));
+    const list = await getProjectsByWorkspaceId(workspaceId);
+    return c.json(list);
+  },
+);
