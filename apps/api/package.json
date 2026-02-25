@@ -17,7 +17,9 @@
     "@godinez/db": "workspace:*",
     "@godinez/types": "workspace:*",
     "@hono/node-server": "^1.19.9",
+    "drizzle-orm": "^0.38.0",
     "hono": "^4.7.0",
+    "postgres": "^3.4.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {

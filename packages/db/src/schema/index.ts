@@ -1,2 +1,11 @@
-// Schema tables will be added in Phase 1
-export {};
+export { users } from "./users";
+export { agents } from "./agents";
+export { workspaces } from "./workspaces";
+export { workspaceMembers } from "./workspace-members";
+export { projects } from "./projects";
+export { conversations } from "./conversations";
+export { messages } from "./messages";
+export { tasks } from "./tasks";
+export { files } from "./files";
+export { agentLogs } from "./agent-logs";
+export * from "./relations";
