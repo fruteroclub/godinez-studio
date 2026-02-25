@@ -1,3 +1,4 @@
+import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { cors } from "hono/cors";
@@ -17,10 +18,8 @@ app.get("/", (c) => {
   });
 });
 
-const port = process.env.PORT || 3001;
-console.log(`Godinez Studio API running on port ${port}`);
+const port = Number(process.env.PORT || 3001);
 
-export default {
-  port,
-  fetch: app.fetch,
-};
+serve({ fetch: app.fetch, port }, () => {
+  console.log(`Godinez Studio API running on port ${port}`);
+});

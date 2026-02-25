@@ -6,8 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Godinez Studio — AI workspace SPA for Latin American SMBs. Separate product from the godinez-ai marketing site.
 
-**Stack:** Turborepo + pnpm monorepo, Hono API (Bun runtime), Vite + React SPA, Drizzle ORM, PostgreSQL, Clerk auth, Tailwind CSS 4
-**Deploy:** Railway (Railpack builder for Bun support)
+**Stack:** Turborepo + pnpm monorepo, Hono API (Node.js), Vite + React SPA, Drizzle ORM, PostgreSQL, Clerk auth, Tailwind CSS 4
+**Deploy:** Railway (Railpack builder)
 **Repo:** fruteroclub/godinez-studio
 
 ## Development Commands
@@ -29,14 +29,14 @@ Run `pnpm dev:api` and `pnpm dev:web` in separate terminals for local developmen
 
 ### Monorepo Layout
 
-- `apps/api` (`@godinez/api`) — Hono server on Bun. Routes in `src/routes/`. Port 3001.
+- `apps/api` (`@godinez/api`) — Hono server on Node.js. Local dev uses `bun --hot`. Routes in `src/routes/`. Port 3001.
 - `apps/web` (`@godinez/web`) — Vite + React SPA. Uses `@` path alias for `src/`. React Router, TanStack Query, Clerk React.
 - `packages/db` (`@godinez/db`) — Drizzle schema + `createDb()` factory. Schema tables in `src/schema/`.
 - `packages/types` (`@godinez/types`) — Domain enums, API contract types, shared content strings.
 
 ### Key Patterns
 
-- **pnpm** is the package manager. **Bun** is the runtime for `apps/api` only.
+- **pnpm** is the package manager. **Node.js** is the production runtime. **Bun** for local API dev only (`bun --hot`).
 - Workspace packages use `workspace:*` protocol for inter-package deps.
 - Turbo handles build ordering — `typecheck` depends on `^build` so packages compile first.
 - Vite proxies `/api` → `localhost:3001` in dev, so no CORS issues locally.
