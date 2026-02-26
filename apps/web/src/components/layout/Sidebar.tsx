@@ -47,7 +47,8 @@ export default function Sidebar({
   return (
     <aside className="flex h-full w-60 flex-col border-r border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-background))]">
       <div className="flex h-14 items-center border-b border-[hsl(var(--sidebar-border))] px-4">
-        <Link to="/studio" onClick={onNavigate} className="flex items-center">
+        <Link to="/studio" onClick={onNavigate} className="flex items-center gap-2">
+          <img src="/logo.svg" alt="" width={24} height={24} />
           <span className="text-lg">
             <span className="font-sans font-medium text-[hsl(var(--sidebar-foreground))]">
               Godínez

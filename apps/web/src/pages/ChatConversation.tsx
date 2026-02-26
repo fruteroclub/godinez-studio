@@ -1,19 +1,29 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
 import { useChat } from "@/hooks/use-chat";
+import { useActionExecutor } from "@/hooks/use-action-executor";
+import { ActionCard } from "@/components/chat/ActionCard";
+import { ManualActionMenu } from "@/components/chat/ManualActionMenu";
+import { stripActionBlocks } from "@/lib/action-parser";
 import { content } from "@/lib/content";
+import type { ActionType } from "@godinez/types";
 
 const { chat } = content.studio;
 
 export default function ChatConversation() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const { workspace } = useWorkspace();
-  const { messages, sendMessage, isStreaming, isLoading } = useChat(
-    Number(conversationId),
-    workspace?.id ?? 0,
+  const qc = useQueryClient();
+  const onComplete = useCallback(
+    () => qc.invalidateQueries({ queryKey: ["conversations", workspace?.id] }),
+    [qc, workspace?.id],
   );
+  const { messages, sendMessage, isStreaming, isLoading, updateAction } =
+    useChat(Number(conversationId), workspace?.id ?? 0, { onComplete });
+  const { execute } = useActionExecutor(updateAction);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
@@ -43,6 +53,11 @@ export default function ChatConversation() {
       e.preventDefault();
       handleSubmit(e);
     }
+  }
+
+  function handleManualAction(_type: ActionType) {
+    // TODO Phase 2: open a form dialog for the selected action type
+    // For now this is a placeholder
   }
 
   return (
@@ -78,11 +93,34 @@ export default function ChatConversation() {
               }`}
             >
               {msg.role === "agent" ? (
-                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <>
+                  <ReactMarkdown>
+                    {stripActionBlocks(msg.content)}
+                  </ReactMarkdown>
+                  {msg.actions && msg.actions.length > 0 && (
+                    <div className="mt-2 not-prose">
+                      {msg.actions.map((action) => (
+                        <ActionCard
+                          key={action.id}
+                          action={action}
+                          messageId={msg.id}
+                          onExecute={execute}
+                          disabled={msg.streaming}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </>
               ) : (
                 msg.content
               )}
             </div>
+            {/* Manual action menu on agent messages */}
+            {msg.role === "agent" && !msg.streaming && (
+              <div className="ml-1 flex items-end">
+                <ManualActionMenu onSelect={handleManualAction} />
+              </div>
+            )}
           </div>
         ))}
 

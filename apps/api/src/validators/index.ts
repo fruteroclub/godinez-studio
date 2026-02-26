@@ -24,6 +24,7 @@ export const updateTaskSchema = z.object({
   title: z.string().min(1).max(500).optional(),
   description: z.string().max(5000).optional(),
   priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+  projectId: z.number().int().positive().nullable().optional(),
   dueAt: z.string().datetime().optional(),
   assignedAgentId: z.number().int().positive().nullable().optional(),
 });

@@ -46,6 +46,73 @@ export function useProject(projectId: string | undefined) {
   });
 }
 
+interface Task {
+  id: number;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+interface ProjectFile {
+  id: number;
+  filename: string;
+  mimeType: string | null;
+  sizeBytes: number;
+  url: string;
+  createdAt: string;
+}
+
+interface Conversation {
+  id: number;
+  title: string;
+  lastMessageAt: string | null;
+  createdAt: string;
+}
+
+export function useProjectTasks(projectId: string | undefined) {
+  const { getToken } = useAuth();
+  return useQuery({
+    queryKey: ["projectTasks", projectId],
+    queryFn: async () => {
+      const token = await getToken();
+      return apiFetch<Task[]>(`/api/projects/${projectId}/tasks`, { token });
+    },
+    enabled: !!projectId,
+  });
+}
+
+export function useProjectFiles(projectId: string | undefined) {
+  const { getToken } = useAuth();
+  return useQuery({
+    queryKey: ["projectFiles", projectId],
+    queryFn: async () => {
+      const token = await getToken();
+      return apiFetch<ProjectFile[]>(`/api/projects/${projectId}/files`, {
+        token,
+      });
+    },
+    enabled: !!projectId,
+  });
+}
+
+export function useProjectConversations(projectId: string | undefined) {
+  const { getToken } = useAuth();
+  return useQuery({
+    queryKey: ["projectConversations", projectId],
+    queryFn: async () => {
+      const token = await getToken();
+      return apiFetch<Conversation[]>(
+        `/api/projects/${projectId}/conversations`,
+        { token },
+      );
+    },
+    enabled: !!projectId,
+  });
+}
+
 export function useCreateProject(workspaceId: number) {
   const { getToken } = useAuth();
   const qc = useQueryClient();

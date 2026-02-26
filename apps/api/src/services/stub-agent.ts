@@ -6,7 +6,31 @@ const STUB_REPLIES = [
   "Recibido. Estoy revisando los datos disponibles para darte la mejor respuesta.",
 ];
 
+const ACTION_REPLY =
+  `Perfecto, voy a crear un proyecto para organizar esto.\n\n` +
+  `:::action\n` +
+  `type: create_project\n` +
+  `label: Crear proyecto "Plan de Marketing"\n` +
+  `payload:\n` +
+  `  name: Plan de Marketing\n` +
+  `  description: Proyecto para gestionar la estrategia de marketing digital\n` +
+  `:::\n\n` +
+  `También creo una tarea inicial:\n\n` +
+  `:::action\n` +
+  `type: create_task\n` +
+  `label: Crear tarea "Definir audiencia objetivo"\n` +
+  `payload:\n` +
+  `  title: Definir audiencia objetivo\n` +
+  `  description: Investigar y definir el perfil de cliente ideal\n` +
+  `  priority: high\n` +
+  `:::\n\n` +
+  `> [Stub response — connect OpenClaw Gateway for real agent replies]`;
+
 function getStubReply(userMessage: string): string {
+  // Every 3rd message triggers action blocks for testing
+  if (userMessage.length % 3 === 0) {
+    return ACTION_REPLY;
+  }
   const idx = userMessage.length % STUB_REPLIES.length;
   return `${STUB_REPLIES[idx]}\n\n> [Stub response — connect OpenClaw Gateway for real agent replies]`;
 }

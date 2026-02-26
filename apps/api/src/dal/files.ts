@@ -1,6 +1,24 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { files } from "@godinez/db";
 import { db } from "../db";
+
+const QUOTA_BYTES = 500 * 1024 * 1024; // 500 MB
+
+export async function getWorkspaceStorageUsage(workspaceId: number) {
+  const [row] = await db
+    .select({
+      usedBytes: sql<number>`coalesce(sum(${files.sizeBytes}), 0)`.mapWith(
+        Number,
+      ),
+    })
+    .from(files)
+    .where(eq(files.workspaceId, workspaceId));
+
+  return {
+    usedBytes: row.usedBytes,
+    quotaBytes: QUOTA_BYTES,
+  };
+}
 
 export async function getFilesByWorkspaceId(workspaceId: number) {
   return db.query.files.findMany({
