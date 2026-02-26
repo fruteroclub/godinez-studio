@@ -29,7 +29,7 @@ export function useCreateConversation(workspaceId: number) {
   const { getToken } = useAuth();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (data?: { title?: string; projectId?: number }) => {
+    mutationFn: async (data?: { title?: string; projectId?: number; agentId?: number }) => {
       const token = await getToken();
       return apiFetch<Conversation>("/api/conversations", {
         method: "POST",

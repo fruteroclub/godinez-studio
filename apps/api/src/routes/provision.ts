@@ -12,6 +12,7 @@ import {
 import { createAgent } from "../dal/agents";
 import { createConversation } from "../dal/conversations";
 import { gateway } from "../services/gateway-relay";
+import { buildSoulMd } from "../services/agent-soul-template";
 
 const MAX_SLOTS = 5;
 const WORKSPACE_BASE = "/home/devrel-frutero/.openclaw/workspaces";
@@ -100,24 +101,40 @@ app.post(
       return c.json({ error: "PROVISION_FAILED", message: msg }, 502);
     }
 
-    // 7. Insert DB agent
+    // 7. Inject platform-aware SOUL.md into agent workspace
+    const agentName = `${workspace.name} Agent`;
+    try {
+      const soulMd = buildSoulMd({
+        workspaceName: workspace.name,
+        agentName,
+        agentSlot: slotName,
+      });
+      await gateway.agentsFilesSet(agentResult.agentId, "SOUL.md", soulMd);
+      console.log("[Provision] SOUL.md injected for", slotName);
+    } catch (err) {
+      // Non-fatal — agent still works, just without platform instructions
+      const msg = err instanceof Error ? err.message : "agents.files.set failed";
+      console.warn("[Provision] SOUL.md injection failed (non-fatal):", msg);
+    }
+
+    // 8. Insert DB agent
     console.log("[Provision] Inserting DB agent...");
     const slug = `${workspace.slug}-agent`;
     const dbAgent = await createAgent({
-      name: `${workspace.name} Agent`,
+      name: agentName,
       slug,
       template: "custom",
       status: "active",
       openclawId: agentResult.agentId,
     });
 
-    // 8. Link agent to workspace
+    // 9. Link agent to workspace
     await linkAgentToWorkspace(workspaceId, {
       agentId: dbAgent.id,
       agentSlot: agentResult.agentId,
     });
 
-    // 9. Create onboarding conversation
+    // 10. Create onboarding conversation
     const conversation = await createConversation({
       workspaceId,
       agentId: dbAgent.id,

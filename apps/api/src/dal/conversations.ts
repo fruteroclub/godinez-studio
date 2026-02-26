@@ -57,11 +57,46 @@ export async function createMessage(data: {
   agentId?: number;
   metadata?: Record<string, unknown>;
 }) {
-  const [message] = await db.insert(messages).values(data).returning();
+  // Serialize metadata to JSON string for the text column
+  const values = {
+    ...data,
+    metadata: data.metadata ? JSON.stringify(data.metadata) : undefined,
+  };
+  const [message] = await db.insert(messages).values(values).returning();
   // Update conversation lastMessageAt
   await db
     .update(conversations)
     .set({ lastMessageAt: new Date() })
     .where(eq(conversations.id, data.conversationId));
   return message;
+}
+
+export async function getMessageById(id: number) {
+  return db.query.messages.findFirst({
+    where: eq(messages.id, id),
+  });
+}
+
+export async function updateMessageMetadata(
+  id: number,
+  metadata: Record<string, unknown>,
+) {
+  const [message] = await db
+    .update(messages)
+    .set({ metadata: JSON.stringify(metadata) })
+    .where(eq(messages.id, id))
+    .returning();
+  return message;
+}
+
+export async function linkConversationToProject(
+  conversationId: number,
+  projectId: number,
+) {
+  const [conversation] = await db
+    .update(conversations)
+    .set({ projectId })
+    .where(eq(conversations.id, conversationId))
+    .returning();
+  return conversation;
 }

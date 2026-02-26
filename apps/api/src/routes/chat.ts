@@ -2,14 +2,24 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import type { ActionCard } from "@godinez/types";
 import type { AuthEnv } from "../types";
 import { requireAuth } from "../middleware/auth";
 import { resolveUser } from "../middleware/resolve-user";
-import { createMessage, getMessages } from "../dal/conversations";
+import {
+  createMessage,
+  getMessages,
+  getMessageById,
+  updateMessageMetadata,
+  linkConversationToProject,
+} from "../dal/conversations";
+import { createProject } from "../dal/projects";
+import { createTask } from "../dal/tasks";
 import { getWorkspaceById, activateWorkspace } from "../dal/workspaces";
 import { gateway } from "../services/gateway-relay";
 import { resolveAgentSession } from "../services/agent-mapping";
 import { createStubRun } from "../services/stub-agent";
+import { parseActionBlocks, stripActionBlocks } from "../lib/action-parser";
 
 const app = new Hono<AuthEnv>();
 
@@ -44,7 +54,7 @@ app.post(
 
     if (gateway.isConnected) {
       try {
-        const sessionKey = await resolveAgentSession(workspaceId);
+        const sessionKey = await resolveAgentSession(workspaceId, conversationId);
         runId = await gateway.chatSend(sessionKey, content);
         runContexts.set(runId, { conversationId, workspaceId });
       } catch (err) {
@@ -121,13 +131,23 @@ app.get("/stream/:runId", async (c) => {
         },
         onFinal: async (text) => {
           try {
-            // Save agent message to DB
+            // Parse action blocks from agent text
+            const actionBlocks = parseActionBlocks(text);
+            const actions: ActionCard[] = actionBlocks.map((b) => ({
+              ...b,
+              status: "pending" as const,
+            }));
+
+            // Save agent message to DB (strip action blocks from visible content)
             const agentMessage = await createMessage({
               conversationId: stubEntry.conversationId,
               workspaceId: stubEntry.workspaceId,
               role: "agent",
               content: text,
-              metadata: { stub: true },
+              metadata: {
+                stub: true,
+                ...(actions.length > 0 ? { actions } : {}),
+              },
             });
 
             // Activate workspace if still provisioning
@@ -142,6 +162,7 @@ app.get("/stream/:runId", async (c) => {
                 type: "done",
                 text,
                 messageId: agentMessage.id,
+                ...(actions.length > 0 ? { actions } : {}),
               }),
             });
           } catch {
@@ -176,11 +197,21 @@ app.get("/stream/:runId", async (c) => {
           try {
             const ctx = runContexts.get(runId);
             if (ctx) {
+              // Parse action blocks from agent text
+              const actionBlocks = parseActionBlocks(text);
+              const actions: ActionCard[] = actionBlocks.map((b) => ({
+                ...b,
+                status: "pending" as const,
+              }));
+
               const agentMessage = await createMessage({
                 conversationId: ctx.conversationId,
                 workspaceId: ctx.workspaceId,
                 role: "agent",
                 content: text,
+                ...(actions.length > 0
+                  ? { metadata: { actions } }
+                  : {}),
               });
 
               // Activate workspace if still provisioning
@@ -196,6 +227,7 @@ app.get("/stream/:runId", async (c) => {
                     type: "done",
                     text,
                     messageId: agentMessage.id,
+                    ...(actions.length > 0 ? { actions } : {}),
                   }),
                 });
               }
@@ -248,6 +280,95 @@ export const runContexts = new Map<
   string,
   { conversationId: number; workspaceId: number }
 >();
+
+// POST /api/chat/actions/:messageId/execute — Execute a pending action
+app.post(
+  "/actions/:messageId/execute",
+  zValidator("json", z.object({ actionId: z.string() })),
+  async (c) => {
+    const messageId = parseInt(c.req.param("messageId"));
+    const { actionId } = c.req.valid("json");
+
+    const message = await getMessageById(messageId);
+    if (!message) return c.json({ error: "Message not found" }, 404);
+
+    const metadata: Record<string, unknown> = message.metadata
+      ? JSON.parse(message.metadata)
+      : {};
+    const actions: ActionCard[] = (metadata.actions as ActionCard[]) || [];
+    const idx = actions.findIndex((a) => a.id === actionId);
+    if (idx === -1) return c.json({ error: "Action not found" }, 404);
+
+    const action = actions[idx];
+    if (action.status !== "pending" && action.status !== "error") {
+      return c.json({ error: "Action already executed" }, 400);
+    }
+
+    // Mark executing
+    actions[idx] = { ...action, status: "executing" };
+    await updateMessageMetadata(messageId, { ...metadata, actions });
+
+    try {
+      let resultId: number | undefined;
+      const workspaceId = message.workspaceId;
+
+      switch (action.type) {
+        case "create_project": {
+          const project = await createProject({
+            workspaceId,
+            name: String(action.payload.name || ""),
+            description: action.payload.description
+              ? String(action.payload.description)
+              : undefined,
+          });
+          resultId = project.id;
+          // Link conversation to newly created project
+          await linkConversationToProject(message.conversationId, project.id);
+          break;
+        }
+        case "create_task": {
+          const task = await createTask({
+            workspaceId,
+            title: String(action.payload.title || action.payload.name || ""),
+            description: action.payload.description
+              ? String(action.payload.description)
+              : undefined,
+            projectId: action.payload.projectId
+              ? Number(action.payload.projectId)
+              : undefined,
+            priority: action.payload.priority
+              ? String(action.payload.priority)
+              : undefined,
+          });
+          resultId = task.id;
+          break;
+        }
+        case "create_file": {
+          // Phase 1: file creation is a stub — just mark completed
+          resultId = undefined;
+          break;
+        }
+      }
+
+      // Mark completed
+      actions[idx] = {
+        ...action,
+        status: "completed",
+        resultId,
+        executedAt: new Date().toISOString(),
+      };
+      await updateMessageMetadata(messageId, { ...metadata, actions });
+
+      return c.json({ action: actions[idx] });
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error ? err.message : "Execution failed";
+      actions[idx] = { ...action, status: "error", error: errorMsg };
+      await updateMessageMetadata(messageId, { ...metadata, actions });
+      return c.json({ action: actions[idx] }, 500);
+    }
+  },
+);
 
 // GET /api/chat/history/:conversationId — Message history
 app.get("/history/:conversationId", async (c) => {
