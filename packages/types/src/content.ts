@@ -53,6 +53,16 @@ export const studioContent = {
     statusCompleted: "Completada",
     statusFailed: "Fallida",
     statusCancelled: "Cancelada",
+    dragHint: "arrastra para mover",
+    emptyColumn: "Sin tareas",
+  },
+  projectDetail: {
+    tasksSection: "Tareas",
+    filesSection: "Archivos",
+    conversationsSection: "Conversaciones",
+    noTasks: "Este proyecto no tiene tareas.",
+    noFiles: "Este proyecto no tiene archivos.",
+    noConversations: "Este proyecto no tiene conversaciones.",
   },
   files: {
     title: "Archivos",

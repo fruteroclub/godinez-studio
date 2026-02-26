@@ -9,7 +9,9 @@ import {
   createConversation,
   getConversationById,
   getConversationsByWorkspaceId,
+  getConversationsByProject,
 } from "../dal/conversations";
+import { getProjectById } from "../dal/projects";
 
 const app = new Hono<AuthEnv>();
 
@@ -48,6 +50,20 @@ app.get("/:id", async (c) => {
 });
 
 export default app;
+
+// Project-scoped conversation list
+export const projectConversations = new Hono<AuthEnv>();
+
+projectConversations.use("*", requireAuth, resolveUser);
+
+// GET /api/projects/:id/conversations — List project conversations
+projectConversations.get("/:id/conversations", async (c) => {
+  const projectId = parseInt(c.req.param("id"));
+  const project = await getProjectById(projectId);
+  if (!project) return c.json({ error: "Project not found" }, 404);
+  const list = await getConversationsByProject(project.workspaceId, projectId);
+  return c.json(list);
+});
 
 // Workspace-scoped conversation list is mounted on the workspaces router
 export const workspaceConversations = new Hono<AuthEnv>();

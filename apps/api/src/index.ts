@@ -16,6 +16,7 @@ import activity from "./routes/activity";
 import chat from "./routes/chat";
 import conversations, {
   workspaceConversations,
+  projectConversations,
 } from "./routes/conversations";
 import { gateway } from "./services/gateway-relay";
 
@@ -46,6 +47,7 @@ app.route("/api/workspaces", workspaceFiles);
 app.route("/api/projects", projects);
 app.route("/api/projects", projectTasks);
 app.route("/api/projects", projectFiles);
+app.route("/api/projects", projectConversations);
 app.route("/api/tasks", tasks);
 app.route("/api/files", files);
 app.route("/api/agents", agents);

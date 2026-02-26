@@ -49,6 +49,16 @@ export const content = {
       columnPending: "Pendiente",
       columnInProgress: "En progreso",
       columnCompleted: "Completada",
+      dragHint: "arrastra para mover",
+      emptyColumn: "Sin tareas",
+    },
+    projectDetail: {
+      tasksSection: "Tareas",
+      filesSection: "Archivos",
+      conversationsSection: "Conversaciones",
+      noTasks: "Este proyecto no tiene tareas.",
+      noFiles: "Este proyecto no tiene archivos.",
+      noConversations: "Este proyecto no tiene conversaciones.",
     },
     files: {
       title: "Archivos",

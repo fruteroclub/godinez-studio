@@ -66,7 +66,29 @@ export function useUpdateTaskStatus(workspaceId: number) {
         token,
       });
     },
-    onSuccess: () =>
+    onMutate: async ({ taskId, status }) => {
+      await qc.cancelQueries({ queryKey: ["tasks", workspaceId] });
+      const previous = qc.getQueryData<Task[]>(["tasks", workspaceId]);
+      qc.setQueryData<Task[]>(["tasks", workspaceId], (old) =>
+        old?.map((t) =>
+          t.id === taskId
+            ? {
+                ...t,
+                status,
+                completedAt:
+                  status === "completed" ? new Date().toISOString() : null,
+              }
+            : t,
+        ),
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        qc.setQueryData(["tasks", workspaceId], context.previous);
+      }
+    },
+    onSettled: () =>
       qc.invalidateQueries({ queryKey: ["tasks", workspaceId] }),
   });
 }
