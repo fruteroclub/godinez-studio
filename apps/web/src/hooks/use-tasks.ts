@@ -8,6 +8,7 @@ interface Task {
   description: string | null;
   status: string;
   priority: string;
+  projectId: number | null;
   createdAt: string;
   completedAt: string | null;
 }
@@ -44,6 +45,68 @@ export function useCreateTask(workspaceId: number) {
       });
     },
     onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["tasks", workspaceId] }),
+  });
+}
+
+export function useUpdateTask(workspaceId: number) {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      ...data
+    }: {
+      taskId: number;
+      title?: string;
+      description?: string;
+      priority?: string;
+      projectId?: number | null;
+    }) => {
+      const token = await getToken();
+      return apiFetch<Task>(`/api/tasks/${taskId}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+        token,
+      });
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["tasks", workspaceId] }),
+  });
+}
+
+export function useUpdateTaskProject(workspaceId: number) {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      projectId,
+    }: {
+      taskId: number;
+      projectId: number | null;
+    }) => {
+      const token = await getToken();
+      return apiFetch<Task>(`/api/tasks/${taskId}`, {
+        method: "PUT",
+        body: JSON.stringify({ projectId }),
+        token,
+      });
+    },
+    onMutate: async ({ taskId, projectId }) => {
+      await qc.cancelQueries({ queryKey: ["tasks", workspaceId] });
+      const previous = qc.getQueryData<Task[]>(["tasks", workspaceId]);
+      qc.setQueryData<Task[]>(["tasks", workspaceId], (old) =>
+        old?.map((t) => (t.id === taskId ? { ...t, projectId } : t)),
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        qc.setQueryData(["tasks", workspaceId], context.previous);
+      }
+    },
+    onSettled: () =>
       qc.invalidateQueries({ queryKey: ["tasks", workspaceId] }),
   });
 }

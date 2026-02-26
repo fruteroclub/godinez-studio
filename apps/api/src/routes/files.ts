@@ -5,9 +5,10 @@ import type { AuthEnv } from "../types";
 import { requireAuth } from "../middleware/auth";
 import { resolveUser } from "../middleware/resolve-user";
 import { requireWorkspaceMember } from "../middleware/require-workspace";
-import { createFile, deleteFile } from "../dal/files";
+import { createFile, deleteFile, getWorkspaceStorageUsage } from "../dal/files";
 import { storage } from "../services/storage";
 import { db } from "../db";
+import { syncWorkspaceFile } from "../services/workspace-sync";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -37,7 +38,21 @@ app.post("/upload", async (c) => {
     return c.json({ error: "File exceeds 10MB limit" }, 413);
   }
 
-  const { url, key } = await storage.upload(buffer, file.name, file.type);
+  // Check workspace storage quota
+  const { usedBytes, quotaBytes } = await getWorkspaceStorageUsage(workspaceId);
+  if (usedBytes + buffer.length > quotaBytes) {
+    return c.json(
+      {
+        error: "Almacenamiento lleno. Elimina archivos para liberar espacio.",
+        code: "QUOTA_EXCEEDED",
+        usedBytes,
+        quotaBytes,
+      },
+      413,
+    );
+  }
+
+  const { url, key } = await storage.upload(buffer, file.name, file.type, workspaceId);
 
   const record = await createFile({
     workspaceId,
@@ -50,6 +65,7 @@ app.post("/upload", async (c) => {
     uploadedByUserId: userId,
   });
 
+  syncWorkspaceFile(workspaceId);
   return c.json(record, 201);
 });
 
@@ -73,6 +89,7 @@ app.delete("/:id", async (c) => {
 
   await storage.delete(file.storageKey);
   await deleteFile(id);
+  syncWorkspaceFile(file.workspaceId);
   return c.json({ deleted: true });
 });
 
@@ -82,6 +99,17 @@ export default app;
 export const workspaceFiles = new Hono<AuthEnv>();
 
 workspaceFiles.use("*", requireAuth, resolveUser);
+
+// GET /api/workspaces/:id/storage — Workspace storage usage
+workspaceFiles.get("/:id/storage", requireWorkspaceMember, async (c) => {
+  const workspaceId = parseInt(c.req.param("id"));
+  const { usedBytes, quotaBytes } = await getWorkspaceStorageUsage(workspaceId);
+  return c.json({
+    usedBytes,
+    quotaBytes,
+    usedPercent: Math.round((usedBytes / quotaBytes) * 100),
+  });
+});
 
 // GET /api/workspaces/:id/files — List workspace files
 workspaceFiles.get("/:id/files", requireWorkspaceMember, async (c) => {

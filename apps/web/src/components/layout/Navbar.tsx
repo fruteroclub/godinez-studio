@@ -11,6 +11,7 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-14">
           {/* Logo */}
           <Link to="/studio" className="flex items-center gap-2 group">
+            <img src="/logo.svg" alt="" width={28} height={28} />
             <span className="text-xl">
               <span className="font-sans font-medium text-[hsl(var(--foreground))]">
                 Godínez

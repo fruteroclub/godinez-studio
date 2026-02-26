@@ -1,4 +1,4 @@
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, count } from "drizzle-orm";
 import { conversations, messages } from "@godinez/db";
 import { db } from "../db";
 
@@ -99,4 +99,26 @@ export async function linkConversationToProject(
     .where(eq(conversations.id, conversationId))
     .returning();
   return conversation;
+}
+
+export async function updateConversationTitle(
+  conversationId: number,
+  title: string,
+) {
+  const [conversation] = await db
+    .update(conversations)
+    .set({ title })
+    .where(eq(conversations.id, conversationId))
+    .returning();
+  return conversation;
+}
+
+export async function getMessageCountForConversation(
+  conversationId: number,
+): Promise<number> {
+  const [result] = await db
+    .select({ total: count() })
+    .from(messages)
+    .where(eq(messages.conversationId, conversationId));
+  return result?.total ?? 0;
 }

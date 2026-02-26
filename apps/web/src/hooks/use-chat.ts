@@ -14,7 +14,11 @@ export interface ChatMessage {
   createdAt?: string;
 }
 
-export function useChat(conversationId: number, workspaceId: number) {
+export function useChat(
+  conversationId: number,
+  workspaceId: number,
+  options?: { onComplete?: () => void },
+) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -158,6 +162,7 @@ export function useChat(conversationId: number, workspaceId: number) {
               ),
             );
             setIsStreaming(false);
+            options?.onComplete?.();
           },
           onError: () => {
             setMessages((prev) =>

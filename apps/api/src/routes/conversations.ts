@@ -10,8 +10,10 @@ import {
   getConversationById,
   getConversationsByWorkspaceId,
   getConversationsByProject,
+  updateConversationTitle,
 } from "../dal/conversations";
 import { getProjectById } from "../dal/projects";
+import { getWorkspaceById } from "../dal/workspaces";
 
 const app = new Hono<AuthEnv>();
 
@@ -31,11 +33,22 @@ app.post(
   ),
   async (c) => {
     const data = c.req.valid("json");
+
+    // Resolve agentId: use provided, fall back to workspace default
+    let agentId = data.agentId;
+    if (!agentId) {
+      const workspace = await getWorkspaceById(data.workspaceId);
+      agentId = workspace?.agentId ?? undefined;
+    }
+    if (!agentId) {
+      return c.json({ error: "No agent assigned to this workspace" }, 400);
+    }
+
     const conversation = await createConversation({
       workspaceId: data.workspaceId,
-      title: data.title ?? "New conversation",
+      title: data.title ?? "Nueva conversación",
       projectId: data.projectId,
-      agentId: data.agentId,
+      agentId,
     });
     return c.json(conversation, 201);
   },
@@ -48,6 +61,19 @@ app.get("/:id", async (c) => {
   if (!conversation) return c.json({ error: "Conversation not found" }, 404);
   return c.json(conversation);
 });
+
+// PATCH /api/conversations/:id — Update conversation title
+app.patch(
+  "/:id",
+  zValidator("json", z.object({ title: z.string().min(1).max(255) })),
+  async (c) => {
+    const id = parseInt(c.req.param("id"));
+    const { title } = c.req.valid("json");
+    const conversation = await updateConversationTitle(id, title);
+    if (!conversation) return c.json({ error: "Conversation not found" }, 404);
+    return c.json(conversation);
+  },
+);
 
 export default app;
 

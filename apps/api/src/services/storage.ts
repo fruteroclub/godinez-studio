@@ -7,6 +7,7 @@ export interface StorageService {
     buffer: Buffer,
     filename: string,
     mimeType: string,
+    workspaceId?: number,
   ): Promise<{ url: string; key: string }>;
   delete(key: string): Promise<void>;
 }
@@ -45,4 +46,12 @@ class LocalStorage implements StorageService {
   }
 }
 
-export const storage: StorageService = new LocalStorage();
+function createStorage(): StorageService {
+  if (process.env.R2_BUCKET_NAME) {
+    const { R2Storage } = require("./r2-storage") as typeof import("./r2-storage");
+    return new R2Storage();
+  }
+  return new LocalStorage();
+}
+
+export const storage: StorageService = createStorage();

@@ -1,6 +1,7 @@
 import type { ActionBlock, ActionType } from "@godinez/types";
 
 const ACTION_BLOCK_RE = /:::action\n([\s\S]*?):::/g;
+const TITLE_BLOCK_RE = /:::title\n([\s\S]*?):::/g;
 const VALID_TYPES = new Set<ActionType>([
   "create_project",
   "create_task",
@@ -26,10 +27,10 @@ export function parseActionBlocks(text: string): ActionBlock[] {
 }
 
 /**
- * Strip :::action blocks from text, leaving only prose for markdown rendering.
+ * Strip :::action and :::title blocks from text, leaving only prose for markdown rendering.
  */
 export function stripActionBlocks(text: string): string {
-  return text.replace(ACTION_BLOCK_RE, "").trim();
+  return text.replace(ACTION_BLOCK_RE, "").replace(TITLE_BLOCK_RE, "").trim();
 }
 
 function parseBlockBody(body: string): ActionBlock | null {

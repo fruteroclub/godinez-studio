@@ -5,6 +5,7 @@ import { apiFetch } from "@/lib/api";
 interface Conversation {
   id: number;
   title: string | null;
+  projectId: number | null;
   channel: string;
   lastMessageAt: string | null;
   createdAt: string;

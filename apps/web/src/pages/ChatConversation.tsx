@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
 import { useChat } from "@/hooks/use-chat";
@@ -15,8 +16,13 @@ const { chat } = content.studio;
 export default function ChatConversation() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const { workspace } = useWorkspace();
+  const qc = useQueryClient();
+  const onComplete = useCallback(
+    () => qc.invalidateQueries({ queryKey: ["conversations", workspace?.id] }),
+    [qc, workspace?.id],
+  );
   const { messages, sendMessage, isStreaming, isLoading, updateAction } =
-    useChat(Number(conversationId), workspace?.id ?? 0);
+    useChat(Number(conversationId), workspace?.id ?? 0, { onComplete });
   const { execute } = useActionExecutor(updateAction);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);

@@ -1,4 +1,5 @@
 import { serve } from "@hono/node-server";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { cors } from "hono/cors";
@@ -55,6 +56,9 @@ app.route("/api/agents", provision);
 app.route("/api/chat", chat);
 app.route("/api/conversations", conversations);
 app.route("/webhooks", webhooks);
+
+// Serve uploaded files in development (in production, R2 serves files directly)
+app.use("/uploads/*", serveStatic({ root: "./" }));
 
 app.get("/", (c) => {
   return c.json({
