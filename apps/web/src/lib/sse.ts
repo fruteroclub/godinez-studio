@@ -1,8 +1,10 @@
+import type { ActionCard } from "@godinez/types";
+
 const API_URL = import.meta.env.VITE_API_URL || "";
 
 export interface SSEHandlers {
   onDelta?: (text: string) => void;
-  onDone?: (text: string, messageId?: number) => void;
+  onDone?: (text: string, messageId?: number, actions?: ActionCard[]) => void;
   onError?: (error: string) => void;
 }
 
@@ -18,8 +20,8 @@ export function connectSSE(runId: string, handlers: SSEHandlers, token?: string 
   });
 
   es.addEventListener("done", (e) => {
-    const { text, messageId } = JSON.parse(e.data);
-    handlers.onDone?.(text, messageId);
+    const { text, messageId, actions } = JSON.parse(e.data);
+    handlers.onDone?.(text, messageId, actions);
     es.close();
   });
 

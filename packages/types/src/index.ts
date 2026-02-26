@@ -26,6 +26,24 @@ export type TaskPriority = "low" | "medium" | "high" | "urgent";
 export type MessageRole = "user" | "agent" | "system";
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
+// Action cards — agent-proposed resource CRUD
+export type ActionType = "create_project" | "create_task" | "create_file";
+export type ActionStatus = "pending" | "executing" | "completed" | "error";
+
+export interface ActionBlock {
+  id: string;
+  type: ActionType;
+  label: string;
+  payload: Record<string, unknown>;
+}
+
+export interface ActionCard extends ActionBlock {
+  status: ActionStatus;
+  resultId?: number;
+  error?: string;
+  executedAt?: string;
+}
+
 // API response types
 export interface Workspace {
   id: number;
@@ -133,6 +151,7 @@ export interface ChatDoneEvent {
   type: "done";
   text: string;
   messageId: number;
+  actions?: ActionCard[];
 }
 export interface ChatErrorEvent {
   type: "error";

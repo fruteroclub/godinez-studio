@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
-import { useFiles, useUploadFile } from "@/hooks/use-files";
+import { useFiles, useUploadFile, useStorageQuota } from "@/hooks/use-files";
 import { content } from "@/lib/content";
 import EmptyState from "@/components/ui/EmptyState";
 import { ListSkeleton } from "@/components/ui/Skeleton";
@@ -17,6 +17,7 @@ function formatSize(bytes: number | null) {
 export default function Files() {
   const { workspace } = useWorkspace();
   const { data: files, isLoading } = useFiles(workspace?.id);
+  const { data: quota } = useStorageQuota(workspace?.id);
   const upload = useUploadFile(workspace?.id ?? 0);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -48,6 +49,27 @@ export default function Files() {
           </label>
         </div>
       </div>
+
+      {quota && (
+        <div className="space-y-1">
+          <div className="flex items-center justify-between text-xs text-[hsl(var(--muted-foreground))]">
+            <span>
+              {formatSize(quota.usedBytes)} de {formatSize(quota.quotaBytes)}
+            </span>
+            <span>{quota.usedPercent}%</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-[hsl(var(--muted))]">
+            <div
+              className={`h-full rounded-full transition-all ${
+                quota.usedPercent >= 90
+                  ? "bg-red-500"
+                  : "bg-magenta"
+              }`}
+              style={{ width: `${Math.min(quota.usedPercent, 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {isLoading ? (
         <ListSkeleton />

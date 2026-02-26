@@ -81,6 +81,12 @@ export async function linkAgentToWorkspace(
   return workspace;
 }
 
+export async function getWorkspaceByAgentId(agentId: number) {
+  return db.query.workspaces.findFirst({
+    where: eq(workspaces.agentId, agentId),
+  });
+}
+
 export async function activateWorkspace(workspaceId: number) {
   const [workspace] = await db
     .update(workspaces)

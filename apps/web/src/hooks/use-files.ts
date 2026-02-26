@@ -11,6 +11,12 @@ interface FileRecord {
   createdAt: string;
 }
 
+interface StorageQuota {
+  usedBytes: number;
+  quotaBytes: number;
+  usedPercent: number;
+}
+
 export function useFiles(workspaceId: number | undefined) {
   const { getToken } = useAuth();
   return useQuery({
@@ -20,6 +26,21 @@ export function useFiles(workspaceId: number | undefined) {
       return apiFetch<FileRecord[]>(`/api/workspaces/${workspaceId}/files`, {
         token,
       });
+    },
+    enabled: !!workspaceId,
+  });
+}
+
+export function useStorageQuota(workspaceId: number | undefined) {
+  const { getToken } = useAuth();
+  return useQuery({
+    queryKey: ["storage-quota", workspaceId],
+    queryFn: async () => {
+      const token = await getToken();
+      return apiFetch<StorageQuota>(
+        `/api/workspaces/${workspaceId}/storage`,
+        { token },
+      );
     },
     enabled: !!workspaceId,
   });
@@ -40,7 +61,9 @@ export function useUploadFile(workspaceId: number) {
         token,
       });
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["files", workspaceId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["files", workspaceId] });
+      qc.invalidateQueries({ queryKey: ["storage-quota", workspaceId] });
+    },
   });
 }

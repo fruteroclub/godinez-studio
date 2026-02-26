@@ -18,6 +18,7 @@ import {
 } from "../dal/projects";
 import { createProjectSchema, updateProjectSchema } from "../validators";
 import { db } from "../db";
+import { syncWorkspaceFile } from "../services/workspace-sync";
 
 const app = new Hono<AuthEnv>();
 
@@ -27,6 +28,7 @@ app.use("*", requireAuth, resolveUser);
 app.post("/", zValidator("json", createProjectSchema), async (c) => {
   const data = c.req.valid("json");
   const project = await createProject(data);
+  syncWorkspaceFile(data.workspaceId);
   return c.json(project, 201);
 });
 
@@ -74,6 +76,7 @@ app.put("/:id", zValidator("json", updateProjectSchema), async (c) => {
   const data = c.req.valid("json");
   const project = await updateProject(id, data);
   if (!project) return c.json({ error: "Project not found" }, 404);
+  syncWorkspaceFile(project.workspaceId);
   return c.json(project);
 });
 
@@ -83,6 +86,7 @@ app.delete("/:id", async (c) => {
   const project = await getProjectById(id);
   if (!project) return c.json({ error: "Project not found" }, 404);
   await deleteProject(id);
+  syncWorkspaceFile(project.workspaceId);
   return c.json({ deleted: true });
 });
 

@@ -22,6 +22,7 @@ import {
   updateTaskStatusSchema,
 } from "../validators";
 import { db } from "../db";
+import { syncWorkspaceFile } from "../services/workspace-sync";
 
 const app = new Hono<AuthEnv>();
 
@@ -32,6 +33,7 @@ app.post("/", zValidator("json", createTaskSchema), async (c) => {
   const userId = c.get("userId");
   const data = c.req.valid("json");
   const task = await createTask({ ...data, createdByUserId: userId });
+  syncWorkspaceFile(data.workspaceId);
   return c.json(task, 201);
 });
 
@@ -53,6 +55,7 @@ app.put("/:id", zValidator("json", updateTaskSchema), async (c) => {
 
   const task = await updateTask(id, updateData);
   if (!task) return c.json({ error: "Task not found" }, 404);
+  syncWorkspaceFile(task.workspaceId);
   return c.json(task);
 });
 
@@ -77,6 +80,7 @@ app.put(
     }
 
     const task = await updateTask(id, updateData);
+    syncWorkspaceFile(existing.workspaceId);
     return c.json(task);
   },
 );
@@ -87,6 +91,7 @@ app.delete("/:id", async (c) => {
   const task = await getTaskById(id);
   if (!task) return c.json({ error: "Task not found" }, 404);
   await deleteTask(id);
+  syncWorkspaceFile(task.workspaceId);
   return c.json({ deleted: true });
 });
 

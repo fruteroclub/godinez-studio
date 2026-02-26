@@ -2,14 +2,37 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import type { ActionCard } from "@godinez/types";
 import type { AuthEnv } from "../types";
 import { requireAuth } from "../middleware/auth";
 import { resolveUser } from "../middleware/resolve-user";
-import { createMessage, getMessages } from "../dal/conversations";
+import {
+  createMessage,
+  getMessages,
+  getMessageById,
+  getConversationById,
+  updateMessageMetadata,
+  linkConversationToProject,
+  updateConversationTitle,
+  getMessageCountForConversation,
+} from "../dal/conversations";
+import { createProject } from "../dal/projects";
+import { createTask } from "../dal/tasks";
 import { getWorkspaceById, activateWorkspace } from "../dal/workspaces";
 import { gateway } from "../services/gateway-relay";
 import { resolveAgentSession } from "../services/agent-mapping";
 import { createStubRun } from "../services/stub-agent";
+import { parseActionBlocks, stripActionBlocks } from "../lib/action-parser";
+import {
+  generateHeuristicTitle,
+  parseTitleBlock,
+  stripTitleBlocks,
+} from "../services/conversation-title";
+import {
+  buildMessageContext,
+  prependContext,
+} from "../services/message-context";
+import { syncWorkspaceFile } from "../services/workspace-sync";
 
 const app = new Hono<AuthEnv>();
 
@@ -39,13 +62,24 @@ app.post(
       userId,
     });
 
+    // Auto-title: on first message, set a heuristic title from user text
+    const msgCount = await getMessageCountForConversation(conversationId);
+    if (msgCount === 1) {
+      const heuristicTitle = generateHeuristicTitle(content);
+      await updateConversationTitle(conversationId, heuristicTitle);
+    }
+
+    // Build context-enriched content for the agent
+    const contextHeader = await buildMessageContext(conversationId, workspaceId);
+    const enrichedContent = prependContext(contextHeader, content);
+
     // Send to Gateway or use stub
     let runId: string;
 
     if (gateway.isConnected) {
       try {
-        const sessionKey = await resolveAgentSession(workspaceId);
-        runId = await gateway.chatSend(sessionKey, content);
+        const sessionKey = await resolveAgentSession(workspaceId, conversationId);
+        runId = await gateway.chatSend(sessionKey, enrichedContent);
         runContexts.set(runId, { conversationId, workspaceId });
       } catch (err) {
         const error = err instanceof Error ? err.message : "Gateway error";
@@ -53,7 +87,7 @@ app.post(
       }
     } else {
       // Stub mode — create a stub run and register it
-      const stub = createStubRun(content);
+      const stub = createStubRun(enrichedContent);
       runId = stub.runId;
 
       // Register stub handlers that will be picked up by the SSE endpoint
@@ -121,14 +155,36 @@ app.get("/stream/:runId", async (c) => {
         },
         onFinal: async (text) => {
           try {
-            // Save agent message to DB
+            // Parse and strip :::title block (agent-suggested title)
+            const suggestedTitle = parseTitleBlock(text);
+            const cleanText = stripTitleBlocks(text);
+
+            // Parse action blocks from agent text
+            const actionBlocks = parseActionBlocks(cleanText);
+            const actions: ActionCard[] = actionBlocks.map((b) => ({
+              ...b,
+              status: "pending" as const,
+            }));
+
+            // Save agent message to DB (with title block stripped)
             const agentMessage = await createMessage({
               conversationId: stubEntry.conversationId,
               workspaceId: stubEntry.workspaceId,
               role: "agent",
-              content: text,
-              metadata: { stub: true },
+              content: cleanText,
+              metadata: {
+                stub: true,
+                ...(actions.length > 0 ? { actions } : {}),
+              },
             });
+
+            // Update conversation title if agent suggested one
+            if (suggestedTitle) {
+              await updateConversationTitle(
+                stubEntry.conversationId,
+                suggestedTitle,
+              );
+            }
 
             // Activate workspace if still provisioning
             const ws = await getWorkspaceById(stubEntry.workspaceId);
@@ -140,8 +196,9 @@ app.get("/stream/:runId", async (c) => {
               event: "done",
               data: JSON.stringify({
                 type: "done",
-                text,
+                text: cleanText,
                 messageId: agentMessage.id,
+                ...(actions.length > 0 ? { actions } : {}),
               }),
             });
           } catch {
@@ -174,14 +231,36 @@ app.get("/stream/:runId", async (c) => {
         onFinal: async (text) => {
           // Always save to DB, even if stream is closed (user navigated away)
           try {
+            // Parse and strip :::title block (agent-suggested title)
+            const suggestedTitle = parseTitleBlock(text);
+            const cleanText = stripTitleBlocks(text);
+
             const ctx = runContexts.get(runId);
             if (ctx) {
+              // Parse action blocks from agent text
+              const actionBlocks = parseActionBlocks(cleanText);
+              const actions: ActionCard[] = actionBlocks.map((b) => ({
+                ...b,
+                status: "pending" as const,
+              }));
+
               const agentMessage = await createMessage({
                 conversationId: ctx.conversationId,
                 workspaceId: ctx.workspaceId,
                 role: "agent",
-                content: text,
+                content: cleanText,
+                ...(actions.length > 0
+                  ? { metadata: { actions } }
+                  : {}),
               });
+
+              // Update conversation title if agent suggested one
+              if (suggestedTitle) {
+                await updateConversationTitle(
+                  ctx.conversationId,
+                  suggestedTitle,
+                );
+              }
 
               // Activate workspace if still provisioning
               const ws = await getWorkspaceById(ctx.workspaceId);
@@ -194,8 +273,9 @@ app.get("/stream/:runId", async (c) => {
                   event: "done",
                   data: JSON.stringify({
                     type: "done",
-                    text,
+                    text: cleanText,
                     messageId: agentMessage.id,
+                    ...(actions.length > 0 ? { actions } : {}),
                   }),
                 });
               }
@@ -203,7 +283,7 @@ app.get("/stream/:runId", async (c) => {
             } else if (!streamClosed) {
               await stream.writeSSE({
                 event: "done",
-                data: JSON.stringify({ type: "done", text }),
+                data: JSON.stringify({ type: "done", text: cleanText }),
               });
             }
           } catch {
@@ -248,6 +328,104 @@ export const runContexts = new Map<
   string,
   { conversationId: number; workspaceId: number }
 >();
+
+// POST /api/chat/actions/:messageId/execute — Execute a pending action
+app.post(
+  "/actions/:messageId/execute",
+  zValidator("json", z.object({ actionId: z.string() })),
+  async (c) => {
+    const messageId = parseInt(c.req.param("messageId"));
+    const { actionId } = c.req.valid("json");
+
+    const message = await getMessageById(messageId);
+    if (!message) return c.json({ error: "Message not found" }, 404);
+
+    const metadata: Record<string, unknown> = message.metadata
+      ? JSON.parse(message.metadata)
+      : {};
+    const actions: ActionCard[] = (metadata.actions as ActionCard[]) || [];
+    const idx = actions.findIndex((a) => a.id === actionId);
+    if (idx === -1) return c.json({ error: "Action not found" }, 404);
+
+    const action = actions[idx];
+    if (action.status !== "pending" && action.status !== "error") {
+      return c.json({ error: "Action already executed" }, 400);
+    }
+
+    // Mark executing
+    actions[idx] = { ...action, status: "executing" };
+    await updateMessageMetadata(messageId, { ...metadata, actions });
+
+    try {
+      let resultId: number | undefined;
+      const workspaceId = message.workspaceId;
+
+      // Resolve conversation's project for task inheritance
+      const conversation = await getConversationById(message.conversationId);
+
+      switch (action.type) {
+        case "create_project": {
+          const project = await createProject({
+            workspaceId,
+            name: String(action.payload.name || ""),
+            description: action.payload.description
+              ? String(action.payload.description)
+              : undefined,
+          });
+          resultId = project.id;
+          // Link conversation to newly created project
+          await linkConversationToProject(message.conversationId, project.id);
+          break;
+        }
+        case "create_task": {
+          // Inherit project from action payload, or fall back to conversation's project
+          const taskProjectId = action.payload.projectId
+            ? Number(action.payload.projectId)
+            : conversation?.projectId ?? undefined;
+
+          const task = await createTask({
+            workspaceId,
+            title: String(action.payload.title || action.payload.name || ""),
+            description: action.payload.description
+              ? String(action.payload.description)
+              : undefined,
+            projectId: taskProjectId,
+            priority: action.payload.priority
+              ? String(action.payload.priority)
+              : undefined,
+          });
+          resultId = task.id;
+          break;
+        }
+        case "create_file": {
+          // Phase 1: file creation is a stub — just mark completed
+          resultId = undefined;
+          break;
+        }
+      }
+
+      // Mark completed
+      actions[idx] = {
+        ...action,
+        status: "completed",
+        resultId,
+        executedAt: new Date().toISOString(),
+      };
+      await updateMessageMetadata(messageId, { ...metadata, actions });
+
+      // Sync workspace state to agent after resource creation
+      syncWorkspaceFile(workspaceId);
+
+      return c.json({ action: actions[idx] });
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error ? err.message : "Execution failed";
+      actions[idx] = { ...action, status: "error", error: errorMsg };
+      await updateMessageMetadata(messageId, { ...metadata, actions });
+      return c.json({ action: actions[idx] }, 500);
+    }
+  },
+);
 
 // GET /api/chat/history/:conversationId — Message history
 app.get("/history/:conversationId", async (c) => {

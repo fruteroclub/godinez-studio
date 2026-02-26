@@ -1,4 +1,5 @@
 import { serve } from "@hono/node-server";
+import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { cors } from "hono/cors";
@@ -16,6 +17,7 @@ import activity from "./routes/activity";
 import chat from "./routes/chat";
 import conversations, {
   workspaceConversations,
+  projectConversations,
 } from "./routes/conversations";
 import { gateway } from "./services/gateway-relay";
 
@@ -46,6 +48,7 @@ app.route("/api/workspaces", workspaceFiles);
 app.route("/api/projects", projects);
 app.route("/api/projects", projectTasks);
 app.route("/api/projects", projectFiles);
+app.route("/api/projects", projectConversations);
 app.route("/api/tasks", tasks);
 app.route("/api/files", files);
 app.route("/api/agents", agents);
@@ -53,6 +56,9 @@ app.route("/api/agents", provision);
 app.route("/api/chat", chat);
 app.route("/api/conversations", conversations);
 app.route("/webhooks", webhooks);
+
+// Serve uploaded files in development (in production, R2 serves files directly)
+app.use("/uploads/*", serveStatic({ root: "./" }));
 
 app.get("/", (c) => {
   return c.json({
