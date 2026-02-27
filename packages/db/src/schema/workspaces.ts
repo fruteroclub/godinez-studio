@@ -17,7 +17,7 @@ export const workspaces = pgTable("workspaces", {
     .notNull()
     .references(() => users.id),
   agentId: integer("agent_id").references(() => agents.id),
-  tier: text("tier").notNull().default("becario"), // becario | asistente | agente
+  tier: text("tier").notNull().default("beta_tester"),
   status: text("status").notNull().default("provisioning"), // active | suspended | provisioning
   agentSlot: varchar("agent_slot", { length: 255 }), // OpenClaw agent ID mapping
   settings: text("settings"), // JSON string for workspace-level config

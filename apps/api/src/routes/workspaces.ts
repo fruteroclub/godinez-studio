@@ -66,7 +66,7 @@ app.put(
     "json",
     z.object({
       name: z.string().min(1).max(255).optional(),
-      tier: z.enum(["becario", "asistente", "agente"]).optional(),
+      tier: z.enum(["beta_tester"]).optional(),
       status: z.enum(["active", "suspended", "provisioning"]).optional(),
     }),
   ),
