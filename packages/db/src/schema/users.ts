@@ -14,6 +14,8 @@ export const users = pgTable("users", {
   name: varchar("name", { length: 255 }),
   avatarUrl: text("avatar_url"),
   role: text("role").notNull().default("user"), // user | admin
+  jobRole: varchar("job_role", { length: 50 }),
+  businessDescription: varchar("business_description", { length: 255 }),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

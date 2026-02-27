@@ -19,6 +19,7 @@ import { getWorkspaceById } from "../dal/workspaces";
 import { getAgentById } from "../dal/agents";
 import { gateway } from "./gateway-relay";
 import { buildSoulMd } from "./agent-soul-template";
+import { SYNC_DEBOUNCE_MS, SYNC_MAX_TASKS, SYNC_MAX_FILES } from "../lib/config";
 
 // ─── Feature flag ────────────────────────────────────────────────────
 
@@ -29,7 +30,6 @@ function isEnabled(): boolean {
 // ─── Debounce state ──────────────────────────────────────────────────
 
 const pendingTimers = new Map<number, ReturnType<typeof setTimeout>>();
-const DEBOUNCE_MS = 5_000;
 
 /**
  * Public entry point. Call after any mutation that changes workspace state.
@@ -47,7 +47,7 @@ export function syncWorkspaceFile(workspaceId: number): void {
   const timer = setTimeout(() => {
     pendingTimers.delete(workspaceId);
     executeSyncSafe(workspaceId);
-  }, DEBOUNCE_MS);
+  }, SYNC_DEBOUNCE_MS);
 
   pendingTimers.set(workspaceId, timer);
 }
@@ -103,8 +103,6 @@ async function executeSync(workspaceId: number): Promise<void> {
 
 // ─── Markdown builder ────────────────────────────────────────────────
 
-const MAX_TASKS = 30;
-const MAX_FILES = 10;
 
 async function buildWorkspaceMd(
   workspaceId: number,
@@ -125,14 +123,14 @@ async function buildWorkspaceMd(
       inArray(tasksTable.status, ["pending", "in_progress"]),
     ),
     orderBy: desc(tasksTable.createdAt),
-    limit: MAX_TASKS,
+    limit: SYNC_MAX_TASKS,
   });
 
   // Query recent files (capped)
   const files = await db.query.files.findMany({
     where: eq(filesTable.workspaceId, workspaceId),
     orderBy: desc(filesTable.createdAt),
-    limit: MAX_FILES,
+    limit: SYNC_MAX_FILES,
   });
 
   // Build task counts per project

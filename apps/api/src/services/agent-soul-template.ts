@@ -17,6 +17,16 @@ const PERSONALITY_INSTRUCTIONS: Record<string, string> = {
     "Eres detallado y analítico. Explicas el razonamiento detrás de tus sugerencias, usas datos cuando los tienes y eres preciso en tus recomendaciones.",
 };
 
+const ROLE_LABELS: Record<string, string> = {
+  founder: "Fundador/CEO",
+  marketing: "Marketing",
+  sales: "Ventas",
+  operations: "Operaciones",
+  tech: "Tecnología",
+  support: "Soporte",
+  other: "Otro",
+};
+
 const NEED_LABELS: Record<string, string> = {
   launch: "Lanzar productos rápido (apps, sitios, MVPs)",
   automate: "Automatizar procesos repetitivos (flujos, pipelines, integraciones)",
@@ -33,6 +43,8 @@ export function buildSoulMd(ctx: {
   agentName: string;
   agentSlot: string;
   userName?: string;
+  userRole?: string;
+  businessDescription?: string;
   personality?: string;
   needs?: string[];
   customInstructions?: string;
@@ -46,26 +58,37 @@ ${PERSONALITY_INSTRUCTIONS[ctx.personality] || PERSONALITY_INSTRUCTIONS.friendly
 `
     : "";
 
+  // Build "Who your user is" section with natural sentence
+  const userParts: string[] = [];
+  if (ctx.userName) {
+    const rolePart = ctx.userRole ? `, a **${ROLE_LABELS[ctx.userRole] || ctx.userRole}**` : "";
+    const bizPart = ctx.businessDescription ? ` — "${ctx.businessDescription}"` : "";
+    userParts.push(`Your user's name is **${ctx.userName}**${rolePart}${bizPart}. Use their name naturally in conversation — in greetings and when it makes sense, but don't overdo it.`);
+  }
+  if (ctx.needs?.length) {
+    userParts.push(`They told you they want help with:\n${ctx.needs.map((s) => `- ${NEED_LABELS[s] || s}`).join("\n")}\n\nKeep these priorities in mind when proposing projects and tasks. Reference their goals when relevant.`);
+  }
+
   const userSection =
-    ctx.userName || ctx.needs?.length
+    userParts.length > 0
       ? `
 
 ## Who your user is
-${ctx.userName ? `\nYour user's name is **${ctx.userName}**. Use their name naturally in conversation — in greetings and when it makes sense, but don't overdo it.\n` : ""}${
-          ctx.needs?.length
-            ? `\nThey told you they want help with:\n${ctx.needs.map((s) => `- ${NEED_LABELS[s] || s}`).join("\n")}\n\nKeep these priorities in mind when proposing projects and tasks. Reference their goals when relevant.\n`
-            : ""
-        }`
+
+${userParts.join("\n\n")}
+`
       : "";
 
-  const onboardingSection =
-    ctx.userName || ctx.needs?.length
-      ? `
+  const hasContext = ctx.userName || ctx.needs?.length;
+  const hasBizContext = ctx.businessDescription;
+
+  const onboardingSection = hasContext
+    ? `
 1. Greet ${ctx.userName ? `**${ctx.userName}**` : "the user"} by name and introduce yourself — explain that you're their work agent and they can ask you for help with projects, tasks and organization.
-2. Reference what they said they need help with${ctx.needs?.length ? ` (${ctx.needs.map((s) => NEED_LABELS[s]?.split(" (")[0] || s).join(", ")})` : ""} and propose a first project based on their top priority.
+2. ${hasBizContext ? `You already know about their business ("${ctx.businessDescription}"). Skip discovery questions and immediately propose a relevant first project based on their business and priorities.` : `Reference what they said they need help with${ctx.needs?.length ? ` (${ctx.needs.map((s) => NEED_LABELS[s]?.split(" (")[0] || s).join(", ")})` : ""} and propose a first project based on their top priority.`}
 3. When you have enough context, propose creating a first project with 2-3 initial tasks using action blocks.
 4. Be warm but concise. Don't ask more than 2 questions at a time. Listen, confirm, propose.`
-      : `
+    : `
 1. Briefly introduce yourself — explain that you're their work agent and they can ask you for help with projects, tasks and organization.
 2. Ask about their business — what they do, what industry they're in, what problems they want to solve first.
 3. When you have enough context, propose creating a first project with 2-3 initial tasks using action blocks.

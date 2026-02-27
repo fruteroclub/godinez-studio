@@ -17,14 +17,14 @@ export const messages = pgTable(
     id: serial("id").primaryKey(),
     conversationId: integer("conversation_id")
       .notNull()
-      .references(() => conversations.id),
+      .references(() => conversations.id, { onDelete: "cascade" }),
     workspaceId: integer("workspace_id")
       .notNull()
-      .references(() => workspaces.id),
+      .references(() => workspaces.id, { onDelete: "cascade" }),
     role: text("role").notNull(), // user | agent | system
     content: text("content").notNull(),
-    userId: integer("user_id").references(() => users.id),
-    agentId: integer("agent_id").references(() => agents.id),
+    userId: integer("user_id").references(() => users.id, { onDelete: "set null" }),
+    agentId: integer("agent_id").references(() => agents.id, { onDelete: "set null" }),
     metadata: text("metadata"), // JSON string: model, tokens, latency, toolCalls
     fileId: integer("file_id"),
     createdAt: timestamp("created_at", { withTimezone: true })

@@ -1,6 +1,6 @@
 // Domain enums
 export type UserRole = "user" | "admin";
-export type WorkspaceTier = "becario" | "asistente" | "agente";
+export type WorkspaceTier = "beta_tester";
 export type WorkspaceStatus = "active" | "suspended" | "provisioning";
 export type MemberRole = "owner" | "admin" | "member" | "viewer";
 export type AgentTemplate =

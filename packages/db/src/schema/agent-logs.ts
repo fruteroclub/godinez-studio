@@ -14,10 +14,10 @@ export const agentLogs = pgTable("agent_logs", {
   id: serial("id").primaryKey(),
   workspaceId: integer("workspace_id")
     .notNull()
-    .references(() => workspaces.id),
+    .references(() => workspaces.id, { onDelete: "cascade" }),
   agentId: integer("agent_id")
     .notNull()
-    .references(() => agents.id),
+    .references(() => agents.id, { onDelete: "cascade" }),
   level: text("level").notNull().default("info"), // debug | info | warn | error
   event: varchar("event", { length: 255 }).notNull(),
   message: text("message"),

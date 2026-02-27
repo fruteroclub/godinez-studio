@@ -92,6 +92,8 @@ app.put(
     "json",
     z.object({
       agentName: z.string().min(1).max(50).optional(),
+      userRole: z.string().max(50).optional(),
+      businessDescription: z.string().max(255).optional(),
       personality: z
         .enum(["professional", "friendly", "creative", "technical"])
         .optional(),
@@ -121,6 +123,9 @@ app.put(
     // Merge into config
     const prevConfig = (agent.config as Record<string, unknown>) ?? {};
     const newConfig: Record<string, unknown> = { ...prevConfig };
+    if (body.userRole !== undefined) newConfig.userRole = body.userRole;
+    if (body.businessDescription !== undefined)
+      newConfig.businessDescription = body.businessDescription;
     if (body.personality !== undefined) newConfig.personality = body.personality;
     if (body.needs !== undefined) newConfig.needs = body.needs;
     if (body.customInstructions !== undefined)
@@ -143,6 +148,8 @@ app.put(
       agentName: resolvedName,
       agentSlot: agent.openclawId,
       userName: (newConfig.userName as string) ?? undefined,
+      userRole: (newConfig.userRole as string) ?? undefined,
+      businessDescription: (newConfig.businessDescription as string) ?? undefined,
       personality: (newConfig.personality as string) ?? undefined,
       needs: (newConfig.needs as string[]) ?? undefined,
       customInstructions: (newConfig.customInstructions as string) ?? undefined,
@@ -176,6 +183,8 @@ app.post("/:id/reinject-soul", async (c) => {
     agentName: agent.name,
     agentSlot: agent.openclawId,
     userName: (cfg.userName as string) ?? undefined,
+    userRole: (cfg.userRole as string) ?? undefined,
+    businessDescription: (cfg.businessDescription as string) ?? undefined,
     personality: (cfg.personality as string) ?? undefined,
     needs: (cfg.needs as string[]) ?? undefined,
     customInstructions: (cfg.customInstructions as string) ?? undefined,

@@ -87,6 +87,8 @@ export function useUpdateAgentFile(agentId: number | null) {
 
 export interface AgentConfigInput {
   agentName?: string;
+  userRole?: string;
+  businessDescription?: string;
   personality?: string;
   needs?: string[];
   customInstructions?: string;
