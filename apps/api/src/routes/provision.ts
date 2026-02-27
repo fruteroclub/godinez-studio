@@ -24,10 +24,22 @@ app.use("*", requireAuth, resolveUser);
 // POST /api/agents/provision — Provision an OpenClaw agent for a workspace
 app.post(
   "/provision",
-  zValidator("json", z.object({ workspaceId: z.number() })),
+  zValidator(
+    "json",
+    z.object({
+      workspaceId: z.number(),
+      userName: z.string().optional(),
+      agentName: z.string().min(1).max(50).optional(),
+      personality: z
+        .enum(["professional", "friendly", "creative", "technical"])
+        .optional(),
+      needs: z.array(z.string()).optional(),
+    }),
+  ),
   async (c) => {
     const userId = c.get("userId");
-    const { workspaceId } = c.req.valid("json");
+    const { workspaceId, userName, agentName, personality, needs } =
+      c.req.valid("json");
 
     // 1. Verify workspace exists
     const workspace = await getWorkspaceById(workspaceId);
@@ -102,12 +114,15 @@ app.post(
     }
 
     // 7. Inject platform-aware SOUL.md into agent workspace
-    const agentName = `${workspace.name} Agent`;
+    const resolvedAgentName = agentName || `${workspace.name} Agent`;
     try {
       const soulMd = buildSoulMd({
         workspaceName: workspace.name,
-        agentName,
+        agentName: resolvedAgentName,
         agentSlot: slotName,
+        userName,
+        personality,
+        needs,
       });
       await gateway.agentsFilesSet(agentResult.agentId, "SOUL.md", soulMd);
       console.log("[Provision] SOUL.md injected for", slotName);
@@ -120,12 +135,18 @@ app.post(
     // 8. Insert DB agent
     console.log("[Provision] Inserting DB agent...");
     const slug = `${workspace.slug}-agent`;
+    const agentConfig: Record<string, unknown> = {};
+    if (userName) agentConfig.userName = userName;
+    if (personality) agentConfig.personality = personality;
+    if (needs?.length) agentConfig.needs = needs;
+
     const dbAgent = await createAgent({
-      name: agentName,
+      name: resolvedAgentName,
       slug,
       template: "custom",
       status: "active",
       openclawId: agentResult.agentId,
+      ...(Object.keys(agentConfig).length > 0 && { config: agentConfig }),
     });
 
     // 9. Link agent to workspace

@@ -1,21 +1,15 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { apiFetch } from "@/lib/api";
 import { content } from "@/lib/content";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
-import {
-  useAgentFile,
-  usePrefetchAgentFiles,
-  useUpdateAgentFile,
-  useResetSoul,
-} from "@/hooks/use-agent";
+import { useUpdateAgentConfig } from "@/hooks/use-agent";
 import { useCreateConversation } from "@/hooks/use-conversations";
-import AgentHatching from "@/components/onboarding/AgentHatching";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 
-const { agents: ac } = content.studio;
+const { agents: ac, onboarding } = content.studio;
 
 interface Agent {
   id: number;
@@ -26,13 +20,23 @@ interface Agent {
   config: Record<string, unknown> | null;
 }
 
-const FILES = [
-  { name: "SOUL.md", label: ac.fileSoul },
-  { name: "IDENTITY.md", label: ac.fileIdentity },
-  { name: "TOOLS.md", label: ac.fileTools },
+const PERSONALITY_IDS = [
+  "professional",
+  "friendly",
+  "creative",
+  "technical",
 ] as const;
 
-type FileName = (typeof FILES)[number]["name"];
+const NEED_IDS = [
+  "launch",
+  "automate",
+  "social",
+  "sales",
+  "time",
+  "research",
+  "support",
+  "build",
+] as const;
 
 const statusColors: Record<string, string> = {
   active: "bg-green-500/20 text-green-400",
@@ -42,22 +46,7 @@ const statusColors: Record<string, string> = {
   archived: "bg-gray-500/20 text-gray-400",
 };
 
-function formatTimestamp(ms: number) {
-  const d = new Date(ms);
-  const now = new Date();
-  const diffMs = now.getTime() - d.getTime();
-  const diffMin = Math.floor(diffMs / 60_000);
-
-  if (diffMin < 1) return "hace un momento";
-  if (diffMin < 60) return `hace ${diffMin} min`;
-  if (diffMin < 1440) return `hace ${Math.floor(diffMin / 60)}h`;
-  return d.toLocaleDateString("es-MX", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+const MAX_CUSTOM_INSTRUCTIONS = 500;
 
 export default function Agents() {
   const { workspace, isLoading: wsLoading, slug } = useWorkspace();
@@ -77,11 +66,11 @@ export default function Agents() {
   }
 
   if (!workspace?.agentId || !agent) {
-    return <AgentHatching />;
+    return <Navigate to="/studio/new" replace />;
   }
 
   return (
-    <AgentConfigEditor
+    <AgentSettingsForm
       agent={agent}
       workspaceId={workspace.id}
       slug={slug}
@@ -89,7 +78,7 @@ export default function Agents() {
   );
 }
 
-function AgentConfigEditor({
+function AgentSettingsForm({
   agent,
   workspaceId,
   slug,
@@ -99,78 +88,56 @@ function AgentConfigEditor({
   slug: string;
 }) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<FileName>("SOUL.md");
-  const [draft, setDraft] = useState("");
-  const [saveFlash, setSaveFlash] = useState(false);
-  const [needsRestart, setNeedsRestart] = useState(false);
-  // Track the server content we last synced from, to detect external changes
-  const syncedContent = useRef<string | null>(null);
-  const [externalChange, setExternalChange] = useState(false);
-
-  usePrefetchAgentFiles(agent.id); // load all 3 files in parallel on mount
-  const file = useAgentFile(agent.id, activeTab);
-  const updateFile = useUpdateAgentFile(agent.id);
-  const resetSoul = useResetSoul(agent.id);
+  const updateConfig = useUpdateAgentConfig(agent.id);
   const createConversation = useCreateConversation(workspaceId);
 
-  const serverContent = file.data?.content ?? "";
-  const updatedAtMs = file.data?.updatedAtMs;
+  const config = agent.config ?? {};
 
-  // Sync draft when file first loads or tab changes
+  // Form state — init from agent config
+  const [agentName, setAgentName] = useState(agent.name);
+  const [personality, setPersonality] = useState<string>(
+    (config.personality as string) || "friendly",
+  );
+  const [selectedNeeds, setSelectedNeeds] = useState<string[]>(
+    (config.needs as string[]) || [],
+  );
+  const [customInstructions, setCustomInstructions] = useState(
+    (config.customInstructions as string) || "",
+  );
+
+  const [saveFlash, setSaveFlash] = useState(false);
+  const [needsRestart, setNeedsRestart] = useState(false);
+
+  // Reset form when agent data changes (e.g. after save invalidation)
   useEffect(() => {
-    if (file.data === undefined) return;
-    setDraft(serverContent);
-    syncedContent.current = serverContent;
-    setExternalChange(false);
-  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+    setAgentName(agent.name);
+    setPersonality((agent.config?.personality as string) || "friendly");
+    setSelectedNeeds((agent.config?.needs as string[]) || []);
+    setCustomInstructions((agent.config?.customInstructions as string) || "");
+  }, [agent]);
 
-  // Detect external changes on refetch (don't overwrite user's draft)
-  useEffect(() => {
-    if (file.data === undefined || syncedContent.current === null) return;
-    if (serverContent !== syncedContent.current) {
-      // Server content changed since we last synced
-      const userHasEdits = draft !== syncedContent.current;
-      if (userHasEdits) {
-        // User has local edits — show notice, don't overwrite
-        setExternalChange(true);
-      } else {
-        // No local edits — silently update
-        setDraft(serverContent);
-        syncedContent.current = serverContent;
-        setExternalChange(false);
-      }
-    }
-  }, [serverContent]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const acceptExternal = useCallback(() => {
-    setDraft(serverContent);
-    syncedContent.current = serverContent;
-    setExternalChange(false);
-  }, [serverContent]);
+  function toggleNeed(id: string) {
+    setSelectedNeeds((prev) =>
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+    );
+  }
 
   function handleSave() {
-    updateFile.mutate(
-      { filename: activeTab, content: draft },
+    updateConfig.mutate(
+      {
+        agentName: agentName.trim(),
+        personality,
+        needs: selectedNeeds,
+        customInstructions: customInstructions.trim(),
+      },
       {
         onSuccess: () => {
-          syncedContent.current = draft;
-          setExternalChange(false);
           setNeedsRestart(true);
           setSaveFlash(true);
           setTimeout(() => setSaveFlash(false), 2000);
         },
       },
     );
-  }
-
-  function handleReset() {
-    if (!confirm(ac.resetSoulConfirm)) return;
-    resetSoul.mutate(undefined, {
-      onSuccess: () => {
-        syncedContent.current = null; // let the refetch sync
-        setNeedsRestart(true);
-      },
-    });
   }
 
   function handleRestart() {
@@ -183,6 +150,8 @@ function AgentConfigEditor({
       },
     );
   }
+
+  const canSave = agentName.trim().length > 0;
 
   return (
     <div className="space-y-6">
@@ -230,90 +199,133 @@ function AgentConfigEditor({
         </div>
       )}
 
-      {/* File editor card */}
-      <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6">
-        <h3 className="font-medium text-[hsl(var(--foreground))] mb-4">
-          {ac.files}
-        </h3>
-
-        {/* Tabs */}
-        <div className="flex gap-1 border-b border-[hsl(var(--border))] mb-4">
-          {FILES.map((f) => (
-            <button
-              key={f.name}
-              onClick={() => setActiveTab(f.name)}
-              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
-                activeTab === f.name
-                  ? "border-magenta text-magenta"
-                  : "border-transparent text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
+      {/* Settings form */}
+      <div className="space-y-8 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6">
+        {/* Agent name */}
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
+            {ac.agentNameLabel}
+          </label>
+          <input
+            type="text"
+            value={agentName}
+            onChange={(e) => setAgentName(e.target.value)}
+            maxLength={50}
+            className="w-full max-w-sm rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
+          />
         </div>
 
-        {/* External change banner */}
-        {externalChange && (
-          <div className="mb-3 flex items-center justify-between rounded-md border border-yellow-500/30 bg-yellow-500/5 px-4 py-2">
-            <p className="text-sm text-yellow-400">
-              Archivo modificado externamente por el agente.
-            </p>
-            <button
-              onClick={acceptExternal}
-              className="text-sm font-medium text-yellow-400 hover:text-yellow-300 underline"
-            >
-              Cargar versión nueva
-            </button>
+        {/* Personality picker */}
+        <div>
+          <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
+            {ac.personalityLabel}
+          </label>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {PERSONALITY_IDS.map((id) => {
+              const p = onboarding.personalities[id];
+              if (!p) return null;
+              const isSelected = personality === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setPersonality(id)}
+                  className={`flex flex-col rounded-lg border p-3 text-left transition-all ${
+                    isSelected
+                      ? "border-magenta bg-magenta/10"
+                      : "border-white/10 bg-[hsl(var(--card))] hover:border-white/20"
+                  }`}
+                >
+                  <span className="text-sm font-medium text-[hsl(var(--foreground))]">
+                    {p.title}
+                  </span>
+                  <span className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
+                    {p.description}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-        )}
+        </div>
 
-        {/* Editor area */}
-        {file.isLoading ? (
-          <div className="h-80 rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--background))] animate-pulse" />
-        ) : file.error ? (
-          <div className="rounded-md border border-red-500/20 bg-red-500/5 p-4 text-sm text-red-400">
-            {ac.loadError}
+        {/* Needs picker */}
+        <div>
+          <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
+            {ac.needsLabel}
+          </label>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {NEED_IDS.map((id) => {
+              const need = onboarding.needs[id];
+              if (!need) return null;
+              const isSelected = selectedNeeds.includes(id);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => toggleNeed(id)}
+                  className={`relative flex flex-col items-start rounded-lg border p-4 text-left transition-all ${
+                    isSelected
+                      ? "border-magenta bg-magenta/10"
+                      : "border-white/10 bg-[hsl(var(--card))] hover:border-white/20 hover:shadow-[0_0_12px_rgba(233,30,140,0.08)]"
+                  }`}
+                >
+                  {isSelected && (
+                    <div className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-magenta text-[10px] text-white">
+                      ✓
+                    </div>
+                  )}
+                  <span className="text-2xl">{need.emoji}</span>
+                  <span className="mt-2 text-sm font-medium text-[hsl(var(--foreground))]">
+                    {need.title}
+                  </span>
+                  <span className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
+                    {need.description}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-        ) : (
+        </div>
+
+        {/* Custom instructions */}
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
+            {ac.customInstructionsLabel}
+          </label>
           <textarea
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            rows={20}
-            className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-4 py-3 font-mono text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20 resize-y"
+            value={customInstructions}
+            onChange={(e) => {
+              if (e.target.value.length <= MAX_CUSTOM_INSTRUCTIONS) {
+                setCustomInstructions(e.target.value);
+              }
+            }}
+            rows={4}
+            placeholder={ac.customInstructionsPlaceholder}
+            className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20 resize-y"
           />
-        )}
-
-        {/* Footer: timestamp + actions */}
-        <div className="mt-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handleSave}
-              disabled={updateFile.isPending || file.isLoading}
-              className="rounded-md bg-magenta px-4 py-2 text-sm font-medium text-white hover:bg-magenta/90 transition-colors disabled:opacity-50"
-            >
-              {updateFile.isPending
-                ? ac.saving
-                : saveFlash
-                  ? ac.saved
-                  : ac.save}
-            </button>
-            {updatedAtMs && (
-              <span className="text-xs text-[hsl(var(--muted-foreground))]">
-                Actualizado {formatTimestamp(updatedAtMs)}
-              </span>
-            )}
+          <div className="mt-1.5 flex items-center justify-between">
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">
+              {ac.customInstructionsHint}
+            </p>
+            <span className="text-xs text-[hsl(var(--muted-foreground))]">
+              {customInstructions.length}/{MAX_CUSTOM_INSTRUCTIONS}
+            </span>
           </div>
+        </div>
 
-          {activeTab === "SOUL.md" && (
-            <button
-              onClick={handleReset}
-              disabled={resetSoul.isPending || file.isLoading}
-              className="rounded-md border border-[hsl(var(--border))] px-4 py-2 text-sm text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--accent))] transition-colors disabled:opacity-50"
-            >
-              {resetSoul.isPending ? ac.resetting : ac.resetSoul}
-            </button>
-          )}
+        {/* Save button */}
+        <div>
+          <button
+            onClick={handleSave}
+            disabled={updateConfig.isPending || !canSave}
+            className="rounded-md bg-magenta px-6 py-2 text-sm font-medium text-white hover:bg-magenta/90 transition-colors disabled:opacity-50"
+          >
+            {updateConfig.isPending
+              ? ac.saving
+              : saveFlash
+                ? ac.saved
+                : ac.save}
+          </button>
         </div>
       </div>
     </div>

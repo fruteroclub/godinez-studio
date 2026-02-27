@@ -5,6 +5,7 @@ import Shell from "./components/layout/Shell";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import WorkspaceSelector from "./pages/WorkspaceSelector";
+import OnboardingWizard from "./pages/OnboardingWizard";
 import Dashboard from "./pages/Dashboard";
 import Chat from "./pages/Chat";
 import ChatConversation from "./pages/ChatConversation";
@@ -34,6 +35,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <WorkspaceSelector />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/studio/new",
+        element: (
+          <ProtectedRoute>
+            <OnboardingWizard />
           </ProtectedRoute>
         ),
       },
