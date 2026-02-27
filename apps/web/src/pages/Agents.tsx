@@ -20,6 +20,16 @@ interface Agent {
   config: Record<string, unknown> | null;
 }
 
+const ROLE_IDS = [
+  "founder",
+  "marketing",
+  "sales",
+  "operations",
+  "tech",
+  "support",
+  "other",
+] as const;
+
 const PERSONALITY_IDS = [
   "professional",
   "friendly",
@@ -101,6 +111,12 @@ function AgentSettingsForm({
   const [selectedNeeds, setSelectedNeeds] = useState<string[]>(
     (config.needs as string[]) || [],
   );
+  const [userRole, setUserRole] = useState(
+    (config.userRole as string) || "",
+  );
+  const [businessDescription, setBusinessDescription] = useState(
+    (config.businessDescription as string) || "",
+  );
   const [customInstructions, setCustomInstructions] = useState(
     (config.customInstructions as string) || "",
   );
@@ -113,6 +129,8 @@ function AgentSettingsForm({
     setAgentName(agent.name);
     setPersonality((agent.config?.personality as string) || "friendly");
     setSelectedNeeds((agent.config?.needs as string[]) || []);
+    setUserRole((agent.config?.userRole as string) || "");
+    setBusinessDescription((agent.config?.businessDescription as string) || "");
     setCustomInstructions((agent.config?.customInstructions as string) || "");
   }, [agent]);
 
@@ -126,6 +144,8 @@ function AgentSettingsForm({
     updateConfig.mutate(
       {
         agentName: agentName.trim(),
+        userRole,
+        businessDescription: businessDescription.trim(),
         personality,
         needs: selectedNeeds,
         customInstructions: customInstructions.trim(),
@@ -211,6 +231,49 @@ function AgentSettingsForm({
             value={agentName}
             onChange={(e) => setAgentName(e.target.value)}
             maxLength={50}
+            className="w-full max-w-sm rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
+          />
+        </div>
+
+        {/* User role picker */}
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
+            {ac.userRoleLabel}
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {ROLE_IDS.map((id) => {
+              const label = onboarding.roles[id];
+              if (!label) return null;
+              const isSelected = userRole === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setUserRole(id)}
+                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                    isSelected
+                      ? "border-magenta bg-magenta/10 text-[hsl(var(--foreground))]"
+                      : "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] hover:border-white/20"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Business description */}
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
+            {ac.businessDescriptionLabel}
+          </label>
+          <input
+            type="text"
+            value={businessDescription}
+            onChange={(e) => setBusinessDescription(e.target.value)}
+            placeholder={ac.businessDescriptionPlaceholder}
+            maxLength={120}
             className="w-full max-w-sm rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
           />
         </div>

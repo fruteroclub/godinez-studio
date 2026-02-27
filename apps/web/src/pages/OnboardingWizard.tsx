@@ -6,6 +6,16 @@ import { content } from "@/lib/content";
 
 const { onboarding } = content.studio;
 
+const ROLE_IDS = [
+  "founder",
+  "marketing",
+  "sales",
+  "operations",
+  "tech",
+  "support",
+  "other",
+] as const;
+
 const NEED_IDS = [
   "launch",
   "automate",
@@ -33,6 +43,8 @@ export default function OnboardingWizard() {
   // Form state
   const [workspaceName, setWorkspaceName] = useState("");
   const [userName, setUserName] = useState("");
+  const [userRole, setUserRole] = useState("");
+  const [businessDescription, setBusinessDescription] = useState("");
   const [selectedNeeds, setSelectedNeeds] = useState<string[]>([]);
   const [agentName, setAgentName] = useState("");
   const [personality, setPersonality] = useState<string>("friendly");
@@ -57,7 +69,12 @@ export default function OnboardingWizard() {
   function canAdvance(): boolean {
     switch (step) {
       case 1:
-        return workspaceName.trim().length > 0 && userName.trim().length > 0;
+        return (
+          workspaceName.trim().length > 0 &&
+          userName.trim().length > 0 &&
+          userRole.length > 0 &&
+          businessDescription.trim().length > 0
+        );
       case 2:
         return selectedNeeds.length > 0;
       case 3:
@@ -97,6 +114,8 @@ export default function OnboardingWizard() {
         agentName: agentName.trim(),
         personality,
         needs: selectedNeeds,
+        userRole,
+        businessDescription: businessDescription.trim(),
       });
 
       // 3. Navigate to chat
@@ -139,6 +158,10 @@ export default function OnboardingWizard() {
             setWorkspaceName={setWorkspaceName}
             userName={userName}
             setUserName={setUserName}
+            userRole={userRole}
+            setUserRole={setUserRole}
+            businessDescription={businessDescription}
+            setBusinessDescription={setBusinessDescription}
           />
         )}
         {step === 2 && (
@@ -160,6 +183,8 @@ export default function OnboardingWizard() {
           <StepReview
             workspaceName={workspaceName}
             userName={userName}
+            userRole={userRole}
+            businessDescription={businessDescription}
             selectedNeeds={selectedNeeds}
             agentName={agentName}
             personality={personality}
@@ -204,11 +229,19 @@ function StepWorkspace({
   setWorkspaceName,
   userName,
   setUserName,
+  userRole,
+  setUserRole,
+  businessDescription,
+  setBusinessDescription,
 }: {
   workspaceName: string;
   setWorkspaceName: (v: string) => void;
   userName: string;
   setUserName: (v: string) => void;
+  userRole: string;
+  setUserRole: (v: string) => void;
+  businessDescription: string;
+  setBusinessDescription: (v: string) => void;
 }) {
   return (
     <div className="space-y-6">
@@ -240,6 +273,47 @@ function StepWorkspace({
             value={userName}
             onChange={(e) => setUserName(e.target.value)}
             placeholder={onboarding.userNamePlaceholder}
+            className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
+          />
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
+            {onboarding.userRoleLabel}
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {ROLE_IDS.map((id) => {
+              const label = onboarding.roles[id];
+              if (!label) return null;
+              const isSelected = userRole === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setUserRole(id)}
+                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                    isSelected
+                      ? "border-magenta bg-magenta/10 text-[hsl(var(--foreground))]"
+                      : "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] hover:border-white/20"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
+            {onboarding.businessDescriptionLabel}
+          </label>
+          <input
+            type="text"
+            value={businessDescription}
+            onChange={(e) => setBusinessDescription(e.target.value)}
+            placeholder={onboarding.businessDescriptionPlaceholder}
+            maxLength={120}
             className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
           />
         </div>
@@ -386,6 +460,8 @@ function StepAgent({
 function StepReview({
   workspaceName,
   userName,
+  userRole,
+  businessDescription,
   selectedNeeds,
   agentName,
   personality,
@@ -395,6 +471,8 @@ function StepReview({
 }: {
   workspaceName: string;
   userName: string;
+  userRole: string;
+  businessDescription: string;
   selectedNeeds: string[];
   agentName: string;
   personality: string;
@@ -404,6 +482,7 @@ function StepReview({
 }) {
   const personalityLabel =
     onboarding.personalities[personality]?.title || personality;
+  const roleLabel = onboarding.roles[userRole] || userRole;
   const needLabels = selectedNeeds
     .map((id) => onboarding.needs[id]?.title)
     .filter(Boolean);
@@ -417,6 +496,8 @@ function StepReview({
       <div className="space-y-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5">
         <ReviewRow label={onboarding.reviewWorkspace} value={workspaceName} />
         <ReviewRow label={onboarding.reviewUser} value={userName} />
+        <ReviewRow label={onboarding.reviewRole} value={roleLabel} />
+        <ReviewRow label={onboarding.reviewBusiness} value={businessDescription} />
         <ReviewRow label={onboarding.reviewNeeds} value={needLabels.join(", ")} />
         <ReviewRow label={onboarding.reviewAgent} value={agentName} />
         <ReviewRow label={onboarding.reviewPersonality} value={personalityLabel} />

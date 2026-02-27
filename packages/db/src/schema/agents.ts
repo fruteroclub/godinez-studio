@@ -19,6 +19,8 @@ export const agents = pgTable("agents", {
     needs?: string[];
     personality?: string;
     userName?: string;
+    userRole?: string;
+    businessDescription?: string;
     customInstructions?: string;
   }>(),
   openclawId: varchar("openclaw_id", { length: 255 }),

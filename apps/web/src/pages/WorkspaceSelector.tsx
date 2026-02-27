@@ -42,7 +42,7 @@ export default function WorkspaceSelector() {
                     {ws.name}
                   </p>
                   <p className="text-xs text-[hsl(var(--muted-foreground))]">
-                    {ws.slug} · {ws.tier}
+                    {ws.slug}
                   </p>
                 </div>
                 <span className="text-xs text-[hsl(var(--muted-foreground))]">

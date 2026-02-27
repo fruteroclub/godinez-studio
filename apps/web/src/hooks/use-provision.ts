@@ -13,6 +13,8 @@ interface ProvisionInput {
   agentName?: string;
   personality?: string;
   needs?: string[];
+  userRole?: string;
+  businessDescription?: string;
 }
 
 export function useProvision(workspaceSlug: string) {
