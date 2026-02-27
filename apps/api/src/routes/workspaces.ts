@@ -12,10 +12,12 @@ import {
   createWorkspace,
   getWorkspacesByUserId,
   getWorkspaceBySlug,
+  getWorkspaceById,
   updateWorkspace,
   deleteWorkspace,
   getMemberRole,
 } from "../dal/workspaces";
+import { gateway } from "../services/gateway-relay";
 import { ensureUniqueSlug } from "../lib/slug";
 
 const app = new Hono<AuthEnv>();
@@ -77,13 +79,29 @@ app.put(
   },
 );
 
-// DELETE /workspaces/:id — Delete workspace
+// DELETE /workspaces/:id — Delete workspace + cleanup OpenClaw agent
 app.delete(
   "/:id",
   requireWorkspaceMember,
   requireRole("owner"),
   async (c) => {
     const id = parseInt(c.req.param("id"));
+
+    // Look up workspace to find linked agent before deleting
+    const workspace = await getWorkspaceById(id);
+
+    // Clean up OpenClaw agent if one is linked
+    if (workspace?.agentSlot && gateway.isConnected) {
+      try {
+        await gateway.agentsDelete(workspace.agentSlot, true);
+        console.log("[Workspace] Deleted OpenClaw agent:", workspace.agentSlot);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "agents.delete failed";
+        console.warn("[Workspace] Agent cleanup failed (non-fatal):", msg);
+      }
+    }
+
+    // Cascade-delete all DB rows (conversations, messages, tasks, etc.)
     await deleteWorkspace(id);
     return c.json({ deleted: true });
   },
