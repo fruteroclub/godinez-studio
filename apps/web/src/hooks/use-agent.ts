@@ -85,6 +85,37 @@ export function useUpdateAgentFile(agentId: number | null) {
   });
 }
 
+export interface AgentConfigInput {
+  agentName?: string;
+  personality?: string;
+  needs?: string[];
+  customInstructions?: string;
+}
+
+export function useUpdateAgentConfig(agentId: number | null) {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: AgentConfigInput) => {
+      const token = await getToken();
+      return apiFetch<Record<string, unknown>>(
+        `/api/agents/${agentId}/config`,
+        {
+          method: "PUT",
+          body: JSON.stringify(input),
+          token,
+        },
+      );
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agent", agentId] });
+      qc.invalidateQueries({
+        queryKey: ["agent-file", agentId, "SOUL.md"],
+      });
+    },
+  });
+}
+
 export function useResetSoul(agentId: number | null) {
   const { getToken } = useAuth();
   const qc = useQueryClient();

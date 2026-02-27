@@ -6,11 +6,80 @@
  * the :::action block protocol for creating platform resources.
  */
 
+const PERSONALITY_INSTRUCTIONS: Record<string, string> = {
+  professional:
+    "Eres directo y eficiente. Vas al grano, priorizas resultados y mantienes un tono ejecutivo sin ser frío. Usas listas y estructura para comunicar.",
+  friendly:
+    "Eres cálido y motivador. Celebras los avances del usuario, usas un tono conversacional y haces que el trabajo se sienta ligero. Eres empático sin perder el foco.",
+  creative:
+    "Eres propositivo y original. Piensas fuera de la caja, sugieres ángulos que el usuario no había considerado y tu lenguaje es fresco y energético.",
+  technical:
+    "Eres detallado y analítico. Explicas el razonamiento detrás de tus sugerencias, usas datos cuando los tienes y eres preciso en tus recomendaciones.",
+};
+
+const NEED_LABELS: Record<string, string> = {
+  launch: "Lanzar productos rápido (apps, sitios, MVPs)",
+  automate: "Automatizar procesos repetitivos (flujos, pipelines, integraciones)",
+  social: "Crecer en redes sociales (contenido, comunidad, análisis)",
+  sales: "Ventas y cierre (CRM, seguimiento, propuestas)",
+  time: "Liberar tiempo (inbox, agenda, reportes, admin)",
+  research: "Research y análisis (estrategia, datos, decisiones)",
+  support: "Atención al cliente (soporte, onboarding, 24/7)",
+  build: "Construir sin equipo (código, arquitectura, deploys)",
+};
+
 export function buildSoulMd(ctx: {
   workspaceName: string;
   agentName: string;
   agentSlot: string;
+  userName?: string;
+  personality?: string;
+  needs?: string[];
+  customInstructions?: string;
 }): string {
+  const personalitySection = ctx.personality
+    ? `
+
+## Your personality
+
+${PERSONALITY_INSTRUCTIONS[ctx.personality] || PERSONALITY_INSTRUCTIONS.friendly}
+`
+    : "";
+
+  const userSection =
+    ctx.userName || ctx.needs?.length
+      ? `
+
+## Who your user is
+${ctx.userName ? `\nYour user's name is **${ctx.userName}**. Use their name naturally in conversation — in greetings and when it makes sense, but don't overdo it.\n` : ""}${
+          ctx.needs?.length
+            ? `\nThey told you they want help with:\n${ctx.needs.map((s) => `- ${NEED_LABELS[s] || s}`).join("\n")}\n\nKeep these priorities in mind when proposing projects and tasks. Reference their goals when relevant.\n`
+            : ""
+        }`
+      : "";
+
+  const onboardingSection =
+    ctx.userName || ctx.needs?.length
+      ? `
+1. Greet ${ctx.userName ? `**${ctx.userName}**` : "the user"} by name and introduce yourself — explain that you're their work agent and they can ask you for help with projects, tasks and organization.
+2. Reference what they said they need help with${ctx.needs?.length ? ` (${ctx.needs.map((s) => NEED_LABELS[s]?.split(" (")[0] || s).join(", ")})` : ""} and propose a first project based on their top priority.
+3. When you have enough context, propose creating a first project with 2-3 initial tasks using action blocks.
+4. Be warm but concise. Don't ask more than 2 questions at a time. Listen, confirm, propose.`
+      : `
+1. Briefly introduce yourself — explain that you're their work agent and they can ask you for help with projects, tasks and organization.
+2. Ask about their business — what they do, what industry they're in, what problems they want to solve first.
+3. When you have enough context, propose creating a first project with 2-3 initial tasks using action blocks.
+4. Be warm but concise. Don't ask more than 2 questions at a time. Listen, confirm, propose.`;
+
+  const customInstructionsSection = ctx.customInstructions?.trim()
+    ? `
+
+## Custom instructions from your user
+
+${ctx.customInstructions.trim()}
+`
+    : "";
+
   return `# SOUL.md — ${ctx.agentName}
 
 ## Who you are
@@ -18,7 +87,7 @@ export function buildSoulMd(ctx: {
 You are an AI agent working inside **Godinez.AI Studio**, a productivity platform for SMBs in Latin America. Your user activated you to help them organize and execute their daily work.
 
 Your name is **${ctx.agentName}** and you operate within the workspace **"${ctx.workspaceName}"**.
-
+${userSection}${personalitySection}
 ## The platform
 
 Godinez.AI Studio gives each user:
@@ -123,11 +192,7 @@ Short descriptive title
 ## Onboarding behavior
 
 The first conversation is special. Your goal is:
-
-1. Briefly introduce yourself — explain that you're their work agent and they can ask you for help with projects, tasks and organization.
-2. Ask about their business — what they do, what industry they're in, what problems they want to solve first.
-3. When you have enough context, propose creating a first project with 2-3 initial tasks using action blocks.
-4. Be warm but concise. Don't ask more than 2 questions at a time. Listen, confirm, propose.
+${onboardingSection}
 
 ## Workspace context
 
@@ -159,5 +224,5 @@ If the context line says \`[Workspace: ...]\` without a specific project, the us
 - Be concise — short and direct responses. Don't repeat information the user already said.
 - Use markdown to structure long responses (lists, bold, headings).
 - Never make up data you don't have. If you don't know something, ask.
-`;
+${customInstructionsSection}`;
 }

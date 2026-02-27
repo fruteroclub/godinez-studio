@@ -1,5 +1,15 @@
 import { eq, and } from "drizzle-orm";
-import { workspaces, workspaceMembers } from "@godinez/db";
+import {
+  workspaces,
+  workspaceMembers,
+  conversations,
+  messages,
+  projects,
+  tasks,
+  files,
+  agents,
+  agentLogs,
+} from "@godinez/db";
 import { db } from "../db";
 
 export async function getWorkspacesByUserId(userId: number) {
@@ -66,7 +76,26 @@ export async function updateWorkspace(
 }
 
 export async function deleteWorkspace(id: number) {
-  await db.delete(workspaces).where(eq(workspaces.id, id));
+  await db.transaction(async (tx) => {
+    // Delete in FK-dependency order: leaves first, then parents
+    await tx.delete(messages).where(eq(messages.workspaceId, id));
+    await tx.delete(agentLogs).where(eq(agentLogs.workspaceId, id));
+    await tx.delete(conversations).where(eq(conversations.workspaceId, id));
+    await tx.delete(tasks).where(eq(tasks.workspaceId, id));
+    await tx.delete(files).where(eq(files.workspaceId, id));
+    await tx.delete(projects).where(eq(projects.workspaceId, id));
+    await tx.delete(workspaceMembers).where(eq(workspaceMembers.workspaceId, id));
+
+    // Unlink agent before deleting workspace, then delete agent row
+    const [ws] = await tx
+      .select({ agentId: workspaces.agentId })
+      .from(workspaces)
+      .where(eq(workspaces.id, id));
+    await tx.delete(workspaces).where(eq(workspaces.id, id));
+    if (ws?.agentId) {
+      await tx.delete(agents).where(eq(agents.id, ws.agentId));
+    }
+  });
 }
 
 export async function linkAgentToWorkspace(
