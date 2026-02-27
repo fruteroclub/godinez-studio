@@ -1,8 +1,8 @@
+import { Navigate } from "react-router-dom";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
 import { useDashboard } from "@/hooks/use-workspace";
 import { content } from "@/lib/content";
 import { PageSkeleton } from "@/components/ui/Skeleton";
-import AgentHatching from "@/components/onboarding/AgentHatching";
 
 const { dashboard } = content.studio;
 
@@ -12,9 +12,9 @@ export default function Dashboard() {
 
   if (isLoading) return <PageSkeleton />;
 
-  // Show hatching UI if no agent assigned
+  // Redirect to onboarding if no agent provisioned
   if (!workspace?.agentSlot) {
-    return <AgentHatching />;
+    return <Navigate to="/studio/new" replace />;
   }
 
   const statCards = [

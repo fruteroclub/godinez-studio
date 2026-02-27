@@ -18,6 +18,10 @@ export async function getAllAgents() {
   return db.query.agents.findMany();
 }
 
+export async function deleteAgent(id: number) {
+  await db.delete(agents).where(eq(agents.id, id));
+}
+
 export async function createAgent(data: {
   name: string;
   slug: string;
@@ -27,5 +31,17 @@ export async function createAgent(data: {
   config?: Record<string, unknown>;
 }) {
   const [agent] = await db.insert(agents).values(data).returning();
+  return agent;
+}
+
+export async function updateAgent(
+  id: number,
+  data: { name?: string; config?: Record<string, unknown> },
+) {
+  const [agent] = await db
+    .update(agents)
+    .set(data)
+    .where(eq(agents.id, id))
+    .returning();
   return agent;
 }

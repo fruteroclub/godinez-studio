@@ -16,9 +16,10 @@ export const agents = pgTable("agents", {
   config: jsonb("config").$type<{
     model?: string;
     channels?: string[];
-    skills?: string[];
+    needs?: string[];
     personality?: string;
-    systemPrompt?: string;
+    userName?: string;
+    customInstructions?: string;
   }>(),
   openclawId: varchar("openclaw_id", { length: 255 }),
   createdAt: timestamp("created_at", { withTimezone: true })
