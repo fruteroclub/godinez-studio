@@ -12,7 +12,7 @@ export const projects = pgTable("projects", {
   id: serial("id").primaryKey(),
   workspaceId: integer("workspace_id")
     .notNull()
-    .references(() => workspaces.id),
+    .references(() => workspaces.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   status: text("status").notNull().default("active"), // active | completed | archived

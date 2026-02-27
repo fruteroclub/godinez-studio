@@ -15,10 +15,10 @@ export const workspaceMembers = pgTable(
     id: serial("id").primaryKey(),
     workspaceId: integer("workspace_id")
       .notNull()
-      .references(() => workspaces.id),
+      .references(() => workspaces.id, { onDelete: "cascade" }),
     userId: integer("user_id")
       .notNull()
-      .references(() => users.id),
+      .references(() => users.id, { onDelete: "cascade" }),
     role: text("role").notNull().default("member"), // owner | admin | member | viewer
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
