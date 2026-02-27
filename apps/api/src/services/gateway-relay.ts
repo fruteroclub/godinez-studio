@@ -1,5 +1,6 @@
 import WebSocket from "ws";
 import crypto from "node:crypto";
+import { z } from "zod";
 
 // ─── Protocol types (matching OpenClaw protocol v3) ─────────────────
 
@@ -138,6 +139,103 @@ interface AgentFileEntry {
   content?: string;
 }
 
+// ─── Zod schemas for runtime validation of gateway responses ────────
+
+const HelloOkPayloadSchema = z.object({
+  type: z.literal("hello-ok"),
+  protocol: z.number(),
+  server: z.object({ version: z.string(), connId: z.string() }),
+  features: z.object({
+    methods: z.array(z.string()),
+    events: z.array(z.string()),
+  }),
+});
+
+const ChatSendPayloadSchema = z.object({
+  runId: z.string().optional(),
+  status: z.string().optional(),
+});
+
+const ChatHistoryPayloadSchema = z.object({
+  messages: z.array(z.unknown()),
+  sessionId: z.string().optional(),
+});
+
+const AgentSummarySchema = z.object({
+  id: z.string(),
+  name: z.string().optional(),
+  identity: z
+    .object({
+      name: z.string().optional(),
+      theme: z.string().optional(),
+      emoji: z.string().optional(),
+      avatar: z.string().optional(),
+      avatarUrl: z.string().optional(),
+    })
+    .optional(),
+});
+
+const AgentsListPayloadSchema = z.object({
+  defaultId: z.string(),
+  mainKey: z.string(),
+  scope: z.enum(["per-sender", "global"]),
+  agents: z.array(AgentSummarySchema),
+});
+
+const AgentsCreatePayloadSchema = z.object({
+  ok: z.literal(true),
+  agentId: z.string(),
+  name: z.string(),
+  workspace: z.string(),
+});
+
+const AgentFileEntrySchema = z.object({
+  name: z.string(),
+  path: z.string(),
+  missing: z.boolean(),
+  size: z.number().optional(),
+  updatedAtMs: z.number().optional(),
+  content: z.string().optional(),
+});
+
+const AgentsFilesListPayloadSchema = z.object({
+  agentId: z.string(),
+  workspace: z.string(),
+  files: z.array(AgentFileEntrySchema),
+});
+
+const AgentsFileResultPayloadSchema = z.object({
+  file: AgentFileEntrySchema,
+});
+
+const ChatEventPayloadSchema = z.object({
+  runId: z.string(),
+  sessionKey: z.string(),
+  seq: z.number(),
+  state: z.enum(["delta", "final", "aborted", "error"]),
+  message: z
+    .object({
+      content: z
+        .array(z.object({ type: z.string().optional(), text: z.string().optional() }))
+        .optional(),
+    })
+    .passthrough()
+    .optional(),
+  errorMessage: z.string().optional(),
+  usage: z.unknown().optional(),
+  stopReason: z.string().optional(),
+});
+
+/** Parse gateway payload with Zod. Throws with a clear message on mismatch. */
+function parsePayload<T>(schema: z.ZodType<T>, payload: unknown, method: string): T {
+  const result = schema.safeParse(payload);
+  if (!result.success) {
+    const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(", ");
+    throw new Error(`[Gateway] ${method} response validation failed: ${issues}`);
+  }
+  return result.data;
+}
+
 // ─── Run handler for streaming ──────────────────────────────────────
 
 type RunHandler = {
@@ -250,12 +348,12 @@ class GatewayRelay {
               handshakeDone = true;
               this._connected = true;
               this.reconnectAttempt = 0;
-              const server = p.server as { version: string; connId: string };
-              this.serverInfo = server;
+              const helloOk = parsePayload(HelloOkPayloadSchema, p, "connect");
+              this.serverInfo = helloOk.server;
               console.log(
-                `[Gateway] Connected to OpenClaw v${server.version} (conn: ${server.connId})`,
+                `[Gateway] Connected to OpenClaw v${helloOk.server.version} (conn: ${helloOk.server.connId})`,
               );
-              resolve(p as unknown as HelloOk);
+              resolve(helloOk);
               return;
             }
           }
@@ -321,8 +419,8 @@ class GatewayRelay {
         response.error?.message ?? "chat.send failed",
       );
     }
-    const payload = response.payload as { runId?: string; status?: string };
-    return payload?.runId ?? idempotencyKey;
+    const payload = parsePayload(ChatSendPayloadSchema, response.payload, "chat.send");
+    return payload.runId ?? idempotencyKey;
   }
 
   async chatAbort(sessionKey: string, runId?: string): Promise<void> {
@@ -340,7 +438,7 @@ class GatewayRelay {
     if (!response.ok) {
       throw new Error(response.error?.message ?? "chat.history failed");
     }
-    return response.payload as { messages: unknown[]; sessionId?: string };
+    return parsePayload(ChatHistoryPayloadSchema, response.payload, "chat.history");
   }
 
   // ─── Agent management methods ─────────────────────────────────
@@ -350,7 +448,7 @@ class GatewayRelay {
     if (!response.ok) {
       throw new Error(response.error?.message ?? "agents.list failed");
     }
-    return response.payload as unknown as AgentsListResult;
+    return parsePayload(AgentsListPayloadSchema, response.payload, "agents.list");
   }
 
   async agentsCreate(params: {
@@ -363,7 +461,7 @@ class GatewayRelay {
     if (!response.ok) {
       throw new Error(response.error?.message ?? "agents.create failed");
     }
-    return response.payload as unknown as AgentsCreateResult;
+    return parsePayload(AgentsCreatePayloadSchema, response.payload, "agents.create");
   }
 
   async agentsUpdate(params: {
@@ -399,11 +497,7 @@ class GatewayRelay {
     if (!response.ok) {
       throw new Error(response.error?.message ?? "agents.files.list failed");
     }
-    return response.payload as unknown as {
-      agentId: string;
-      workspace: string;
-      files: AgentFileEntry[];
-    };
+    return parsePayload(AgentsFilesListPayloadSchema, response.payload, "agents.files.list");
   }
 
   async agentsFilesGet(
@@ -417,9 +511,7 @@ class GatewayRelay {
     if (!response.ok) {
       throw new Error(response.error?.message ?? "agents.files.get failed");
     }
-    const result = response.payload as unknown as {
-      file: AgentFileEntry;
-    };
+    const result = parsePayload(AgentsFileResultPayloadSchema, response.payload, "agents.files.get");
     return result.file;
   }
 
@@ -436,9 +528,7 @@ class GatewayRelay {
     if (!response.ok) {
       throw new Error(response.error?.message ?? "agents.files.set failed");
     }
-    const result = response.payload as unknown as {
-      file: AgentFileEntry;
-    };
+    const result = parsePayload(AgentsFileResultPayloadSchema, response.payload, "agents.files.set");
     return result.file;
   }
 
@@ -467,8 +557,12 @@ class GatewayRelay {
 
     // Event broadcast
     if (frame.type === "event" && frame.event === "chat") {
-      const payload = frame.payload as unknown as ChatEventPayload;
-      const { runId, state, message, errorMessage } = payload;
+      const parsed = ChatEventPayloadSchema.safeParse(frame.payload);
+      if (!parsed.success) {
+        console.warn("[Gateway] chat event validation failed:", parsed.error.message);
+        return;
+      }
+      const { runId, state, message, errorMessage } = parsed.data;
       const handler = this.pendingRuns.get(runId);
       if (!handler) return;
 
