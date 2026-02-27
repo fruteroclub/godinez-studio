@@ -56,14 +56,6 @@ export default function Settings() {
               {workspace?.slug}
             </p>
           </div>
-          <div>
-            <label className="text-sm text-[hsl(var(--muted-foreground))]">
-              Plan
-            </label>
-            <span className="ml-2 rounded-full bg-magenta/20 px-2.5 py-0.5 text-xs font-medium text-magenta">
-              {workspace?.tier}
-            </span>
-          </div>
           <button
             type="submit"
             disabled={updateWorkspace.isPending}

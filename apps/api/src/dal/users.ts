@@ -14,6 +14,18 @@ export async function getUserById(id: number) {
   });
 }
 
+export async function updateUser(
+  id: number,
+  data: { name?: string; jobRole?: string; businessDescription?: string },
+) {
+  const [updated] = await db
+    .update(users)
+    .set(data)
+    .where(eq(users.id, id))
+    .returning();
+  return updated;
+}
+
 export async function upsertUser(data: {
   clerkId: string;
   email: string;

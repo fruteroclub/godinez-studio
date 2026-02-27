@@ -11,11 +11,10 @@ import {
 } from "../dal/workspaces";
 import { createAgent } from "../dal/agents";
 import { createConversation } from "../dal/conversations";
+import { updateUser } from "../dal/users";
 import { gateway } from "../services/gateway-relay";
 import { buildSoulMd } from "../services/agent-soul-template";
-
-const MAX_SLOTS = 5;
-const WORKSPACE_BASE = "/home/devrel-frutero/.openclaw/workspaces";
+import { AGENT_AGENT_MAX_SLOTS, AGENT_AGENT_WORKSPACE_BASE } from "../lib/config";
 
 const app = new Hono<AuthEnv>();
 
@@ -34,11 +33,13 @@ app.post(
         .enum(["professional", "friendly", "creative", "technical"])
         .optional(),
       needs: z.array(z.string()).optional(),
+      userRole: z.string().max(50).optional(),
+      businessDescription: z.string().max(255).optional(),
     }),
   ),
   async (c) => {
     const userId = c.get("userId");
-    const { workspaceId, userName, agentName, personality, needs } =
+    const { workspaceId, userName, agentName, personality, needs, userRole, businessDescription } =
       c.req.valid("json");
 
     // 1. Verify workspace exists
@@ -83,7 +84,7 @@ app.post(
     );
 
     let slotNumber: number | null = null;
-    for (let i = 1; i <= MAX_SLOTS; i++) {
+    for (let i = 1; i <= AGENT_MAX_SLOTS; i++) {
       if (!usedSlots.has(`godin-slot-${i}`)) {
         slotNumber = i;
         break;
@@ -104,7 +105,7 @@ app.post(
     try {
       agentResult = await gateway.agentsCreate({
         name: slotName,
-        workspace: `${WORKSPACE_BASE}/${slotName}`,
+        workspace: `${AGENT_WORKSPACE_BASE}/${slotName}`,
       });
       console.log("[Provision] Agent created:", agentResult.agentId);
     } catch (err) {
@@ -121,6 +122,8 @@ app.post(
         agentName: resolvedAgentName,
         agentSlot: slotName,
         userName,
+        userRole,
+        businessDescription,
         personality,
         needs,
       });
@@ -137,8 +140,18 @@ app.post(
     const slug = `${workspace.slug}-agent`;
     const agentConfig: Record<string, unknown> = {};
     if (userName) agentConfig.userName = userName;
+    if (userRole) agentConfig.userRole = userRole;
+    if (businessDescription) agentConfig.businessDescription = businessDescription;
     if (personality) agentConfig.personality = personality;
     if (needs?.length) agentConfig.needs = needs;
+
+    // Persist role + business on user record (source of truth for analytics)
+    if (userRole || businessDescription) {
+      await updateUser(userId, {
+        ...(userRole && { jobRole: userRole }),
+        ...(businessDescription && { businessDescription }),
+      });
+    }
 
     const dbAgent = await createAgent({
       name: resolvedAgentName,
