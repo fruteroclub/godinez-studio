@@ -14,7 +14,7 @@ import { createConversation } from "../dal/conversations";
 import { updateUser } from "../dal/users";
 import { gateway } from "../services/gateway-relay";
 import { buildSoulMd } from "../services/agent-soul-template";
-import { AGENT_AGENT_MAX_SLOTS, AGENT_AGENT_WORKSPACE_BASE } from "../lib/config";
+import { AGENT_MAX_SLOTS, AGENT_WORKSPACE_BASE } from "../lib/config";
 
 const app = new Hono<AuthEnv>();
 
