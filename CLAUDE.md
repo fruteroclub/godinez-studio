@@ -70,13 +70,16 @@ Brand tokens defined in `apps/web/src/index.css` via Tailwind v4 `@theme inline`
 - `VITE_API_URL` — API base URL
 - `VITE_CLERK_PUBLISHABLE_KEY` — Clerk frontend key
 
-## Git Commit Messages Rules
+## Git Conventions
 
-- Short (max 50-60 chars), descriptive, concise
-- Lowercase preferred
+- Branch from: `dev` (not main)
+- Branch naming: `fix/issue-{N}` for bug fixes, `feat/issue-{N}` for features
+- One focused commit per issue
+- Short (max 50-60 chars), descriptive, concise commit messages
+- Lowercase preferred, use uppercase for proper nouns and relevant acronyms
 - Conventional prefixes: `feat`, `fix`, `chore`, `docs`, `refactor`, `style`, `test`
 - No co-signatures or attributions
-- Lowercase preferred, use uppercase for proper nouns and relevant acronyms
+- Never force-push, never commit to `dev` directly
 
 ## Key Rules
 
