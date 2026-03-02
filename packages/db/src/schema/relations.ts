@@ -9,6 +9,7 @@ import { messages } from "./messages";
 import { tasks } from "./tasks";
 import { files } from "./files";
 import { agentLogs } from "./agent-logs";
+import { referralCodes } from "./referral-codes";
 
 export const usersRelations = relations(users, ({ many }) => ({
   ownedWorkspaces: many(workspaces),
@@ -16,6 +17,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   messages: many(messages),
   tasks: many(tasks),
   files: many(files),
+  redeemedReferralCodes: many(referralCodes),
 }));
 
 export const agentsRelations = relations(agents, ({ many }) => ({
@@ -144,6 +146,13 @@ export const filesRelations = relations(files, ({ one }) => ({
   message: one(messages, {
     fields: [files.messageId],
     references: [messages.id],
+  }),
+}));
+
+export const referralCodesRelations = relations(referralCodes, ({ one }) => ({
+  redeemedBy: one(users, {
+    fields: [referralCodes.redeemedByUserId],
+    references: [users.id],
   }),
 }));
 
