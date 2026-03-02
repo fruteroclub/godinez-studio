@@ -90,10 +90,10 @@ export default function SignUp() {
   if (step === "code") {
     return (
       <div className="flex flex-1 items-center justify-center py-12">
-        <div className="w-full max-w-sm space-y-6">
+        <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-charcoal p-8 space-y-6">
           <div className="text-center">
-            <h1 className="text-2xl font-bold">Acceso Beta</h1>
-            <p className="text-muted-foreground mt-2 text-sm">
+            <h1 className="text-2xl font-bold text-white">Acceso Beta</h1>
+            <p className="text-white/60 mt-2 text-sm">
               Ingresa tu código de invitación para crear tu cuenta
             </p>
           </div>
@@ -114,25 +114,25 @@ export default function SignUp() {
               }}
               placeholder="BETA-XXXXXX"
               autoFocus
-              className="w-full rounded-lg border border-border bg-background px-4 py-3 text-center font-mono text-lg tracking-widest placeholder:text-muted-foreground/50 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              className="w-full rounded-lg border border-white/20 bg-white/5 px-4 py-3 text-center font-mono text-lg tracking-widest text-white placeholder:text-white/30 focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
             />
 
             {error && (
-              <p className="text-center text-sm text-destructive">{error}</p>
+              <p className="text-center text-sm text-red-400">{error}</p>
             )}
 
             <button
               type="submit"
               disabled={isValidating}
-              className="w-full rounded-lg bg-primary px-4 py-3 font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+              className="w-full rounded-full bg-magenta px-4 py-3 font-semibold text-white transition-colors hover:bg-magenta-dark disabled:opacity-60"
             >
               {isValidating ? "Validando..." : "Continuar"}
             </button>
           </form>
 
-          <p className="text-center text-xs text-muted-foreground">
+          <p className="text-center text-xs text-white/40">
             ¿Ya tienes cuenta?{" "}
-            <a href="/sign-in" className="text-primary hover:underline">
+            <a href="/sign-in" className="text-magenta hover:underline">
               Inicia sesión
             </a>
           </p>
