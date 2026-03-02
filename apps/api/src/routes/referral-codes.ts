@@ -22,11 +22,12 @@ app.post(
     z.object({
       email: z.string().email(),
       name: z.string().optional(),
+      source: z.string().max(100).optional(),
     }),
   ),
   async (c) => {
-    const { email, name } = c.req.valid("json");
-    const code = await createReferralCode({ email, name });
+    const { email, name, source } = c.req.valid("json");
+    const code = await createReferralCode({ email, name, source });
     return c.json(code, 201);
   },
 );
