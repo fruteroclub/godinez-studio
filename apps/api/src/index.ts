@@ -19,6 +19,7 @@ import conversations, {
   workspaceConversations,
   projectConversations,
 } from "./routes/conversations";
+import referralCodes from "./routes/referral-codes";
 import { gateway } from "./services/gateway-relay";
 
 const app = new Hono();
@@ -29,7 +30,7 @@ app.use(
   cors({
     origin: process.env.CORS_ORIGIN?.split(",") ?? "*",
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Service-Key"],
     exposeHeaders: ["Content-Type"],
     credentials: true,
     maxAge: 3600,
@@ -55,6 +56,7 @@ app.route("/api/agents", agents);
 app.route("/api/agents", provision);
 app.route("/api/chat", chat);
 app.route("/api/conversations", conversations);
+app.route("/api/referral-codes", referralCodes);
 app.route("/webhooks", webhooks);
 
 // Serve uploaded files in development (in production, R2 serves files directly)

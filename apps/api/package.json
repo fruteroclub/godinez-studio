@@ -8,9 +8,9 @@
     "start": "node dist/index.js",
     "build": "tsup",
     "typecheck": "tsc --noEmit",
-    "db:generate": "drizzle-kit generate",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio",
+    "db:generate": "set -a && . ./.env.local && set +a && drizzle-kit generate",
+    "db:push": "set -a && . ./.env.local && set +a && drizzle-kit push",
+    "db:studio": "set -a && . ./.env.local && set +a && drizzle-kit studio",
     "db:seed": "bun scripts/seed.ts"
   },
   "dependencies": {
