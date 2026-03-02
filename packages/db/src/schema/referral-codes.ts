@@ -22,4 +22,5 @@ export const referralCodes = pgTable("referral_codes", {
     .notNull()
     .defaultNow(),
   usedAt: timestamp("used_at", { withTimezone: true }),
+  source: varchar("source", { length: 100 }),
 });

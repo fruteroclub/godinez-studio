@@ -18,6 +18,7 @@ function generateCode(): string {
 export async function createReferralCode(data: {
   email: string;
   name?: string;
+  source?: string;
 }) {
   const code = generateCode();
   const expiresAt = new Date();
@@ -29,6 +30,7 @@ export async function createReferralCode(data: {
       code,
       email: data.email,
       name: data.name,
+      source: data.source,
       expiresAt,
     })
     .returning();
