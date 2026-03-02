@@ -8,4 +8,5 @@ export { messages } from "./messages";
 export { tasks } from "./tasks";
 export { files } from "./files";
 export { agentLogs } from "./agent-logs";
+export { referralCodes } from "./referral-codes";
 export * from "./relations";
