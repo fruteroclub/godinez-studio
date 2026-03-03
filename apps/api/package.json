@@ -10,8 +10,7 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "set -a && . ./.env.local && set +a && drizzle-kit generate",
     "db:push": "set -a && . ./.env.local && set +a && drizzle-kit push",
-    "db:studio": "set -a && . ./.env.local && set +a && drizzle-kit studio",
-    "db:seed": "bun scripts/seed.ts"
+    "db:studio": "set -a && . ./.env.local && set +a && drizzle-kit studio"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.999.0",
