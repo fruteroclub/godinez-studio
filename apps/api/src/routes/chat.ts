@@ -340,10 +340,15 @@ app.post(
     const message = await getMessageById(messageId);
     if (!message) return c.json({ error: "Message not found" }, 404);
 
-    const metadata: Record<string, unknown> = message.metadata
-      ? JSON.parse(message.metadata)
-      : {};
-    const actions: ActionCard[] = (metadata.actions as ActionCard[]) || [];
+    let metadata: Record<string, unknown> = {};
+    try {
+      metadata = message.metadata ? JSON.parse(message.metadata) : {};
+    } catch {
+      return c.json({ error: "Invalid message metadata" }, 400);
+    }
+    const actions: ActionCard[] = Array.isArray(metadata.actions)
+      ? (metadata.actions as ActionCard[])
+      : [];
     const idx = actions.findIndex((a) => a.id === actionId);
     if (idx === -1) return c.json({ error: "Action not found" }, 404);
 
@@ -363,14 +368,16 @@ app.post(
       // Resolve conversation's project for task inheritance
       const conversation = await getConversationById(message.conversationId);
 
+      const p = action.payload ?? {};
+
       switch (action.type) {
         case "create_project": {
+          const name = typeof p.name === "string" ? p.name : "";
+          if (!name) return c.json({ error: "Action payload missing name" }, 400);
           const project = await createProject({
             workspaceId,
-            name: String(action.payload.name || ""),
-            description: action.payload.description
-              ? String(action.payload.description)
-              : undefined,
+            name,
+            description: typeof p.description === "string" ? p.description : undefined,
           });
           resultId = project.id;
           // Link conversation to newly created project
@@ -378,21 +385,23 @@ app.post(
           break;
         }
         case "create_task": {
+          const title = typeof p.title === "string" ? p.title
+            : typeof p.name === "string" ? p.name : "";
+          if (!title) return c.json({ error: "Action payload missing title" }, 400);
+
           // Inherit project from action payload, or fall back to conversation's project
-          const taskProjectId = action.payload.projectId
-            ? Number(action.payload.projectId)
+          const rawProjectId = typeof p.projectId === "number" ? p.projectId
+            : typeof p.projectId === "string" ? Number(p.projectId) : undefined;
+          const taskProjectId = rawProjectId && !Number.isNaN(rawProjectId)
+            ? rawProjectId
             : conversation?.projectId ?? undefined;
 
           const task = await createTask({
             workspaceId,
-            title: String(action.payload.title || action.payload.name || ""),
-            description: action.payload.description
-              ? String(action.payload.description)
-              : undefined,
+            title,
+            description: typeof p.description === "string" ? p.description : undefined,
             projectId: taskProjectId,
-            priority: action.payload.priority
-              ? String(action.payload.priority)
-              : undefined,
+            priority: typeof p.priority === "string" ? p.priority : undefined,
           });
           resultId = task.id;
           break;
