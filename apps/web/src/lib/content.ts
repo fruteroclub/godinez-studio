@@ -164,7 +164,7 @@ export const content = {
       // Step 3
       step3Title: "Personaliza tu agente",
       agentNameLabel: "¿Cómo se llama tu agente?",
-      agentNamePlaceholder: "Lupita, Toño, Max...",
+      agentNamePlaceholder: "Mi asistente, Asistente Pro...",
       personalityLabel: "Personalidad",
       personalities: {
         professional: { title: "Profesional", description: "Directo, eficiente, enfocado en resultados" },

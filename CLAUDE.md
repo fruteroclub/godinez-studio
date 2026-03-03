@@ -21,7 +21,7 @@ pnpm typecheck              # TypeScript check across all packages
 pnpm db:push                # Push Drizzle schema to database
 pnpm db:generate            # Generate Drizzle migrations
 pnpm db:studio              # Open Drizzle Studio GUI
-pnpm db:seed                # Seed 3 core agents (Lupita, Toño, Marisol)
+pnpm db:studio              # Open Drizzle Studio GUI
 ```
 
 Run `pnpm dev:api` and `pnpm dev:web` in separate terminals for local development. The Vite dev server proxies `/api` requests to `:3001`.
@@ -115,10 +115,6 @@ All routes mounted in `apps/api/src/index.ts`:
 3. API relays to OpenClaw Gateway (WebSocket JSON-RPC 2.0) or falls back to stub agent
 4. Events streamed: `delta` (text chunks), `done` (completion), `error`
 
-### Seed Data
+### Agents
 
-Three core agents seeded via `pnpm db:seed`:
-
-- **Lupita** (`lupita-pmo`) — PMO: project management, scheduling
-- **Toño** (`tono-cto`) — CTO: code review, architecture, devops
-- **Marisol** (`marisol-influencer`) — Influencer: content creation, social media
+Agents are provisioned from OpenClaw — each user names and configures their own agent. There are no hardcoded seed agents.
