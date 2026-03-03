@@ -28,7 +28,7 @@ app.use("*", logger());
 app.use(
   "*",
   cors({
-    origin: process.env.CORS_ORIGIN?.split(",") ?? "*",
+    origin: process.env.CORS_ORIGIN?.split(",") ?? [],
     allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization", "X-Service-Key"],
     exposeHeaders: ["Content-Type"],
