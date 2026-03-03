@@ -11,6 +11,7 @@ import {
   type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
+import type { Task, TaskStatus, TaskPriority } from "@godinez/types";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
 import {
   useTasks,
@@ -24,17 +25,6 @@ import { content } from "@/lib/content";
 import { KanbanSkeleton } from "@/components/ui/Skeleton";
 
 const { tasks: tc } = content.studio;
-
-interface Task {
-  id: number;
-  title: string;
-  description: string | null;
-  status: string;
-  priority: string;
-  projectId: number | null;
-  createdAt: string;
-  completedAt: string | null;
-}
 
 const columns = [
   { key: "pending", label: tc.columnPending, color: "border-yellow-500/30" },
@@ -304,7 +294,7 @@ function TaskEditModal({
               </label>
               <select
                 value={priority}
-                onChange={(e) => setPriority(e.target.value)}
+                onChange={(e) => setPriority(e.target.value as TaskPriority)}
                 className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
               >
                 <option value="low">Baja</option>
@@ -389,7 +379,7 @@ export default function Tasks() {
   const updateStatus = useUpdateTaskStatus(workspace?.id ?? 0);
   const updateProject = useUpdateTaskProject(workspace?.id ?? 0);
   const [title, setTitle] = useState("");
-  const [priority, setPriority] = useState("medium");
+  const [priority, setPriority] = useState<TaskPriority>("medium");
   const [projectId, setProjectId] = useState<number | undefined>(undefined);
   const [filterProjectId, setFilterProjectId] = useState<string>("all");
   const [activeTask, setActiveTask] = useState<Task | null>(null);
@@ -410,7 +400,7 @@ export default function Tasks() {
     if (!over) return;
 
     const taskId = active.id as number;
-    const newStatus = over.id as string;
+    const newStatus = over.id as TaskStatus;
     const task = (tasks ?? []).find((t) => t.id === taskId);
     if (!task || task.status === newStatus) return;
 
@@ -502,7 +492,7 @@ export default function Tasks() {
         </select>
         <select
           value={priority}
-          onChange={(e) => setPriority(e.target.value)}
+          onChange={(e) => setPriority(e.target.value as TaskPriority)}
           className="rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
         >
           <option value="low">Baja</option>

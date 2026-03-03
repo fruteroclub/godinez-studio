@@ -1,14 +1,7 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { Project } from "@godinez/types";
 import { apiFetch } from "@/lib/api";
-
-interface Project {
-  id: number;
-  name: string;
-  description: string | null;
-  status: string;
-  createdAt: string;
-}
 
 interface ProjectDetail extends Project {
   stats: {

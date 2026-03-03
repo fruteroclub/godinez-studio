@@ -1,17 +1,7 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { Task, TaskStatus } from "@godinez/types";
 import { apiFetch } from "@/lib/api";
-
-interface Task {
-  id: number;
-  title: string;
-  description: string | null;
-  status: string;
-  priority: string;
-  projectId: number | null;
-  createdAt: string;
-  completedAt: string | null;
-}
 
 export function useTasks(workspaceId: number | undefined) {
   const { getToken } = useAuth();
@@ -120,7 +110,7 @@ export function useUpdateTaskStatus(workspaceId: number) {
       status,
     }: {
       taskId: number;
-      status: string;
+      status: TaskStatus;
     }) => {
       const token = await getToken();
       return apiFetch<Task>(`/api/tasks/${taskId}/status`, {
