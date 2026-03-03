@@ -1,15 +1,7 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { Conversation } from "@godinez/types";
 import { apiFetch } from "@/lib/api";
-
-interface Conversation {
-  id: number;
-  title: string | null;
-  projectId: number | null;
-  channel: string;
-  lastMessageAt: string | null;
-  createdAt: string;
-}
 
 export function useConversations(workspaceId: number | undefined) {
   const { getToken } = useAuth();

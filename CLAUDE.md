@@ -61,7 +61,7 @@ Brand tokens defined in `apps/web/src/index.css` via Tailwind v4 `@theme inline`
 - `CLERK_SECRET_KEY` — Clerk backend secret
 - `CLERK_WEBHOOK_SECRET` — Clerk webhook signing secret
 - `PORT` — defaults to 3001
-- `CORS_ORIGIN` — comma-separated allowed origins (defaults to `*`)
+- `CORS_ORIGIN` — comma-separated allowed origins (required, no wildcard fallback)
 - `OPENCLAW_GATEWAY_URL` — WebSocket URL for OpenClaw Gateway (optional)
 - `OPENCLAW_GATEWAY_TOKEN` — Gateway auth token (optional)
 
@@ -89,6 +89,18 @@ Brand tokens defined in `apps/web/src/index.css` via Tailwind v4 `@theme inline`
 4. **TypeScript strict mode** everywhere.
 5. **`@godinez/` scope** for all workspace packages.
 6. **Hono routes** export a `new Hono()` instance, mounted via `app.route()` in `apps/api/src/index.ts`.
+7. **Types from `@godinez/types`** — never duplicate domain types in hooks or components. Import from the shared package.
+8. **Spanish UI** — all user-facing text in Spanish. English only for code, logs, and developer-facing content.
+9. **Zod validation** on all user input and external data (API payloads, parsed JSON, webhook bodies).
+10. **Drizzle parameterized queries** — never interpolate user input into SQL.
+
+## Security
+
+- Never commit secrets or `.env` files. All sensitive config via environment variables.
+- Validate all user input at API boundaries with Zod.
+- All resource access must be workspace-scoped — check membership before returning data.
+- `CORS_ORIGIN` must be explicitly set (no wildcard fallback). Fail-closed if unset.
+- Clerk handles authentication; workspace membership handles authorization.
 
 ### API Routes
 

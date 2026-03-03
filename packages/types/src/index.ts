@@ -30,6 +30,29 @@ export type LogLevel = "debug" | "info" | "warn" | "error";
 export type ActionType = "create_project" | "create_task" | "create_file";
 export type ActionStatus = "pending" | "executing" | "completed" | "error";
 
+export interface CreateProjectPayload {
+  name: string;
+  description?: string;
+}
+
+export interface CreateTaskPayload {
+  title?: string;
+  name?: string;
+  description?: string;
+  projectId?: number;
+  priority?: string;
+}
+
+export interface CreateFilePayload {
+  filename?: string;
+  content?: string;
+}
+
+export type ActionPayload =
+  | CreateProjectPayload
+  | CreateTaskPayload
+  | CreateFilePayload;
+
 export interface ActionBlock {
   id: string;
   type: ActionType;
@@ -42,6 +65,18 @@ export interface ActionCard extends ActionBlock {
   resultId?: number;
   error?: string;
   executedAt?: string;
+}
+
+// Agent config — stored as JSONB in agents table
+export interface AgentConfig {
+  model?: string;
+  channels?: string[];
+  needs?: string[];
+  personality?: string;
+  userName?: string;
+  userRole?: string;
+  businessDescription?: string;
+  customInstructions?: string;
 }
 
 // API response types
@@ -129,6 +164,7 @@ export interface Agent {
   slug: string;
   template: AgentTemplate;
   status: AgentStatus;
+  config: AgentConfig | null;
   openclawId: string | null;
   createdAt: string;
   updatedAt: string;

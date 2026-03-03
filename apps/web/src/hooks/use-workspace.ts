@@ -1,16 +1,7 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { Workspace } from "@godinez/types";
 import { apiFetch } from "@/lib/api";
-
-interface Workspace {
-  id: number;
-  name: string;
-  slug: string;
-  tier: string;
-  status: string;
-  agentId: number | null;
-  agentSlot: string | null;
-}
 
 interface DashboardStats {
   activeProjects: number;

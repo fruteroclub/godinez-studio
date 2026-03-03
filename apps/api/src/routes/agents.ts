@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import type { AgentConfig } from "@godinez/types";
 import type { AuthEnv } from "../types";
 import { requireAuth } from "../middleware/auth";
 import { resolveUser } from "../middleware/resolve-user";
@@ -8,6 +9,24 @@ import { getAllAgents, getAgentById, updateAgent } from "../dal/agents";
 import { getWorkspaceByAgentId, getMemberRole } from "../dal/workspaces";
 import { gateway } from "../services/gateway-relay";
 import { buildSoulMd } from "../services/agent-soul-template";
+
+/** Safely extract AgentConfig from the JSONB column */
+function parseAgentConfig(raw: unknown): AgentConfig {
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    const obj = raw as Record<string, unknown>;
+    return {
+      model: typeof obj.model === "string" ? obj.model : undefined,
+      channels: Array.isArray(obj.channels) ? obj.channels.filter((c): c is string => typeof c === "string") : undefined,
+      needs: Array.isArray(obj.needs) ? obj.needs.filter((n): n is string => typeof n === "string") : undefined,
+      personality: typeof obj.personality === "string" ? obj.personality : undefined,
+      userName: typeof obj.userName === "string" ? obj.userName : undefined,
+      userRole: typeof obj.userRole === "string" ? obj.userRole : undefined,
+      businessDescription: typeof obj.businessDescription === "string" ? obj.businessDescription : undefined,
+      customInstructions: typeof obj.customInstructions === "string" ? obj.customInstructions : undefined,
+    };
+  }
+  return {};
+}
 
 const app = new Hono<AuthEnv>();
 
@@ -121,8 +140,8 @@ app.put(
     }
 
     // Merge into config
-    const prevConfig = (agent.config as Record<string, unknown>) ?? {};
-    const newConfig: Record<string, unknown> = { ...prevConfig };
+    const prevConfig = parseAgentConfig(agent.config);
+    const newConfig: AgentConfig = { ...prevConfig };
     if (body.userRole !== undefined) newConfig.userRole = body.userRole;
     if (body.businessDescription !== undefined)
       newConfig.businessDescription = body.businessDescription;
@@ -147,12 +166,12 @@ app.put(
       workspaceName: workspace.name,
       agentName: resolvedName,
       agentSlot: agent.openclawId,
-      userName: (newConfig.userName as string) ?? undefined,
-      userRole: (newConfig.userRole as string) ?? undefined,
-      businessDescription: (newConfig.businessDescription as string) ?? undefined,
-      personality: (newConfig.personality as string) ?? undefined,
-      needs: (newConfig.needs as string[]) ?? undefined,
-      customInstructions: (newConfig.customInstructions as string) ?? undefined,
+      userName: newConfig.userName,
+      userRole: newConfig.userRole,
+      businessDescription: newConfig.businessDescription,
+      personality: newConfig.personality,
+      needs: newConfig.needs,
+      customInstructions: newConfig.customInstructions,
     });
 
     try {
@@ -176,18 +195,18 @@ app.post("/:id/reinject-soul", async (c) => {
   if (!gateway.isConnected) return c.json({ error: "Gateway offline" }, 503);
 
   const workspace = await getWorkspaceByAgentId(id);
-  const cfg = (agent.config as Record<string, unknown>) ?? {};
+  const cfg = parseAgentConfig(agent.config);
 
   const soulMd = buildSoulMd({
     workspaceName: workspace?.name ?? "Espacio de trabajo",
     agentName: agent.name,
     agentSlot: agent.openclawId,
-    userName: (cfg.userName as string) ?? undefined,
-    userRole: (cfg.userRole as string) ?? undefined,
-    businessDescription: (cfg.businessDescription as string) ?? undefined,
-    personality: (cfg.personality as string) ?? undefined,
-    needs: (cfg.needs as string[]) ?? undefined,
-    customInstructions: (cfg.customInstructions as string) ?? undefined,
+    userName: cfg.userName,
+    userRole: cfg.userRole,
+    businessDescription: cfg.businessDescription,
+    personality: cfg.personality,
+    needs: cfg.needs,
+    customInstructions: cfg.customInstructions,
   });
 
   try {
