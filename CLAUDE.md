@@ -21,7 +21,6 @@ pnpm typecheck              # TypeScript check across all packages
 pnpm db:push                # Push Drizzle schema to database
 pnpm db:generate            # Generate Drizzle migrations
 pnpm db:studio              # Open Drizzle Studio GUI
-pnpm db:studio              # Open Drizzle Studio GUI
 ```
 
 Run `pnpm dev:api` and `pnpm dev:web` in separate terminals for local development. The Vite dev server proxies `/api` requests to `:3001`.
