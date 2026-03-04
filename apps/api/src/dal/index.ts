@@ -8,3 +8,4 @@ export * from "./files";
 export * from "./agent-logs";
 export * from "./referral-codes";
 export * from "./admin";
+export * from "./instances";
