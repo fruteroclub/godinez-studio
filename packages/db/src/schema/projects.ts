@@ -16,6 +16,7 @@ export const projects = pgTable("projects", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   status: text("status").notNull().default("active"), // active | completed | archived
+  previewUrl: text("preview_url"), // Cloudflare tunnel or ngrok URL for live preview
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

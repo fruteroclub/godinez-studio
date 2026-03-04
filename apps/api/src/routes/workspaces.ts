@@ -16,6 +16,7 @@ import {
   updateWorkspace,
   deleteWorkspace,
   getMemberRole,
+  getWorkspacePreview,
 } from "../dal/workspaces";
 import { gateway } from "../services/gateway-relay";
 import { ensureUniqueSlug } from "../lib/slug";
@@ -106,5 +107,22 @@ app.delete(
     return c.json({ deleted: true });
   },
 );
+
+// GET /workspaces/:slug/preview — Get active preview URL for workspace
+app.get("/:slug/preview", async (c) => {
+  const userId = c.get("userId");
+  const slug = c.req.param("slug");
+  
+  const workspace = await getWorkspaceBySlug(slug);
+  if (!workspace) return c.json({ error: "Workspace not found" }, 404);
+
+  const role = await getMemberRole(workspace.id, userId);
+  if (!role) return c.json({ error: "Not a workspace member" }, 403);
+
+  const preview = await getWorkspacePreview(workspace.id);
+  if (!preview) return c.json({ error: "No preview available" }, 404);
+
+  return c.json({ previewUrl: preview.previewUrl, projectName: preview.name });
+});
 
 export default app;
