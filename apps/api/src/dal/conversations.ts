@@ -37,7 +37,7 @@ export async function getConversationsByProject(
 
 export async function createConversation(data: {
   workspaceId: number;
-  agentId?: number;
+  agentId: number;
   projectId?: number;
   title?: string;
 }) {
