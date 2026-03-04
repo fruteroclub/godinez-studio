@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNotNull } from "drizzle-orm";
 import {
   workspaces,
   workspaceMembers,
@@ -123,4 +123,23 @@ export async function activateWorkspace(workspaceId: number) {
     .where(eq(workspaces.id, workspaceId))
     .returning();
   return workspace;
+}
+
+export async function getWorkspacePreview(workspaceId: number) {
+  // Get the most recently updated active project with a preview URL
+  const project = await db.query.projects.findFirst({
+    where: and(
+      eq(projects.workspaceId, workspaceId),
+      eq(projects.status, "active"),
+      isNotNull(projects.previewUrl),
+    ),
+    orderBy: (projects, { desc }) => [desc(projects.updatedAt)],
+  });
+  
+  if (!project) return null;
+  
+  return {
+    previewUrl: project.previewUrl,
+    name: project.name,
+  };
 }

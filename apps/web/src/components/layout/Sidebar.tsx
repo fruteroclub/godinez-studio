@@ -18,6 +18,7 @@ function getNavItems(slug: string): NavItem[] {
     { label: sidebar.tasks, href: `/studio/${slug}/tasks`, icon: "✓" },
     { label: sidebar.files, href: `/studio/${slug}/files`, icon: "📄" },
     { label: sidebar.activity, href: `/studio/${slug}/activity`, icon: "📊" },
+    { label: sidebar.lab, href: `/studio/${slug}/lab`, icon: "🧪" },
   ];
 }
 

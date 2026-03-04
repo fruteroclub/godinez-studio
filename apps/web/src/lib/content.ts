@@ -8,6 +8,7 @@ export const content = {
       tasks: "Tareas",
       files: "Archivos",
       activity: "Actividad",
+      lab: "Lab",
       team: "Equipo",
       settings: "Configuración",
     },
@@ -68,6 +69,15 @@ export const content = {
     activity: {
       title: "Actividad",
       empty: "No hay actividad reciente.",
+    },
+    lab: {
+      title: "Lab",
+      description: "Vista previa de tu proyecto en desarrollo",
+      noPreview: "No hay preview disponible. Inicia un proyecto con preview para verlo aquí.",
+      refresh: "Actualizar",
+      openExternal: "Abrir en nueva pestaña",
+      fullscreen: "Pantalla completa",
+      exitFullscreen: "Salir de pantalla completa",
     },
     team: {
       title: "Equipo",
