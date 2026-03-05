@@ -1,5 +1,7 @@
 import WebSocket from "ws";
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 import { z } from "zod";
 
 // ─── Protocol types (matching OpenClaw protocol v3) ─────────────────
@@ -46,15 +48,41 @@ function base64UrlEncode(buf: Buffer): string {
   return buf.toString("base64url");
 }
 
-function generateDeviceIdentity() {
+interface DeviceIdentity {
+  deviceId: string;
+  publicKeyB64: string;
+  privateKeyPem: string;
+}
+
+const DEVICE_IDENTITY_PATH = path.join(
+  process.env.DEVICE_IDENTITY_DIR ?? ".openclaw",
+  "device-identity.json",
+);
+
+function loadOrCreateDeviceIdentity(): DeviceIdentity {
+  try {
+    const data = JSON.parse(fs.readFileSync(DEVICE_IDENTITY_PATH, "utf-8"));
+    if (data.deviceId && data.publicKeyB64 && data.privateKeyPem) {
+      console.log(`[Gateway] Loaded device identity ${data.deviceId.slice(0, 8)}…`);
+      return data;
+    }
+  } catch {
+    // File doesn't exist or is invalid — generate new identity
+  }
+
   const { publicKey, privateKey } = crypto.generateKeyPairSync("ed25519");
   const rawPub = publicKey.export({ type: "spki", format: "der" }).subarray(12);
   const deviceId = crypto.createHash("sha256").update(rawPub).digest("hex");
-  return {
+  const identity: DeviceIdentity = {
     deviceId,
     publicKeyB64: base64UrlEncode(rawPub),
     privateKeyPem: privateKey.export({ type: "pkcs8", format: "pem" }) as string,
   };
+
+  fs.mkdirSync(path.dirname(DEVICE_IDENTITY_PATH), { recursive: true });
+  fs.writeFileSync(DEVICE_IDENTITY_PATH, JSON.stringify(identity, null, 2), { mode: 0o600 });
+  console.log(`[Gateway] Created new device identity ${deviceId.slice(0, 8)}…`);
+  return identity;
 }
 
 function buildDeviceAuthPayload(params: {
@@ -260,7 +288,7 @@ class GatewayRelay {
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private serverInfo: { version: string; connId: string } | null = null;
-  private device = generateDeviceIdentity();
+  private device = loadOrCreateDeviceIdentity();
 
   get isConnected(): boolean {
     return this._connected;

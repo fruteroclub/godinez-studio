@@ -17,6 +17,7 @@ import Agents from "./pages/Agents";
 import Activity from "./pages/Activity";
 import Team from "./pages/Team";
 import Settings from "./pages/Settings";
+import Admin from "./pages/Admin";
 
 export const router = createBrowserRouter([
   {
@@ -67,6 +68,7 @@ export const router = createBrowserRouter([
       { path: "activity", element: <Activity /> },
       { path: "team", element: <Team /> },
       { path: "settings", element: <Settings /> },
+      { path: "admin", element: <Admin /> },
     ],
   },
   {

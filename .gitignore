@@ -3,5 +3,6 @@ dist/
 .turbo/
 *.tsbuildinfo
 .env
+.openclaw/
 .env.local
 .env.*.local
