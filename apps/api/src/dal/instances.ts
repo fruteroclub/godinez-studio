@@ -163,6 +163,20 @@ export async function decrementUsedSlots(id: number) {
     .where(eq(gatewayInstances.id, id));
 }
 
+export async function markInstanceOffline(id: number) {
+  await db
+    .update(gatewayInstances)
+    .set({ status: "offline" })
+    .where(eq(gatewayInstances.id, id));
+}
+
+export async function markInstanceActive(id: number) {
+  await db
+    .update(gatewayInstances)
+    .set({ status: "active" })
+    .where(eq(gatewayInstances.id, id));
+}
+
 export async function deleteInstance(id: number) {
   const instance = await db.query.gatewayInstances.findFirst({
     where: eq(gatewayInstances.id, id),
