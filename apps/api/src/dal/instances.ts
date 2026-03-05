@@ -1,4 +1,4 @@
-import { sql, eq } from "drizzle-orm";
+import { sql, eq, and } from "drizzle-orm";
 import {
   gatewayInstances,
   workspaces,
@@ -109,6 +109,58 @@ export async function updateInstance(
     .where(eq(gatewayInstances.id, id))
     .returning();
   return instance;
+}
+
+export async function getInstanceByName(name: string) {
+  return db.query.gatewayInstances.findFirst({
+    where: eq(gatewayInstances.name, name),
+  });
+}
+
+export async function pickSharedInstance() {
+  // Fill-then-spill: pick the fullest non-full active shared instance
+  const [row] = await db
+    .select()
+    .from(gatewayInstances)
+    .where(
+      and(
+        eq(gatewayInstances.tier, "shared"),
+        eq(gatewayInstances.status, "active"),
+        sql`${gatewayInstances.usedSlots} < ${gatewayInstances.maxSlots}`,
+      ),
+    )
+    .orderBy(sql`${gatewayInstances.usedSlots} DESC`)
+    .limit(1);
+  return row ?? null;
+}
+
+export async function pickDedicatedInstance(customerId: number) {
+  const [row] = await db
+    .select()
+    .from(gatewayInstances)
+    .where(
+      and(
+        eq(gatewayInstances.tier, "dedicated"),
+        eq(gatewayInstances.customerId, customerId),
+        eq(gatewayInstances.status, "active"),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+export async function incrementUsedSlots(id: number) {
+  await db
+    .update(gatewayInstances)
+    .set({ usedSlots: sql`${gatewayInstances.usedSlots} + 1` })
+    .where(eq(gatewayInstances.id, id));
+}
+
+export async function decrementUsedSlots(id: number) {
+  await db
+    .update(gatewayInstances)
+    .set({ usedSlots: sql`GREATEST(${gatewayInstances.usedSlots} - 1, 0)` })
+    .where(eq(gatewayInstances.id, id));
 }
 
 export async function deleteInstance(id: number) {
