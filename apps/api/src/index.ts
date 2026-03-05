@@ -22,7 +22,7 @@ import conversations, {
 import referralCodes from "./routes/referral-codes";
 import admin from "./routes/admin";
 import users from "./routes/users";
-import { gateway } from "./services/gateway-relay";
+import "./services/gateway-pool"; // initialize pool (lazy connections)
 
 const app = new Hono();
 
@@ -79,13 +79,5 @@ serve({ fetch: app.fetch, port }, () => {
   console.log(`Godinez Studio API running on port ${port}`);
 });
 
-// Connect to OpenClaw Gateway if configured
-if (process.env.OPENCLAW_GATEWAY_URL) {
-  gateway
-    .connect(
-      process.env.OPENCLAW_GATEWAY_URL,
-      process.env.OPENCLAW_GATEWAY_TOKEN!,
-    )
-    .then(() => console.log("[Gateway] Connected"))
-    .catch((err) => console.error("[Gateway] Connection failed:", err));
-}
+// Gateway connections are now lazy via GatewayPool — no startup connection needed.
+// Instances are registered in the gateway_instances table and connected on first use.

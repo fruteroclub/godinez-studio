@@ -294,61 +294,42 @@ openclaw gateway call chat.send \
 # should return: { "runId": "verify-1", "status": "started" }
 ```
 
-## Step 8 — Connect to Godinez Studio API
+## Step 8 — Register Instance in Godinez Studio
 
-> **Current limitation:** The API connects to a single gateway via `OPENCLAW_GATEWAY_URL`. Multi-instance routing (OPS-21–24) is not yet implemented.
+The API uses a **gateway pool** that connects to instances on demand. No gateway env vars needed — instances are registered in the database and managed via the admin dashboard.
 
-### For Railway (production/staging)
+### Register via admin dashboard
 
-Set these env vars on the API service:
+1. Open the admin dashboard at `/admin`
+2. In the **Instancias** section, click **Agregar instancia**
+3. Fill in the form:
 
-```
-OPENCLAW_GATEWAY_URL=wss://godin-{NNN}-openclaw-gateway.godinez.ai
-OPENCLAW_GATEWAY_TOKEN=<token-from-step-4>
-AGENT_MAX_SLOTS=15
-AGENT_WORKSPACE_BASE=/home/<user>/.openclaw/workspaces
-```
+| Field | Value | Source |
+|-------|-------|--------|
+| Name | `godin-{NNN}` | Your naming convention |
+| URL | `wss://godin-{NNN}-openclaw-gateway.godinez.ai` | From Step 5 (CF Tunnel) |
+| Token | `<token>` | From Step 4 (`~/.openclaw/openclaw.json` → `gateway.auth.token`) |
+| Tier | `shared` or `dedicated` | `shared` for general use |
+| Max slots | `15` | Matches provisioning script |
+| Region | `us-east-1` | EC2 region |
 
-### For local development
+4. Click **Guardar**
 
-**`apps/api/.env.local`:**
-
-```bash
-DATABASE_URL=postgresql://godinez:godinez@localhost:5432/godinez_studio
-CLERK_SECRET_KEY=sk_test_...
-PORT=3001
-CORS_ORIGIN=http://localhost:5173
-OPENCLAW_GATEWAY_URL=wss://godin-{NNN}-openclaw-gateway.godinez.ai
-OPENCLAW_GATEWAY_TOKEN=<token-from-step-4>
-AGENT_WORKSPACE_BASE=/home/<user>/.openclaw/workspaces
-```
-
-**`apps/web/.env.local`:**
-
-```bash
-VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
-```
+The pool connects lazily — the first chat or provision request targeting this instance triggers the WebSocket connection.
 
 ### Device pairing (first connection only)
 
-The first time the API connects, the gateway rejects it with "pairing required":
-
-```
-[Gateway] Auth failed: pairing required
-```
-
-On the EC2:
+The first time the pool connects to a new instance, the gateway rejects it with "pairing required". On the EC2:
 
 ```bash
 openclaw devices list          # find the pending request from "Godinez Studio"
 openclaw devices approve <request-id>
 ```
 
-Restart the API — should now connect:
+The next request will auto-retry and connect:
 
 ```
 [Gateway] Connected to OpenClaw vX.X.X
-[Gateway] Connected
 ```
 
 ## Step 9 — Verify End-to-End
@@ -426,15 +407,7 @@ To decommission an instance:
 5. Terminate EC2 instance
 6. Remove from instance registry
 
-## What's Next (Layer 2 — Multi-Instance Routing)
+## What's Next
 
-Tracked as OPS-21 through OPS-27. When built, the API will:
-
-1. **Instance registry** — DB table (`gateway_instances`) mapping instance → URL + token + capacity + workspace base
-2. **Gateway pool** — Replace singleton `gateway-relay.ts` with connection pool keyed by instance
-3. **Routing logic** — Provision endpoint picks instance with available capacity (fill-then-spill)
-4. **Workspace binding** — `workspaces.instanceId` column persists which gateway owns the workspace
-5. **Health checks** — Periodic pings, circuit breaker on failures
-6. **Migration tooling** — Move workspace between instances (re-create agent + re-inject files)
-
-This will eliminate the manual `AGENT_WORKSPACE_BASE` env var and the single-gateway limitation.
+- **OPS-25/26** — Graceful degradation (API returns "agent offline" + UI shows status when instance is down)
+- **Migration tooling** — Move workspace between instances (re-create agent + re-inject files)
