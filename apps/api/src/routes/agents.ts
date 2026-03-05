@@ -64,9 +64,9 @@ app.get("/:id/files", async (c) => {
   try {
     relay = await getRelayForAgent(id);
   } catch {
-    return c.json({ error: "Gateway offline" }, 503);
+    return c.json({ error: "AGENT_OFFLINE", message: "Tu agente no está disponible en este momento." }, 503);
   }
-  if (!relay) return c.json({ error: "Gateway offline" }, 503);
+  if (!relay) return c.json({ error: "AGENT_OFFLINE", message: "Tu agente no está disponible en este momento." }, 503);
 
   try {
     const result = await relay.agentsFilesList(agent.openclawId);
@@ -89,9 +89,9 @@ app.get("/:id/files/:name", async (c) => {
   try {
     relay = await getRelayForAgent(id);
   } catch {
-    return c.json({ error: "Gateway offline" }, 503);
+    return c.json({ error: "AGENT_OFFLINE", message: "Tu agente no está disponible en este momento." }, 503);
   }
-  if (!relay) return c.json({ error: "Gateway offline" }, 503);
+  if (!relay) return c.json({ error: "AGENT_OFFLINE", message: "Tu agente no está disponible en este momento." }, 503);
 
   try {
     const file = await relay.agentsFilesGet(agent.openclawId, name);
@@ -118,9 +118,9 @@ app.put(
     try {
       relay = await getRelayForAgent(id);
     } catch {
-      return c.json({ error: "Gateway offline" }, 503);
+      return c.json({ error: "AGENT_OFFLINE", message: "Tu agente no está disponible en este momento." }, 503);
     }
-    if (!relay) return c.json({ error: "Gateway offline" }, 503);
+    if (!relay) return c.json({ error: "AGENT_OFFLINE", message: "Tu agente no está disponible en este momento." }, 503);
 
     try {
       const file = await relay.agentsFilesSet(agent.openclawId, name, content);
@@ -224,9 +224,9 @@ app.post("/:id/reinject-soul", async (c) => {
   try {
     relay = await getRelayForAgent(id);
   } catch {
-    return c.json({ error: "Gateway offline" }, 503);
+    return c.json({ error: "AGENT_OFFLINE", message: "Tu agente no está disponible en este momento." }, 503);
   }
-  if (!relay) return c.json({ error: "Gateway offline" }, 503);
+  if (!relay) return c.json({ error: "AGENT_OFFLINE", message: "Tu agente no está disponible en este momento." }, 503);
 
   const workspace = await getWorkspaceByAgentId(id);
   const cfg = parseAgentConfig(agent.config);

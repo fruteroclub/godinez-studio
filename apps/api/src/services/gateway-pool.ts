@@ -4,6 +4,8 @@ import {
   getInstanceByName,
   pickSharedInstance,
   pickDedicatedInstance,
+  markInstanceOffline,
+  markInstanceActive,
 } from "../dal/instances";
 import {
   POOL_IDLE_TIMEOUT_MS,
@@ -11,13 +13,15 @@ import {
   LEGACY_INSTANCE_NAME,
 } from "../lib/config";
 
+const MAX_CONNECT_FAILURES = 3;
+
 class GatewayPool {
   private relays = new Map<number, GatewayRelay>();
   private healthTimer: ReturnType<typeof setInterval> | null = null;
   private legacyInstanceId: number | null = null;
+  private failureCounts = new Map<number, number>();
 
   constructor() {
-    // Start idle reaping + health checks
     this.healthTimer = setInterval(() => {
       this.reapIdle();
     }, POOL_HEALTH_INTERVAL_MS);
@@ -35,18 +39,31 @@ class GatewayPool {
     if (!instance) {
       throw new Error(`Instance ${instanceId} not found`);
     }
+    if (instance.status === "offline") {
+      throw new Error("AGENT_OFFLINE");
+    }
     if (instance.status !== "active") {
       throw new Error(`Instance ${instance.name} is ${instance.status}`);
     }
 
-    const relay = new GatewayRelay(instanceId);
-    await relay.connect(instance.url, instance.token);
-    this.relays.set(instanceId, relay);
-    return relay;
+    try {
+      const relay = new GatewayRelay(instanceId);
+      await relay.connect(instance.url, instance.token);
+      this.relays.set(instanceId, relay);
+      // Reset failure count on success and ensure active status
+      if (this.failureCounts.has(instanceId)) {
+        this.failureCounts.delete(instanceId);
+        await markInstanceActive(instanceId);
+        console.log(`[GatewayPool] Instance ${instance.name} recovered, marking active`);
+      }
+      return relay;
+    } catch (err) {
+      await this.recordFailure(instanceId, instance.name);
+      throw err;
+    }
   }
 
   async getRelayForWorkspace(instanceId: number | null): Promise<GatewayRelay> {
-    // Workspaces with null instanceId fall back to legacy instance
     const resolvedId = instanceId ?? (await this.getLegacyInstanceId());
     if (resolvedId === null) {
       throw new Error("No legacy instance configured");
@@ -69,6 +86,15 @@ class GatewayPool {
     if (relay) {
       relay.disconnect();
       this.relays.delete(instanceId);
+    }
+  }
+
+  private async recordFailure(instanceId: number, name: string): Promise<void> {
+    const count = (this.failureCounts.get(instanceId) ?? 0) + 1;
+    this.failureCounts.set(instanceId, count);
+    if (count >= MAX_CONNECT_FAILURES) {
+      await markInstanceOffline(instanceId);
+      console.log(`[GatewayPool] Instance ${name} marked offline after ${count} failures`);
     }
   }
 

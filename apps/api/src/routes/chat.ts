@@ -228,7 +228,7 @@ app.get("/stream/:runId", async (c) => {
     if (!relay) {
       await stream.writeSSE({
         event: "error",
-        data: JSON.stringify({ type: "error", error: "Gateway offline" }),
+        data: JSON.stringify({ type: "error", error: "AGENT_OFFLINE" }),
       });
       cleanup();
       await stream.close();
