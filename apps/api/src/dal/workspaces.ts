@@ -143,3 +143,55 @@ export async function getWorkspacePreview(workspaceId: number) {
     name: project.name,
   };
 }
+
+export async function saveWorkspacePreview(workspaceId: number, previewUrl: string) {
+  // Find or create an active project to store the preview URL
+  const existingProject = await db.query.projects.findFirst({
+    where: and(
+      eq(projects.workspaceId, workspaceId),
+      eq(projects.status, "active"),
+    ),
+    orderBy: (projects, { desc }) => [desc(projects.updatedAt)],
+  });
+
+  if (existingProject) {
+    // Update existing project
+    const [updated] = await db
+      .update(projects)
+      .set({ previewUrl })
+      .where(eq(projects.id, existingProject.id))
+      .returning();
+    return updated;
+  } else {
+    // Create new project with preview URL
+    const [created] = await db
+      .insert(projects)
+      .values({
+        workspaceId,
+        name: "Live Preview",
+        description: "Auto-created from tunnel URL",
+        status: "active",
+        previewUrl,
+      })
+      .returning();
+    return created;
+  }
+}
+
+export async function getRecentChatMessages(workspaceId: number, limit: number = 20) {
+  // Get recent assistant messages that might contain tunnel URLs
+  const recentMessages = await db.query.messages.findMany({
+    where: and(
+      eq(messages.workspaceId, workspaceId),
+      eq(messages.role, "assistant"),
+    ),
+    orderBy: (messages, { desc }) => [desc(messages.createdAt)],
+    limit,
+  });
+
+  return recentMessages.map((m) => ({
+    id: m.id,
+    content: m.content,
+    createdAt: m.createdAt,
+  }));
+}
