@@ -19,6 +19,7 @@ export const gatewayInstances = pgTable("gateway_instances", {
   status: text("status").notNull().default("active"),
   maxSlots: integer("max_slots").notNull().default(15),
   usedSlots: integer("used_slots").notNull().default(0),
+  workspaceBase: text("workspace_base").notNull().default("/home/openclaw/.openclaw/workspaces"),
   region: varchar("region", { length: 20 }).default("us-east-1"),
   customerId: integer("customer_id").references(
     (): AnyPgColumn => workspaces.id,
