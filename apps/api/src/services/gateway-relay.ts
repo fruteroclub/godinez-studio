@@ -274,7 +274,7 @@ type RunHandler = {
 
 // ─── Gateway Relay ──────────────────────────────────────────────────
 
-class GatewayRelay {
+export class GatewayRelay {
   private ws: WebSocket | null = null;
   private pendingRuns = new Map<string, RunHandler>();
   private pendingRequests = new Map<
@@ -290,11 +290,22 @@ class GatewayRelay {
   private serverInfo: { version: string; connId: string } | null = null;
   private device = loadOrCreateDeviceIdentity();
 
+  /** ID from gateway_instances table. -1 for legacy singleton. */
+  readonly instanceId: number;
+  /** Updated on every method call — used by GatewayPool for idle reaping. */
+  lastActivityAt: Date;
+
+  constructor(instanceId = -1) {
+    this.instanceId = instanceId;
+    this.lastActivityAt = new Date();
+  }
+
   get isConnected(): boolean {
     return this._connected;
   }
 
   async connect(url: string, token: string): Promise<HelloOk> {
+    this.lastActivityAt = new Date();
     this.url = url;
     this.token = token;
 
@@ -563,10 +574,12 @@ class GatewayRelay {
   // ─── Run handlers for streaming ───────────────────────────────
 
   onRun(runId: string, handlers: RunHandler): void {
+    this.lastActivityAt = new Date();
     this.pendingRuns.set(runId, handlers);
   }
 
   offRun(runId: string): void {
+    this.lastActivityAt = new Date();
     this.pendingRuns.delete(runId);
   }
 
@@ -629,6 +642,7 @@ class GatewayRelay {
     method: string,
     params: Record<string, unknown>,
   ): Promise<ResponseFrame> {
+    this.lastActivityAt = new Date();
     return new Promise((resolve) => {
       if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
         resolve({
@@ -687,4 +701,5 @@ class GatewayRelay {
   }
 }
 
+// Backward-compat singleton — will be replaced by GatewayPool in OPS-22
 export const gateway = new GatewayRelay();
