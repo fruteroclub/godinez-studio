@@ -21,6 +21,7 @@ import conversations, {
 } from "./routes/conversations";
 import referralCodes from "./routes/referral-codes";
 import admin from "./routes/admin";
+import users from "./routes/users";
 import { gateway } from "./services/gateway-relay";
 
 const app = new Hono();
@@ -59,6 +60,7 @@ app.route("/api/chat", chat);
 app.route("/api/conversations", conversations);
 app.route("/api/referral-codes", referralCodes);
 app.route("/api/admin", admin);
+app.route("/api/users", users);
 app.route("/webhooks", webhooks);
 
 // Serve uploaded files in development (in production, R2 serves files directly)

@@ -2,36 +2,46 @@
 
 How to provision a new EC2 instance running OpenClaw Gateway for Godinez Studio.
 
-## Reference Instance
-
-The current production setup (instance `godin-002`):
+## Architecture Overview
 
 ```
-EC2 ip-172-31-81-169  (us-east-1, Ubuntu)
-├── User: devrel-frutero
-├── OpenClaw: 2026.2.19-2
-├── Node: 22+
-├── Gateway: port 18789, bind loopback, auth token
-├── Tunnel: Cloudflare Tunnel → wss://godin-002-openclaw-gateway.godinez.ai
-├── Agent slots: godin-slot-{1..15}
-├── Workspace base: /home/devrel-frutero/.openclaw/workspaces/
-├── Model: anthropic/claude-sonnet-4-6
-├── maxConcurrent: 4 (shared across all agents)
-├── Hooks: boot-md, command-logger, session-memory
-└── Existing "main" agent (Telegram + Discord) — do not touch
+┌─────────────────────┐     wss://     ┌──────────────────────────────────────┐
+│  Godinez Studio API  │◄──────────────►│  EC2 Instance (OpenClaw Gateway)     │
+│  (Railway / local)   │  CF Tunnel     │                                      │
+└─────────────────────┘                 │  cloudflared ──► localhost:18789     │
+                                        │                                      │
+                                        │  Agents:                             │
+                                        │  ├── main (Telegram/Discord)         │
+                                        │  ├── godin-slot-1  ◄── Studio user   │
+                                        │  ├── godin-slot-2  ◄── Studio user   │
+                                        │  ├── ...                             │
+                                        │  └── godin-slot-15 ◄── Studio user   │
+                                        │                                      │
+                                        │  Each slot has:                      │
+                                        │  ├── workspace/  (SOUL.md, etc.)     │
+                                        │  └── agent/auth-profiles.json        │
+                                        └──────────────────────────────────────┘
 ```
+
+The Studio API connects to the gateway via Cloudflare Tunnel (`wss://`). Each user workspace maps to one agent slot. The `main` agent handles Telegram/Discord and is not used by Studio.
+
+## Reference Instances
+
+| Instance | EC2 | User | Gateway URL | Slots | Status |
+|----------|-----|------|-------------|-------|--------|
+| godin-001 | ip-172-31-82-45 | dumbleclaw | `wss://godin-001-openclaw-gateway.godinez.ai` | 1-15 | active (dev) |
+| godin-002 | ip-172-31-81-169 | devrel-frutero | `wss://godin-002-openclaw-gateway.godinez.ai` | 1-15 | active (beta) |
 
 ## Prerequisites
 
-- AWS account with EC2 access (us-east-1 or target region)
-- Cloudflare account with access to `godinez.ai` zone (Account B)
-- Anthropic API key (for the OpenClaw instance's Claude usage)
-- GitHub PAT with `repo` scope (for github-worker skill, if needed)
-- SSH key pair for the new instance
+- **EC2 instance** — Ubuntu 22.04+, t3.medium minimum (t3.large recommended), us-east-1
+- **LLM API key** — Anthropic recommended (model: `anthropic/claude-sonnet-4-6`)
+- **Cloudflare account** — access to `godinez.ai` zone (Account B)
+- **SSH access** — to the EC2 instance
 
 ## Step 1 — Provision EC2
 
-Launch an Ubuntu 22.04+ instance. Recommended specs:
+Launch an Ubuntu 22.04+ instance.
 
 | Spec | Minimum | Recommended |
 |------|---------|-------------|
@@ -40,38 +50,31 @@ Launch an Ubuntu 22.04+ instance. Recommended specs:
 | Storage | 20 GB gp3 | 40 GB gp3 |
 | Region | us-east-1 | same as current |
 
-Security group rules:
+Security group — SSH only. Gateway stays on loopback, Cloudflare Tunnel handles external access:
 
 | Port | Source | Purpose |
 |------|--------|---------|
 | 22 | your IP / bastion | SSH |
-| 18789 | 127.0.0.1 only | Gateway (Cloudflare Tunnel handles external access) |
-
-> Gateway binds to loopback — external access goes through Cloudflare Tunnel, not a public port.
 
 ```bash
-# tag the instance for identification
-# naming convention: godin-{NNN} (e.g. godin-003, godin-004)
+# naming convention: godin-{NNN}
 INSTANCE_NAME="godin-003"
 ```
 
 ## Step 2 — System Setup
 
-SSH into the new instance and install dependencies.
-
 ```bash
-# update system
 sudo apt update && sudo apt upgrade -y
 
-# install Node.js 22+
+# Node.js 22+
 curl -fsSL https://deb.nodesource.com/setup_22.x | sudo bash -
 sudo apt install -y nodejs
 
-# install pnpm (for skill dependencies)
+# pnpm (for skill dependencies)
 npm install -g pnpm@latest
 
 # verify
-node --version   # must be >= 22
+node --version   # >= 22
 pnpm --version
 
 # create service user (or use default ubuntu user)
@@ -82,278 +85,313 @@ sudo su - openclaw
 ## Step 3 — Install OpenClaw
 
 ```bash
-# as the openclaw user
 npm install -g openclaw@latest
-
-# verify
 openclaw --version
 
-# create directory structure
 mkdir -p ~/.openclaw/workspaces
 mkdir -p ~/.openclaw/workspace/skills
 ```
 
 ## Step 4 — Configure OpenClaw
 
-Create `~/.openclaw/config.json`. This is the core config — adapt from the template below.
+```bash
+openclaw onboard
+```
+
+Choose **local** for gateway mode. This creates `~/.openclaw/openclaw.json`.
+
+After the wizard completes, verify and patch the config. These settings are **required** for Studio agent slots to work:
+
+```bash
+# open the config
+nano ~/.openclaw/openclaw.json
+```
+
+Verify these keys exist under `agents.defaults`:
 
 ```json
 {
-  "meta": {
-    "lastTouchedVersion": "2026.2.25"
-  },
-  "gateway": {
-    "port": 18789,
-    "bind": "loopback",
-    "auth": {
-      "mode": "token",
-      "token": "GENERATE_WITH_openssl_rand_-hex_32"
-    },
-    "reload": {
-      "mode": "hybrid",
-      "debounceMs": 300
-    }
-  },
   "agents": {
     "defaults": {
-      "workspace": "~/.openclaw/workspace",
-      "models": {
-        "primary": "anthropic/claude-sonnet-4-6"
-      }
-    },
-    "maxConcurrent": 4,
-    "subagents": {
-      "maxConcurrent": 8
-    }
-  },
-  "hooks": {
-    "enabled": true,
-    "internal": {
-      "enabled": true,
-      "entries": {
-        "boot-md": { "enabled": true },
-        "command-logger": { "enabled": true },
-        "session-memory": { "enabled": true }
-      }
-    }
-  },
-  "skills": {
-    "load": {
-      "extraDirs": [
-        "~/.openclaw/workspace/skills"
-      ]
-    },
-    "entries": {}
-  },
-  "channels": {},
-  "env": {
-    "vars": {
-      "ANTHROPIC_API_KEY": "sk-ant-..."
+      "model": { "primary": "anthropic/claude-sonnet-4-6" },
+      "compaction": { "mode": "safeguard" },
+      "maxConcurrent": 4,
+      "subagents": { "maxConcurrent": 8 }
     }
   }
 }
 ```
 
-Generate the gateway token:
+Verify gateway config:
 
-```bash
-TOKEN=$(openssl rand -hex 32)
-echo "Gateway token: $TOKEN"
-# paste into config.json gateway.auth.token
-# also save for Step 7 (Railway env var)
+```json
+{
+  "gateway": {
+    "port": 18789,
+    "bind": "loopback",
+    "auth": {
+      "mode": "token",
+      "token": "<auto-generated-or-run: openssl rand -hex 24>"
+    }
+  }
+}
 ```
 
-Set permissions:
-
-```bash
-chmod 700 ~/.openclaw
-chmod 600 ~/.openclaw/config.json
-```
+> **Save the gateway token** — you'll need it for the Studio API env vars.
 
 ## Step 5 — Install Cloudflare Tunnel
 
-The tunnel exposes the loopback gateway to the internet via Cloudflare, avoiding public ports.
+> **Always use a Cloudflare Tunnel.** Do NOT use direct WS connections (`ws://<ip>:18789`) via Tailscale, VPN, or public IP. Direct connections introduce multiple failure modes: bind mismatches (loopback vs LAN), security group rules, NAT traversal. The tunnel is one moving part and matches production.
+
+### Option A — Via Cloudflare Dashboard (recommended)
+
+1. Go to [Cloudflare Zero Trust](https://one.dash.cloudflare.com) → **Networks** → **Tunnels**
+2. Create tunnel: `godin-{NNN}-openclaw-gateway`
+3. Add public hostname:
+   - Subdomain: `godin-{NNN}-openclaw-gateway`
+   - Domain: `godinez.ai`
+   - Type: `HTTP`
+   - URL: `localhost:18789`
+4. Copy the install command (contains the tunnel token)
+
+On the EC2:
 
 ```bash
-# install cloudflared
+# install cloudflared if not present
 curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -o cloudflared.deb
 sudo dpkg -i cloudflared.deb
 
-# authenticate (opens browser or use service token)
-cloudflared tunnel login
+# install the tunnel connector (paste token from dashboard)
+sudo cloudflared service install <TOKEN>
+sudo systemctl enable cloudflared
+sudo systemctl start cloudflared
+```
 
-# create tunnel — naming convention: godin-{NNN}-openclaw-gateway
+### Option B — Via CLI
+
+```bash
+cloudflared tunnel login
 TUNNEL_NAME="${INSTANCE_NAME}-openclaw-gateway"
 cloudflared tunnel create $TUNNEL_NAME
-
-# note the tunnel UUID from output
-TUNNEL_ID="<uuid-from-output>"
-```
-
-Create tunnel config at `~/.cloudflared/config.yml`:
-
-```yaml
-tunnel: <TUNNEL_ID>
-credentials-file: /home/openclaw/.cloudflared/<TUNNEL_ID>.json
-
-ingress:
-  - hostname: godin-003-openclaw-gateway.godinez.ai
-    service: ws://localhost:18789
-    originRequest:
-      noTLSVerify: true
-  - service: http_status:404
-```
-
-Add DNS record:
-
-```bash
-cloudflared tunnel route dns $TUNNEL_NAME godin-003-openclaw-gateway.godinez.ai
-```
-
-Install as systemd service:
-
-```bash
+cloudflared tunnel route dns $TUNNEL_NAME ${INSTANCE_NAME}-openclaw-gateway.godinez.ai
 sudo cloudflared service install
 sudo systemctl enable cloudflared
 sudo systemctl start cloudflared
 ```
 
-## Step 6 — Start Gateway & Verify
+### Verify tunnel
 
 ```bash
-# start gateway (foreground first to verify)
-openclaw gateway run --verbose
+# on EC2
+sudo systemctl status cloudflared   # active (running)
 
-# expected output:
-# Gateway listening on 127.0.0.1:18789
-# Auth mode: token
-# ...
-
-# verify from the instance
-curl -s http://localhost:18789/health
-
-# verify through tunnel (from your laptop)
-wscat -c wss://godin-003-openclaw-gateway.godinez.ai
-# should connect (then fail auth — that's expected)
+# from your local machine
+curl -i https://godin-{NNN}-openclaw-gateway.godinez.ai
+# should return HTTP 200 with OpenClaw Control UI HTML
 ```
 
-Install gateway as systemd service for persistence:
+## Step 6 — Start Gateway
 
 ```bash
-# option A: openclaw's built-in daemon installer
+openclaw gateway start
+
+# verify
+ss -tlnp | grep 18789   # should show LISTEN on 127.0.0.1:18789
+openclaw agents list     # should show "main" agent
+```
+
+### Auto-start on reboot
+
+```bash
 openclaw onboard --install-daemon
-
-# option B: manual systemd unit
-sudo tee /etc/systemd/system/openclaw-gateway.service << 'EOF'
-[Unit]
-Description=OpenClaw Gateway
-After=network.target
-
-[Service]
-Type=simple
-User=openclaw
-WorkingDirectory=/home/openclaw/.openclaw
-Environment="PATH=/usr/local/bin:/usr/bin"
-Environment="NODE_ENV=production"
-ExecStart=/usr/local/bin/openclaw gateway run --verbose
-Restart=always
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=openclaw-gateway
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable openclaw-gateway
-sudo systemctl start openclaw-gateway
-
-# check status
-sudo systemctl status openclaw-gateway
-sudo journalctl -u openclaw-gateway -f
 ```
 
-## Step 7 — Connect to Godinez Studio API
+## Step 7 — Provision Agent Slots
 
-> **Current limitation:** The API connects to a single gateway via `OPENCLAW_GATEWAY_URL`. Multi-instance routing is not yet implemented. For now, deploy a separate API service per gateway or manually reassign the env var.
+This is the critical step. Each Studio user gets assigned one agent slot. Slots must be pre-provisioned with:
+1. An OpenClaw agent (name + workspace dir)
+2. Auth credentials (`auth-profiles.json` copied from `main`)
 
-Set these Railway env vars on the API service that will use this instance:
+> **Why pre-provision?** OpenClaw's `agents.create` does NOT copy auth credentials from the `main` agent. Without `auth-profiles.json`, a slot will accept `chat.send` (return `status: "started"`) but **silently never respond** — no error, no events. This is the #1 cause of "agent created but never responds".
+
+### Provisioning script
+
+Run this on the EC2 as the openclaw user:
+
+```bash
+#!/bin/bash
+# provision-slots.sh — Pre-provision 15 agent slots for Godinez Studio
+# Run as the openclaw user on the EC2 instance
+
+set -euo pipefail
+
+SLOTS=15
+USER_HOME=$(eval echo ~)
+AUTH_SOURCE="$USER_HOME/.openclaw/agents/main/agent/auth-profiles.json"
+
+# Verify auth source exists
+if [ ! -f "$AUTH_SOURCE" ]; then
+  echo "ERROR: main agent auth-profiles.json not found at $AUTH_SOURCE"
+  echo "Run 'openclaw onboard' first to configure the main agent."
+  exit 1
+fi
+
+echo "Provisioning $SLOTS agent slots..."
+
+for i in $(seq 1 $SLOTS); do
+  SLOT="godin-slot-$i"
+  AGENT_DIR="$USER_HOME/.openclaw/agents/$SLOT/agent"
+  WORKSPACE_DIR="$USER_HOME/.openclaw/workspaces/$SLOT"
+
+  # Check if agent already exists
+  if openclaw agents list --json 2>/dev/null | grep -q "\"id\":\"$SLOT\""; then
+    echo "[$SLOT] already exists — ensuring auth-profiles"
+  else
+    echo "[$SLOT] creating agent..."
+    openclaw gateway call agents.create \
+      --params "{\"name\":\"$SLOT\",\"workspace\":\"$WORKSPACE_DIR\"}"
+  fi
+
+  # Copy auth credentials
+  mkdir -p "$AGENT_DIR"
+  cp "$AUTH_SOURCE" "$AGENT_DIR/auth-profiles.json"
+  echo "[$SLOT] auth-profiles.json copied"
+done
+
+echo ""
+echo "Done. Restarting gateway..."
+openclaw gateway restart
+
+echo ""
+echo "Verifying..."
+openclaw agents list
+echo ""
+echo "Expected: main + $SLOTS godin-slot-N agents"
+```
+
+Save and run:
+
+```bash
+chmod +x provision-slots.sh
+./provision-slots.sh
+```
+
+### Verify
+
+```bash
+openclaw agents list
+# should show: main + godin-slot-1 through godin-slot-15
+# each with workspace at ~/.openclaw/workspaces/godin-slot-N
+
+# spot-check auth
+cat ~/.openclaw/agents/godin-slot-1/agent/auth-profiles.json
+cat ~/.openclaw/agents/godin-slot-15/agent/auth-profiles.json
+# both should contain valid credentials
+
+# test one slot responds
+openclaw gateway call chat.send \
+  --params '{"sessionKey":"agent:godin-slot-1:test","message":"hello","idempotencyKey":"verify-1"}'
+# should return: { "runId": "verify-1", "status": "started" }
+```
+
+## Step 8 — Connect to Godinez Studio API
+
+> **Current limitation:** The API connects to a single gateway via `OPENCLAW_GATEWAY_URL`. Multi-instance routing (OPS-21–24) is not yet implemented.
+
+### For Railway (production/staging)
+
+Set these env vars on the API service:
 
 ```
-OPENCLAW_GATEWAY_URL=wss://godin-003-openclaw-gateway.godinez.ai
+OPENCLAW_GATEWAY_URL=wss://godin-{NNN}-openclaw-gateway.godinez.ai
 OPENCLAW_GATEWAY_TOKEN=<token-from-step-4>
 AGENT_MAX_SLOTS=15
-AGENT_WORKSPACE_BASE=/home/openclaw/.openclaw/workspaces
+AGENT_WORKSPACE_BASE=/home/<user>/.openclaw/workspaces
 ```
 
-The API will connect on startup (`apps/api/src/index.ts:79`):
+### For local development
 
-```typescript
-if (process.env.OPENCLAW_GATEWAY_URL) {
-  gateway.connect(process.env.OPENCLAW_GATEWAY_URL, process.env.OPENCLAW_GATEWAY_TOKEN!)
-}
-```
-
-Verify: provision a test workspace from the Studio UI. Check API logs for `[Gateway] Connected` and `[Provision] Agent created`.
-
-## Step 8 — Install Skills (Optional)
-
-If this instance needs the github-worker skill:
+**`apps/api/.env.local`:**
 
 ```bash
-# clone skills repo
-git clone https://github.com/fruteroclub/godinez-skills.git /tmp/godinez-skills
+DATABASE_URL=postgresql://godinez:godinez@localhost:5432/godinez_studio
+CLERK_SECRET_KEY=sk_test_...
+PORT=3001
+CORS_ORIGIN=http://localhost:5173
+OPENCLAW_GATEWAY_URL=wss://godin-{NNN}-openclaw-gateway.godinez.ai
+OPENCLAW_GATEWAY_TOKEN=<token-from-step-4>
+AGENT_WORKSPACE_BASE=/home/<user>/.openclaw/workspaces
+```
 
-# copy skill to workspace
-cp -r /tmp/godinez-skills/godinez-github-worker ~/.openclaw/workspace/skills/
+**`apps/web/.env.local`:**
 
-# add to config.json
-# skills.entries:
-#   "godinez-github-worker": {
-#     "enabled": true,
-#     "apiKey": "<github-pat>"
-#   }
-# skills.load.extraDirs should already include "~/.openclaw/workspace/skills"
+```bash
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+```
 
-# restart gateway to pick up skills
-sudo systemctl restart openclaw-gateway
+### Device pairing (first connection only)
+
+The first time the API connects, the gateway rejects it with "pairing required":
+
+```
+[Gateway] Auth failed: pairing required
+```
+
+On the EC2:
+
+```bash
+openclaw devices list          # find the pending request from "Godinez Studio"
+openclaw devices approve <request-id>
+```
+
+Restart the API — should now connect:
+
+```
+[Gateway] Connected to OpenClaw vX.X.X
+[Gateway] Connected
 ```
 
 ## Step 9 — Verify End-to-End
 
-Run through the complete flow:
-
 ```bash
-# 1. gateway health
-curl -s http://localhost:18789/health
+# 1. API connects
+pnpm dev:api
+# look for: [Gateway] Connected
 
-# 2. list agents (should be empty on fresh instance)
-openclaw gateway call agents.list
+# 2. Start web
+pnpm dev:web
+# open http://localhost:5173
 
-# 3. from Studio UI: create workspace → onboarding → provision agent
-#    check API logs for:
+# 3. Sign in, create workspace, go through onboarding
+#    API logs should show:
 #    [Provision] Listing agents...
-#    [Provision] Creating agent: godin-slot-1
-#    [Provision] Agent created: <agentId>
+#    [Provision] Creating agent: godin-slot-1  (NOTE: this reuses pre-provisioned slot)
+#    [Provision] Agent created: godin-slot-1
 #    [Provision] SOUL.md injected for godin-slot-1
 
-# 4. send a chat message — verify SSE streaming works
+# 4. Send a chat message — agent should respond with SSE streaming
 
-# 5. check workspace files were created
+# 5. On EC2, verify workspace files
 ls -la ~/.openclaw/workspaces/godin-slot-1/
-# should contain: SOUL.md, MEMORY.md, IDENTITY.md, etc.
+# should contain: SOUL.md, MEMORY.md, IDENTITY.md, AGENTS.md, etc.
+```
+
+## Step 10 — Install Skills (Optional)
+
+```bash
+git clone https://github.com/fruteroclub/godinez-skills.git /tmp/godinez-skills
+cp -r /tmp/godinez-skills/godinez-github-worker ~/.openclaw/workspace/skills/
+
+# restart gateway to pick up skills
+openclaw gateway restart
 ```
 
 ## Capacity Planning
 
-Per-instance limits:
-
 | Resource | Value | Notes |
 |----------|-------|-------|
 | Agent slots | 15 | `AGENT_MAX_SLOTS` env var, soft limit |
-| Concurrent requests | 4 | `agents.maxConcurrent` in config.json |
+| Concurrent requests | 4 | `agents.maxConcurrent` in openclaw.json |
 | Subagent concurrency | 8 | `agents.subagents.maxConcurrent` |
 | Workspace disk | ~5 MB/agent | Grows with MEMORY.md, session logs |
 
@@ -362,35 +400,41 @@ Per-instance limits:
 - CPU/RAM saturation from concurrent requests
 - Latency increase on chat responses (contention)
 
-**Scaling the slot limit:** Increasing `AGENT_MAX_SLOTS` beyond 15 works but increases contention on `maxConcurrent`. If bumping slots, also bump `maxConcurrent` proportionally (rule of thumb: 1 concurrent per 4 slots).
+**Scaling the slot limit:** Increasing beyond 15 works but increases contention on `maxConcurrent`. Rule of thumb: 1 concurrent per 4 slots.
 
-## Instance Registry (Manual)
+## Troubleshooting
 
-Until multi-instance routing is built, track instances manually:
-
-| Instance | Gateway URL | Token | Slots | Status |
-|----------|-------------|-------|-------|--------|
-| godin-002 | `wss://godin-002-openclaw-gateway.godinez.ai` | (in Railway) | 1-15 | active |
-| godin-003 | `wss://godin-003-openclaw-gateway.godinez.ai` | (in Railway) | 1-15 | pending |
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `gateway closed (1006)` from CLI on EC2 | Gateway not running or crashed | `openclaw gateway start` |
+| `Auth failed: pairing required` | New device, not yet approved | `openclaw devices list` + `approve` on EC2 |
+| CLI can't connect but tunnel works | Gateway on loopback, CLI using LAN IP | Restart gateway or check `ss -tlnp \| grep 18789` |
+| Tunnel returns 502 Bad Gateway | Gateway not listening on :18789 | Start/restart gateway |
+| `chat.send` returns `started` but agent never responds | Missing `auth-profiles.json` on the slot, or `agents.defaults.model` not set | Copy auth-profiles from main; verify model in openclaw.json |
+| `EACCES: permission denied, mkdir` during provision | `AGENT_WORKSPACE_BASE` points to wrong user's home dir | Set correct path in env vars |
+| Direct `ws://` connection hangs | Firewall, NAT, Tailscale issues | Use `wss://` tunnel URL instead |
+| `openclaw devices list` fails on EC2 | Gateway process crashed or was restarted | `kill $(pgrep -f openclaw-gateway) && openclaw gateway start` |
 
 ## Teardown
 
 To decommission an instance:
 
 1. Migrate active workspaces (reassign `agentSlot` in DB, re-provision on target instance)
-2. Stop gateway: `sudo systemctl stop openclaw-gateway`
-3. Remove tunnel: `cloudflared tunnel delete $TUNNEL_NAME`
+2. Stop gateway: `openclaw gateway stop` or `kill $(pgrep -f openclaw-gateway)`
+3. Remove tunnel: Cloudflare Dashboard → Tunnels → delete, or `cloudflared tunnel delete $TUNNEL_NAME`
 4. Remove DNS record from Cloudflare
 5. Terminate EC2 instance
 6. Remove from instance registry
 
 ## What's Next (Layer 2 — Multi-Instance Routing)
 
-Not yet built. When needed, the API will require:
+Tracked as OPS-21 through OPS-27. When built, the API will:
 
-1. **Instance registry** — DB table mapping `instance_id` → gateway URL + token + capacity
-2. **Gateway pool** — Replace singleton `gateway-relay.ts` with a connection pool keyed by instance
-3. **Routing logic** — Provision endpoint picks instance with available capacity
-4. **Workspace binding** — `workspaces.instanceId` column to persist which gateway owns the workspace
-5. **Health checks** — Periodic pings to detect offline instances, circuit breaker on failures
+1. **Instance registry** — DB table (`gateway_instances`) mapping instance → URL + token + capacity + workspace base
+2. **Gateway pool** — Replace singleton `gateway-relay.ts` with connection pool keyed by instance
+3. **Routing logic** — Provision endpoint picks instance with available capacity (fill-then-spill)
+4. **Workspace binding** — `workspaces.instanceId` column persists which gateway owns the workspace
+5. **Health checks** — Periodic pings, circuit breaker on failures
 6. **Migration tooling** — Move workspace between instances (re-create agent + re-inject files)
+
+This will eliminate the manual `AGENT_WORKSPACE_BASE` env var and the single-gateway limitation.
