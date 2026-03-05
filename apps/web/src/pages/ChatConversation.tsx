@@ -16,8 +16,8 @@ const { chat: chatContent } = content.studio;
 // Regex to detect tunnel URLs
 const TUNNEL_URL_REGEX = /(https?:\/\/[a-z0-9-]+\.(?:trycloudflare\.com|ngrok\.io|ngrok-free\.app|localhost\.run)(?:\/[^\s\)\]\*\`\<\>]*)?)/gi;
 
-type ViewMode = "chat" | "split" | "preview";
 type TunnelStatus = "idle" | "checking" | "live" | "dead";
+type PreviewDevice = "desktop" | "mobile";
 
 // Extract tunnel URL from message content
 function extractTunnelUrl(messageContent: string): string | null {
@@ -43,10 +43,12 @@ export default function ChatConversation() {
   const [input, setInput] = useState("");
   
   // Preview state
-  const [viewMode, setViewMode] = useState<ViewMode>("chat");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [tunnelStatus, setTunnelStatus] = useState<TunnelStatus>("idle");
   const [isMobile, setIsMobile] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewDevice, setPreviewDevice] = useState<PreviewDevice>("desktop");
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Detect mobile - only on mount
   useEffect(() => {
@@ -83,14 +85,19 @@ export default function ChatConversation() {
     return null;
   }, [messages]);
 
-  // Update preview URL when detected
+  // Update preview URL when detected - with animation
   useEffect(() => {
     if (detectedUrl && detectedUrl !== previewUrl) {
       setPreviewUrl(detectedUrl);
       checkTunnelHealth(detectedUrl);
-      // Auto-switch to split view on desktop
-      if (!isMobile && viewMode === "chat") {
-        setViewMode("split");
+      
+      // Trigger transition animation on desktop
+      if (!isMobile) {
+        setIsTransitioning(true);
+        setTimeout(() => {
+          setShowPreview(true);
+          setIsTransitioning(false);
+        }, 300);
       }
     }
   }, [detectedUrl]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -158,199 +165,185 @@ export default function ChatConversation() {
     }
   }, [tunnelStatus]);
 
+  const previewWidth = previewDevice === "mobile" ? "375px" : "100%";
+
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col">
-      {/* Header with view tabs */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-[hsl(var(--border))]">
-        <h2 className="text-sm font-medium text-[hsl(var(--foreground))]">
-          {chatContent.title}
-        </h2>
-        {/* View tabs - desktop only */}
-        {!isMobile && (
-          <div className="flex gap-1 p-1 bg-[hsl(var(--muted))] rounded-lg">
-            <button
-              onClick={() => setViewMode("chat")}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
-                viewMode === "chat"
-                  ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm"
-                  : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-              }`}
-            >
-              💬 Chat
-            </button>
-            <button
-              onClick={() => setViewMode("split")}
-              disabled={!previewUrl}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 ${
-                viewMode === "split"
-                  ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm"
-                  : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-              }`}
-            >
-              🖥️ Split
-            </button>
-            <button
-              onClick={() => setViewMode("preview")}
-              disabled={!previewUrl}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 ${
-                viewMode === "preview"
-                  ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm"
-                  : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
-              }`}
-            >
-              🧪 Preview
-            </button>
-          </div>
-        )}
-      </div>
-
       {/* Mobile banner when preview available */}
       {isMobile && previewUrl && (
-        <div className="bg-[hsl(var(--muted))] border-b border-[hsl(var(--border))] px-4 py-3">
+        <div className="bg-gradient-to-r from-magenta/10 to-violet/10 border-b border-magenta/20 px-4 py-3 animate-in slide-in-from-top duration-300">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full ${statusColor}`} />
-              <span className="text-sm text-[hsl(var(--muted-foreground))]">
-                Preview disponible
+              <span className="text-sm font-medium text-[hsl(var(--foreground))]">
+                ✨ Preview listo
               </span>
             </div>
             <a
               href={previewUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-md bg-magenta px-3 py-1.5 text-xs font-medium text-white"
+              className="rounded-full bg-magenta px-4 py-1.5 text-xs font-medium text-white shadow-lg shadow-magenta/25 hover:shadow-magenta/40 transition-shadow"
             >
               Abrir ↗️
             </a>
           </div>
-          <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
-            💻 Para mejor experiencia usa escritorio
+          <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1.5">
+            💻 Para editar en vivo, usa escritorio
           </p>
         </div>
       )}
 
-      {/* Main content */}
-      <div className={`flex-1 flex overflow-hidden ${
-        viewMode === "split" && !isMobile ? "" : "flex-col"
+      {/* Main content with animated transition */}
+      <div className={`flex-1 flex overflow-hidden transition-all duration-500 ease-out ${
+        isTransitioning ? "opacity-50" : "opacity-100"
       }`}>
         {/* Chat panel */}
-        {(viewMode !== "preview" || isMobile) && (
-          <div className={`flex flex-col ${
-            viewMode === "split" && !isMobile 
-              ? "w-1/2 border-r border-[hsl(var(--border))]" 
-              : "flex-1"
-          }`}>
-            {/* Typing indicator */}
-            {isStreaming && (
-              <div className="border-b border-[hsl(var(--border))] px-4 py-1.5">
-                <p className="text-xs text-magenta animate-pulse">
-                  Agente está escribiendo...
+        <div className={`flex flex-col transition-all duration-500 ease-out ${
+          showPreview && !isMobile 
+            ? "w-1/2 border-r border-[hsl(var(--border))]" 
+            : "w-full"
+        }`}>
+          {/* Typing indicator */}
+          {isStreaming && (
+            <div className="border-b border-[hsl(var(--border))] px-4 py-2 bg-magenta/5">
+              <div className="flex items-center gap-2">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-magenta rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-2 h-2 bg-magenta rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-2 h-2 bg-magenta rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                </div>
+                <p className="text-xs text-magenta font-medium">
+                  Creando tu proyecto...
                 </p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {isLoading && (
+              <div className="flex justify-center py-8">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-magenta border-t-transparent" />
               </div>
             )}
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {isLoading && (
-                <div className="flex justify-center py-8">
-                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-magenta border-t-transparent" />
-                </div>
-              )}
-
-              {messages.map((msg) => (
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+              >
                 <div
-                  key={msg.id}
-                  className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
+                    msg.role === "user"
+                      ? "bg-magenta text-white rounded-br-md whitespace-pre-wrap"
+                      : msg.role === "agent"
+                        ? "bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded-bl-md prose prose-invert prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2 prose-pre:my-2"
+                        : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] text-xs italic whitespace-pre-wrap"
+                  }`}
                 >
-                  <div
-                    className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
-                      msg.role === "user"
-                        ? "bg-magenta text-white rounded-br-md whitespace-pre-wrap"
-                        : msg.role === "agent"
-                          ? "bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded-bl-md prose prose-invert prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2 prose-pre:my-2"
-                          : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] text-xs italic whitespace-pre-wrap"
-                    }`}
-                  >
-                    {msg.role === "agent" ? (
-                      <>
-                        <ReactMarkdown>
-                          {stripActionBlocks(msg.content)}
-                        </ReactMarkdown>
-                        {msg.actions && msg.actions.length > 0 && (
-                          <div className="mt-2 not-prose">
-                            {msg.actions.map((action) => (
-                              <ActionCard
-                                key={action.id}
-                                action={action}
-                                messageId={msg.id}
-                                onExecute={execute}
-                                disabled={msg.streaming}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      msg.content
-                    )}
-                  </div>
-                  {msg.role === "agent" && !msg.streaming && (
-                    <div className="ml-1 flex items-end">
-                      <ManualActionMenu onSelect={handleManualAction} />
-                    </div>
+                  {msg.role === "agent" ? (
+                    <>
+                      <ReactMarkdown>
+                        {stripActionBlocks(msg.content)}
+                      </ReactMarkdown>
+                      {msg.actions && msg.actions.length > 0 && (
+                        <div className="mt-2 not-prose">
+                          {msg.actions.map((action) => (
+                            <ActionCard
+                              key={action.id}
+                              action={action}
+                              messageId={msg.id}
+                              onExecute={execute}
+                              disabled={msg.streaming}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    msg.content
                   )}
                 </div>
-              ))}
-
-              {messages.length === 0 && !isLoading && (
-                <p className="text-center text-sm text-[hsl(var(--muted-foreground))] py-8">
-                  Envía un mensaje para empezar la conversación
-                </p>
-              )}
-
-              <div ref={bottomRef} />
-            </div>
-
-            <form
-              onSubmit={handleSubmit}
-              className="border-t border-[hsl(var(--border))] p-4"
-            >
-              <div className="flex gap-2 items-end">
-                <textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={chatContent.placeholder}
-                  disabled={isStreaming}
-                  rows={1}
-                  className="flex-1 resize-none rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-4 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20 disabled:opacity-50"
-                />
-                <button
-                  type="submit"
-                  disabled={isStreaming || !input.trim()}
-                  className="rounded-md bg-magenta px-4 py-2 text-sm font-medium text-white hover:bg-magenta/90 transition-colors disabled:opacity-50"
-                >
-                  {chatContent.send}
-                </button>
+                {msg.role === "agent" && !msg.streaming && (
+                  <div className="ml-1 flex items-end">
+                    <ManualActionMenu onSelect={handleManualAction} />
+                  </div>
+                )}
               </div>
-            </form>
-          </div>
-        )}
+            ))}
 
-        {/* Preview panel */}
-        {viewMode !== "chat" && !isMobile && (
-          <div className={`flex flex-col bg-[hsl(var(--muted))] ${
-            viewMode === "split" ? "w-1/2" : "flex-1"
-          }`}>
+            {messages.length === 0 && !isLoading && (
+              <p className="text-center text-sm text-[hsl(var(--muted-foreground))] py-8">
+                Envía un mensaje para empezar la conversación
+              </p>
+            )}
+
+            <div ref={bottomRef} />
+          </div>
+
+          <form
+            onSubmit={handleSubmit}
+            className="border-t border-[hsl(var(--border))] p-4"
+          >
+            <div className="flex gap-2 items-end">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={chatContent.placeholder}
+                disabled={isStreaming}
+                rows={1}
+                className="flex-1 resize-none rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-4 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20 disabled:opacity-50"
+              />
+              <button
+                type="submit"
+                disabled={isStreaming || !input.trim()}
+                className="rounded-md bg-magenta px-4 py-2 text-sm font-medium text-white hover:bg-magenta/90 transition-colors disabled:opacity-50"
+              >
+                {chatContent.send}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* Preview panel - slides in with animation */}
+        {showPreview && !isMobile && (
+          <div className="flex flex-col bg-[hsl(var(--muted))] w-1/2 animate-in slide-in-from-right duration-500">
             {/* Preview header */}
             <div className="flex items-center justify-between px-4 py-2 border-b border-[hsl(var(--border))] bg-[hsl(var(--card))]">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
                 <span className={`w-2 h-2 rounded-full ${statusColor}`} />
-                <span className="text-xs text-[hsl(var(--muted-foreground))] truncate max-w-[200px]">
-                  {previewUrl}
+                <span className="text-sm font-medium text-[hsl(var(--foreground))]">
+                  ✨ Preview
                 </span>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
+                {/* Device toggle */}
+                <div className="flex gap-1 p-1 bg-[hsl(var(--muted))] rounded-lg">
+                  <button
+                    onClick={() => setPreviewDevice("desktop")}
+                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                      previewDevice === "desktop"
+                        ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm"
+                        : "text-[hsl(var(--muted-foreground))]"
+                    }`}
+                    title="Desktop"
+                  >
+                    🖥️
+                  </button>
+                  <button
+                    onClick={() => setPreviewDevice("mobile")}
+                    className={`px-2 py-1 text-xs rounded transition-colors ${
+                      previewDevice === "mobile"
+                        ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm"
+                        : "text-[hsl(var(--muted-foreground))]"
+                    }`}
+                    title="Mobile"
+                  >
+                    📱
+                  </button>
+                </div>
                 <button
                   onClick={handleRefreshPreview}
                   className="p-1.5 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] rounded"
@@ -363,52 +356,62 @@ export default function ChatConversation() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="p-1.5 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] rounded"
-                  title="Open in new tab"
+                  title="Abrir en nueva pestaña"
                 >
                   ↗️
                 </a>
+                <button
+                  onClick={() => setShowPreview(false)}
+                  className="p-1.5 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] rounded"
+                  title="Cerrar preview"
+                >
+                  ✕
+                </button>
               </div>
             </div>
 
             {/* Preview content */}
-            <div className="flex-1 relative">
+            <div className="flex-1 relative flex items-center justify-center bg-[hsl(var(--muted))] p-4">
               {tunnelStatus === "live" && previewUrl ? (
-                <iframe
-                  ref={iframeRef}
-                  src={previewUrl}
-                  className="absolute inset-0 w-full h-full border-0 bg-white"
-                  title="Preview"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-                />
+                <div 
+                  className={`bg-white rounded-lg shadow-2xl overflow-hidden transition-all duration-300 ${
+                    previewDevice === "mobile" ? "h-[667px]" : "w-full h-full"
+                  }`}
+                  style={{ width: previewWidth }}
+                >
+                  <iframe
+                    ref={iframeRef}
+                    src={previewUrl}
+                    className="w-full h-full border-0"
+                    title="Preview"
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                  />
+                </div>
               ) : tunnelStatus === "checking" ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center">
-                    <div className="text-4xl mb-4 animate-spin">⏳</div>
-                    <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                      Verificando tunnel...
-                    </p>
+                <div className="text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r from-magenta to-violet flex items-center justify-center animate-pulse">
+                    <span className="text-2xl">✨</span>
                   </div>
+                  <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                    Conectando preview...
+                  </p>
                 </div>
               ) : tunnelStatus === "dead" ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center p-8">
-                    <div className="text-4xl mb-4">🔌</div>
-                    <p className="text-sm text-destructive font-medium mb-2">
-                      Tunnel desconectado
-                    </p>
-                    <p className="text-xs text-[hsl(var(--muted-foreground))] max-w-xs">
-                      Pide al agente que genere un nuevo tunnel
-                    </p>
-                  </div>
+                <div className="text-center p-8">
+                  <div className="text-4xl mb-4">🔌</div>
+                  <p className="text-sm text-destructive font-medium mb-2">
+                    Preview desconectado
+                  </p>
+                  <p className="text-xs text-[hsl(var(--muted-foreground))] max-w-xs">
+                    Pide al agente que regenere el tunnel
+                  </p>
                 </div>
               ) : (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center p-8">
-                    <div className="text-4xl mb-4">🧪</div>
-                    <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                      El preview aparecerá aquí cuando el agente cree tu proyecto
-                    </p>
-                  </div>
+                <div className="text-center p-8">
+                  <div className="text-4xl mb-4">🧪</div>
+                  <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                    El preview aparecerá aquí
+                  </p>
                 </div>
               )}
             </div>

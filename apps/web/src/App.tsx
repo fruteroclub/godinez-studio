@@ -15,7 +15,6 @@ import Tasks from "./pages/Tasks";
 import Files from "./pages/Files";
 import Agents from "./pages/Agents";
 import Activity from "./pages/Activity";
-import Lab from "./pages/Lab";
 import Team from "./pages/Team";
 import Settings from "./pages/Settings";
 
@@ -66,7 +65,6 @@ export const router = createBrowserRouter([
       { path: "files", element: <Files /> },
       { path: "agents", element: <Agents /> },
       { path: "activity", element: <Activity /> },
-      { path: "lab", element: <Lab /> },
       { path: "team", element: <Team /> },
       { path: "settings", element: <Settings /> },
     ],
