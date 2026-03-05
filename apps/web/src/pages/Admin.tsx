@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, Link } from "react-router-dom";
 import {
   LineChart,
   Line,
@@ -10,7 +10,6 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
-import { useWorkspace } from "@/providers/WorkspaceProvider";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import {
   useAdminOverview,
@@ -18,6 +17,7 @@ import {
   useAdminInstances,
   useAdminGrowth,
   useInstanceHealth,
+  useCreateInstance,
 } from "@/hooks/use-admin";
 import { content } from "@/lib/content";
 import { PageSkeleton, ListSkeleton } from "@/components/ui/Skeleton";
@@ -77,7 +77,7 @@ function OverviewSection() {
   );
 }
 
-// --- Section 2: Instance Health Table ---
+// --- Section 2: Instance Health Table + Create Form ---
 
 function InstanceRow({ instance }: { instance: AdminInstanceRow }) {
   const [expanded, setExpanded] = useState(false);
@@ -171,20 +171,163 @@ function InstanceRow({ instance }: { instance: AdminInstanceRow }) {
   );
 }
 
+function CreateInstanceForm({ onClose }: { onClose: () => void }) {
+  const [name, setName] = useState("");
+  const [url, setUrl] = useState("");
+  const [token, setToken] = useState("");
+  const [tier, setTier] = useState<"shared" | "dedicated">("shared");
+  const [maxSlots, setMaxSlots] = useState(15);
+  const [workspaceBase, setWorkspaceBase] = useState("/home/openclaw/.openclaw/workspaces");
+  const [region, setRegion] = useState("us-east-1");
+  const createInstance = useCreateInstance();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createInstance.mutate(
+      { name, url, token, tier, maxSlots, workspaceBase, region },
+      { onSuccess: () => onClose() },
+    );
+  };
+
+  const inputClass =
+    "w-full rounded-md border border-[hsl(var(--border))] bg-[hsl(var(--input))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus:ring-1 focus:ring-magenta";
+
+  return (
+    <form onSubmit={handleSubmit} className="border-t border-[hsl(var(--border))] p-4 space-y-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-xs text-[hsl(var(--muted-foreground))]">
+            {admin.name}
+          </label>
+          <input
+            className={inputClass}
+            placeholder={admin.namePlaceholder}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-[hsl(var(--muted-foreground))]">
+            {admin.url}
+          </label>
+          <input
+            className={inputClass}
+            placeholder={admin.urlPlaceholder}
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            required
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-[hsl(var(--muted-foreground))]">
+            {admin.token}
+          </label>
+          <input
+            className={inputClass}
+            type="password"
+            placeholder={admin.tokenPlaceholder}
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            required
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs text-[hsl(var(--muted-foreground))]">
+            {admin.workspaceBase}
+          </label>
+          <input
+            className={inputClass}
+            placeholder={admin.workspaceBasePlaceholder}
+            value={workspaceBase}
+            onChange={(e) => setWorkspaceBase(e.target.value)}
+            required
+          />
+        </div>
+        <div className="flex gap-3">
+          <div className="flex-1">
+            <label className="mb-1 block text-xs text-[hsl(var(--muted-foreground))]">
+              {admin.tier}
+            </label>
+            <select
+              className={inputClass}
+              value={tier}
+              onChange={(e) => setTier(e.target.value as "shared" | "dedicated")}
+            >
+              <option value="shared">shared</option>
+              <option value="dedicated">dedicated</option>
+            </select>
+          </div>
+          <div className="w-24">
+            <label className="mb-1 block text-xs text-[hsl(var(--muted-foreground))]">
+              {admin.maxSlots}
+            </label>
+            <input
+              className={inputClass}
+              type="number"
+              min={1}
+              value={maxSlots}
+              onChange={(e) => setMaxSlots(Number(e.target.value))}
+            />
+          </div>
+          <div className="flex-1">
+            <label className="mb-1 block text-xs text-[hsl(var(--muted-foreground))]">
+              {admin.region}
+            </label>
+            <input
+              className={inputClass}
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+      {createInstance.error && (
+        <p className="text-sm text-red-400">{createInstance.error.message}</p>
+      )}
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-md px-4 py-2 text-sm text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] transition-colors"
+        >
+          {admin.cancel}
+        </button>
+        <button
+          type="submit"
+          disabled={createInstance.isPending}
+          className="rounded-md bg-magenta px-4 py-2 text-sm font-medium text-white hover:bg-magenta/90 transition-colors disabled:opacity-50"
+        >
+          {createInstance.isPending ? "..." : admin.save}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 function InstancesSection() {
   const { data: instances, isLoading } = useAdminInstances();
+  const [showForm, setShowForm] = useState(false);
 
   return (
     <section>
-      <h2 className="mb-4 text-lg font-semibold text-[hsl(var(--foreground))]">
-        {admin.instances}
-      </h2>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-[hsl(var(--foreground))]">
+          {admin.instances}
+        </h2>
+        <button
+          onClick={() => setShowForm(!showForm)}
+          className="rounded-md bg-magenta px-3 py-1.5 text-sm font-medium text-white hover:bg-magenta/90 transition-colors"
+        >
+          {admin.addInstance}
+        </button>
+      </div>
       <div className="overflow-x-auto rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
         {isLoading ? (
           <div className="p-4">
             <ListSkeleton rows={3} />
           </div>
-        ) : !instances?.length ? (
+        ) : !instances?.length && !showForm ? (
           <p className="p-4 text-sm text-[hsl(var(--muted-foreground))]">{admin.noInstances}</p>
         ) : (
           <table className="w-full text-left">
@@ -200,12 +343,13 @@ function InstancesSection() {
               </tr>
             </thead>
             <tbody>
-              {instances.map((inst) => (
+              {instances?.map((inst) => (
                 <InstanceRow key={inst.id} instance={inst} />
               ))}
             </tbody>
           </table>
         )}
+        {showForm && <CreateInstanceForm onClose={() => setShowForm(false)} />}
       </div>
     </section>
   );
@@ -395,21 +539,32 @@ function GrowthSection() {
 // --- Main Admin Page ---
 
 export default function Admin() {
-  const { slug } = useWorkspace();
   const { data: user, isLoading } = useCurrentUser();
 
   if (isLoading) return <PageSkeleton />;
-  if (user?.role !== "admin") return <Navigate to={`/studio/${slug}`} replace />;
+  if (user?.role !== "admin") return <Navigate to="/studio" replace />;
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-2xl font-semibold text-[hsl(var(--foreground))]">
-        {admin.title}
-      </h1>
-      <OverviewSection />
-      <InstancesSection />
-      <WorkspacesSection />
-      <GrowthSection />
+    <div className="min-h-screen bg-[hsl(var(--background))]">
+      <header className="border-b border-[hsl(var(--border))] px-6 py-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold text-[hsl(var(--foreground))]">
+            {admin.title}
+          </h1>
+          <Link
+            to="/studio"
+            className="rounded-md px-3 py-1.5 text-sm text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] transition-colors"
+          >
+            ← Studio
+          </Link>
+        </div>
+      </header>
+      <main className="mx-auto max-w-7xl space-y-8 p-6">
+        <OverviewSection />
+        <InstancesSection />
+        <WorkspacesSection />
+        <GrowthSection />
+      </main>
     </div>
   );
 }

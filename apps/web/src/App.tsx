@@ -68,8 +68,15 @@ export const router = createBrowserRouter([
       { path: "activity", element: <Activity /> },
       { path: "team", element: <Team /> },
       { path: "settings", element: <Settings /> },
-      { path: "admin", element: <Admin /> },
     ],
+  },
+  {
+    path: "/admin",
+    element: (
+      <ProtectedRoute>
+        <Admin />
+      </ProtectedRoute>
+    ),
   },
   {
     path: "*",

@@ -17,7 +17,8 @@ import {
   deleteWorkspace,
   getMemberRole,
 } from "../dal/workspaces";
-import { gateway } from "../services/gateway-relay";
+import { pool } from "../services/gateway-pool";
+import { decrementUsedSlots } from "../dal/instances";
 import { ensureUniqueSlug } from "../lib/slug";
 
 const app = new Hono<AuthEnv>();
@@ -91,10 +92,15 @@ app.delete(
     const workspace = await getWorkspaceById(id);
 
     // Clean up OpenClaw agent if one is linked
-    if (workspace?.agentSlot && gateway.isConnected) {
+    if (workspace?.agentSlot) {
       try {
-        await gateway.agentsDelete(workspace.agentSlot, true);
+        const relay = await pool.getRelayForWorkspace(workspace.instanceId);
+        await relay.agentsDelete(workspace.agentSlot, true);
         console.log("[Workspace] Deleted OpenClaw agent:", workspace.agentSlot);
+        // Decrement used_slots on the instance
+        if (workspace.instanceId) {
+          await decrementUsedSlots(workspace.instanceId);
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "agents.delete failed";
         console.warn("[Workspace] Agent cleanup failed (non-fatal):", msg);

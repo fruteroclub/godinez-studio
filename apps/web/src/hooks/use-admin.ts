@@ -1,5 +1,5 @@
 import { useAuth } from "@clerk/clerk-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type {
   AdminOverviewStats,
   AdminWorkspaceRow,
@@ -57,6 +57,32 @@ export function useAdminGrowth(period: "7d" | "30d" | "90d") {
         `/api/admin/growth?period=${period}`,
         { token },
       );
+    },
+  });
+}
+
+export function useCreateInstance() {
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: {
+      name: string;
+      url: string;
+      token: string;
+      tier?: "shared" | "dedicated";
+      maxSlots?: number;
+      workspaceBase?: string;
+      region?: string;
+    }) => {
+      const token = await getToken();
+      return apiFetch<AdminInstanceRow>("/api/admin/instances", {
+        token,
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "instances"] });
     },
   });
 }

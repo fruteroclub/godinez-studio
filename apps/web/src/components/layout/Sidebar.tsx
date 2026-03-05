@@ -44,7 +44,7 @@ export default function Sidebar({
   if (currentUser?.role === "admin") {
     secondaryItems.push({
       label: content.studio.admin.sidebar,
-      href: `/studio/${slug}/admin`,
+      href: "/admin",
       icon: "🔒",
     });
   }
