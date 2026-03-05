@@ -13,9 +13,15 @@ import type { ActionType } from "@godinez/types";
 
 const { chat } = content.studio;
 
+// Regex to detect tunnel URLs
+const TUNNEL_URL_REGEX = /(https?:\/\/[a-z0-9-]+\.(?:trycloudflare\.com|ngrok\.io|ngrok-free\.app|localhost\.run)(?:\/[^\s\)\]\*\`\<\>]*)?)/gi;
+
+type ViewMode = "chat" | "split" | "preview";
+type TunnelStatus = "idle" | "checking" | "live" | "dead";
+
 export default function ChatConversation() {
   const { conversationId } = useParams<{ conversationId: string }>();
-  const { workspace } = useWorkspace();
+  const { workspace, slug } = useWorkspace();
   const qc = useQueryClient();
   const onComplete = useCallback(
     () => qc.invalidateQueries({ queryKey: ["conversations", workspace?.id] }),
@@ -26,7 +32,74 @@ export default function ChatConversation() {
   const { execute } = useActionExecutor(updateAction);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [input, setInput] = useState("");
+  
+  // Preview state
+  const [viewMode, setViewMode] = useState<ViewMode>("chat");
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [tunnelStatus, setTunnelStatus] = useState<TunnelStatus>("idle");
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Extract tunnel URL from message content
+  const extractTunnelUrl = (content: string): string | null => {
+    if (typeof content !== "string") return null;
+    const matches = content.match(TUNNEL_URL_REGEX);
+    return matches ? matches[0] : null;
+  };
+
+  // Check if tunnel is alive
+  const checkTunnelHealth = useCallback(async (url: string): Promise<boolean> => {
+    setTunnelStatus("checking");
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      await fetch(url, { mode: "no-cors", signal: controller.signal });
+      clearTimeout(timeout);
+      setTunnelStatus("live");
+      return true;
+    } catch {
+      setTunnelStatus("dead");
+      return false;
+    }
+  }, []);
+
+  // Scan messages for tunnel URLs
+  useEffect(() => {
+    for (const msg of [...messages].reverse()) {
+      if (msg.role === "agent") {
+        const url = extractTunnelUrl(msg.content);
+        if (url && url !== previewUrl) {
+          setPreviewUrl(url);
+          checkTunnelHealth(url);
+          // Auto-switch to split view on desktop when tunnel detected
+          if (!isMobile && viewMode === "chat") {
+            setViewMode("split");
+          }
+          break;
+        }
+      }
+    }
+  }, [messages, previewUrl, isMobile, viewMode, checkTunnelHealth]);
+
+  // Save preview URL to DB
+  useEffect(() => {
+    if (previewUrl && slug) {
+      fetch(`/api/workspaces/${slug}/preview`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ previewUrl }),
+      }).catch(console.error);
+    }
+  }, [previewUrl, slug]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -57,11 +130,98 @@ export default function ChatConversation() {
 
   function handleManualAction(_type: ActionType) {
     // TODO Phase 2: open a form dialog for the selected action type
-    // For now this is a placeholder
   }
 
-  return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col">
+  function handleRefreshPreview() {
+    if (iframeRef.current && previewUrl) {
+      const url = new URL(previewUrl);
+      url.searchParams.set("_t", Date.now().toString());
+      iframeRef.current.src = url.toString();
+    }
+    if (previewUrl) checkTunnelHealth(previewUrl);
+  }
+
+  const getStatusColor = () => {
+    switch (tunnelStatus) {
+      case "live": return "bg-green-400";
+      case "checking": return "bg-yellow-400 animate-pulse";
+      case "dead": return "bg-red-400";
+      default: return "bg-gray-400";
+    }
+  };
+
+  // Mobile banner when preview is available
+  const MobileBanner = () => {
+    if (!isMobile || !previewUrl) return null;
+    return (
+      <div className="bg-[hsl(var(--muted))] border-b border-[hsl(var(--border))] px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${getStatusColor()}`} />
+            <span className="text-sm text-[hsl(var(--muted-foreground))]">
+              Preview disponible
+            </span>
+          </div>
+          <a
+            href={previewUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-md bg-magenta px-3 py-1.5 text-xs font-medium text-white"
+          >
+            Abrir ↗️
+          </a>
+        </div>
+        <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1">
+          💻 Para mejor experiencia usa escritorio
+        </p>
+      </div>
+    );
+  };
+
+  // View mode tabs (desktop only)
+  const ViewTabs = () => {
+    if (isMobile) return null;
+    return (
+      <div className="flex gap-1 p-1 bg-[hsl(var(--muted))] rounded-lg">
+        <button
+          onClick={() => setViewMode("chat")}
+          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+            viewMode === "chat"
+              ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm"
+              : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+          }`}
+        >
+          💬 Chat
+        </button>
+        <button
+          onClick={() => setViewMode("split")}
+          disabled={!previewUrl}
+          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 ${
+            viewMode === "split"
+              ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm"
+              : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+          }`}
+        >
+          🖥️ Split
+        </button>
+        <button
+          onClick={() => setViewMode("preview")}
+          disabled={!previewUrl}
+          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-50 ${
+            viewMode === "preview"
+              ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm"
+              : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+          }`}
+        >
+          🧪 Preview
+        </button>
+      </div>
+    );
+  };
+
+  // Chat panel component
+  const ChatPanel = ({ className = "" }: { className?: string }) => (
+    <div className={`flex flex-col ${className}`}>
       {/* Typing indicator */}
       {isStreaming && (
         <div className="border-b border-[hsl(var(--border))] px-4 py-1.5">
@@ -84,7 +244,7 @@ export default function ChatConversation() {
             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm ${
+              className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
                 msg.role === "user"
                   ? "bg-magenta text-white rounded-br-md whitespace-pre-wrap"
                   : msg.role === "agent"
@@ -115,7 +275,6 @@ export default function ChatConversation() {
                 msg.content
               )}
             </div>
-            {/* Manual action menu on agent messages */}
             {msg.role === "agent" && !msg.streaming && (
               <div className="ml-1 flex items-end">
                 <ManualActionMenu onSelect={handleManualAction} />
@@ -157,6 +316,109 @@ export default function ChatConversation() {
           </button>
         </div>
       </form>
+    </div>
+  );
+
+  // Preview panel component
+  const PreviewPanel = ({ className = "" }: { className?: string }) => (
+    <div className={`flex flex-col bg-[hsl(var(--muted))] ${className}`}>
+      {/* Preview header */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+        <div className="flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${getStatusColor()}`} />
+          <span className="text-xs text-[hsl(var(--muted-foreground))] truncate max-w-[200px]">
+            {previewUrl}
+          </span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handleRefreshPreview}
+            className="p-1.5 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] rounded"
+            title="Refresh"
+          >
+            🔄
+          </button>
+          <a
+            href={previewUrl || "#"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="p-1.5 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] rounded"
+            title="Open in new tab"
+          >
+            ↗️
+          </a>
+        </div>
+      </div>
+
+      {/* Preview content */}
+      <div className="flex-1 relative">
+        {tunnelStatus === "live" && previewUrl ? (
+          <iframe
+            ref={iframeRef}
+            src={previewUrl}
+            className="absolute inset-0 w-full h-full border-0 bg-white"
+            title="Preview"
+            sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+          />
+        ) : tunnelStatus === "checking" ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="text-4xl mb-4 animate-spin">⏳</div>
+              <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                Verificando tunnel...
+              </p>
+            </div>
+          </div>
+        ) : tunnelStatus === "dead" ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center p-8">
+              <div className="text-4xl mb-4">🔌</div>
+              <p className="text-sm text-destructive font-medium mb-2">
+                Tunnel desconectado
+              </p>
+              <p className="text-xs text-[hsl(var(--muted-foreground))] max-w-xs">
+                Pide al agente que genere un nuevo tunnel
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center p-8">
+              <div className="text-4xl mb-4">🧪</div>
+              <p className="text-sm text-[hsl(var(--muted-foreground))]">
+                El preview aparecerá aquí cuando el agente cree tu proyecto
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex h-[calc(100vh-8rem)] flex-col">
+      {/* Header with view tabs */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-[hsl(var(--border))]">
+        <h2 className="text-sm font-medium text-[hsl(var(--foreground))]">
+          {chat.title}
+        </h2>
+        <ViewTabs />
+      </div>
+
+      {/* Mobile banner */}
+      <MobileBanner />
+
+      {/* Main content based on view mode */}
+      {viewMode === "chat" || isMobile ? (
+        <ChatPanel className="flex-1" />
+      ) : viewMode === "split" ? (
+        <div className="flex-1 flex">
+          <ChatPanel className="w-1/2 border-r border-[hsl(var(--border))]" />
+          <PreviewPanel className="w-1/2" />
+        </div>
+      ) : (
+        <PreviewPanel className="flex-1" />
+      )}
     </div>
   );
 }
