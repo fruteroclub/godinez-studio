@@ -6,3 +6,5 @@ dist/
 .openclaw/
 .env.local
 .env.*.local
+.env.development
+docker-compose.yml
