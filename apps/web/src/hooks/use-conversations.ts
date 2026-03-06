@@ -9,10 +9,11 @@ export function useConversations(workspaceId: number | undefined) {
     queryKey: ["conversations", workspaceId],
     queryFn: async () => {
       const token = await getToken();
-      return apiFetch<Conversation[]>(
+      const res = await apiFetch<{ items: Conversation[]; nextCursor: number | null }>(
         `/api/workspaces/${workspaceId}/conversations`,
         { token },
       );
+      return res.items;
     },
     enabled: !!workspaceId,
   });

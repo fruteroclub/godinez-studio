@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq } from "drizzle-orm";
+import { eq, and, desc, lt } from "drizzle-orm";
 import { files as filesTable, projects as projectsTable } from "@godinez/db";
 import type { AuthEnv } from "../types";
 import { requireAuth } from "../middleware/auth";
@@ -123,14 +123,28 @@ workspaceFiles.get("/:id/storage", requireWorkspaceMember, async (c) => {
   });
 });
 
-// GET /api/workspaces/:id/files — List workspace files
+// GET /api/workspaces/:id/files — List workspace files (paginated)
 workspaceFiles.get("/:id/files", requireWorkspaceMember, async (c) => {
   const workspaceId = parseInt(c.req.param("id"));
-  const files = await db.query.files.findMany({
-    where: eq(filesTable.workspaceId, workspaceId),
-    orderBy: filesTable.createdAt,
+  const limit = Math.min(parseInt(c.req.query("limit") || "50"), 100);
+  const cursor = c.req.query("cursor") ? parseInt(c.req.query("cursor")!) : undefined;
+
+  const conditions = [eq(filesTable.workspaceId, workspaceId)];
+  if (cursor) conditions.push(lt(filesTable.id, cursor));
+
+  const items = await db.query.files.findMany({
+    where: and(...conditions),
+    orderBy: desc(filesTable.id),
+    limit: limit + 1,
   });
-  return c.json(files);
+
+  const hasMore = items.length > limit;
+  const page = hasMore ? items.slice(0, limit) : items;
+
+  return c.json({
+    items: page,
+    nextCursor: hasMore ? page[page.length - 1].id : null,
+  });
 });
 
 // Project-scoped file list
