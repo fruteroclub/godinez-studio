@@ -3,6 +3,9 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
+import { logger as rootLogger } from "../lib/logger";
+
+const log = rootLogger.child({ service: "gateway" });
 
 // ─── Protocol types (matching OpenClaw protocol v3) ─────────────────
 
@@ -63,7 +66,7 @@ function loadOrCreateDeviceIdentity(): DeviceIdentity {
   try {
     const data = JSON.parse(fs.readFileSync(DEVICE_IDENTITY_PATH, "utf-8"));
     if (data.deviceId && data.publicKeyB64 && data.privateKeyPem) {
-      console.log(`[Gateway] Loaded device identity ${data.deviceId.slice(0, 8)}…`);
+      log.debug({ deviceId: data.deviceId.slice(0, 8) }, "loaded device identity");
       return data;
     }
   } catch {
@@ -81,7 +84,7 @@ function loadOrCreateDeviceIdentity(): DeviceIdentity {
 
   fs.mkdirSync(path.dirname(DEVICE_IDENTITY_PATH), { recursive: true });
   fs.writeFileSync(DEVICE_IDENTITY_PATH, JSON.stringify(identity, null, 2), { mode: 0o600 });
-  console.log(`[Gateway] Created new device identity ${deviceId.slice(0, 8)}…`);
+  log.info({ deviceId: deviceId.slice(0, 8) }, "created new device identity");
   return identity;
 }
 
@@ -317,7 +320,7 @@ export class GatewayRelay {
         if (!this._connected) {
           reject(err);
         } else {
-          console.error("[Gateway] WebSocket error:", err.message);
+          log.error({ err: err.message }, "websocket error");
         }
       });
 
@@ -334,7 +337,7 @@ export class GatewayRelay {
             frame.event === "connect.challenge"
           ) {
             const { nonce } = frame.payload as { nonce: string; ts: number };
-            console.log("[Gateway] Received challenge, sending auth...");
+            log.debug("received challenge, sending auth");
 
             const signedAt = Date.now();
             const scopes = ["operator.admin", "operator.read", "operator.write"];
@@ -390,9 +393,7 @@ export class GatewayRelay {
               this.reconnectAttempt = 0;
               const helloOk = parsePayload(HelloOkPayloadSchema, p, "connect");
               this.serverInfo = helloOk.server;
-              console.log(
-                `[Gateway] Connected to OpenClaw v${helloOk.server.version} (conn: ${helloOk.server.connId})`,
-              );
+              log.info({ version: helloOk.server.version, connId: helloOk.server.connId }, "connected to OpenClaw");
               resolve(helloOk);
               return;
             }
@@ -402,7 +403,7 @@ export class GatewayRelay {
           if (!handshakeDone && frame.type === "res" && !frame.ok) {
             handshakeDone = true;
             const msg = frame.error?.message ?? "connect rejected";
-            console.error("[Gateway] Auth failed:", msg);
+            log.error({ err: msg }, "auth failed");
             this.ws?.close();
             reject(new Error(msg));
             return;
@@ -412,7 +413,7 @@ export class GatewayRelay {
             this.handleFrame(frame as GatewayFrame);
           }
         } catch {
-          console.error("[Gateway] Failed to parse message");
+          log.error("failed to parse gateway message");
         }
       });
 
@@ -601,7 +602,7 @@ export class GatewayRelay {
     if (frame.type === "event" && frame.event === "chat") {
       const parsed = ChatEventPayloadSchema.safeParse(frame.payload);
       if (!parsed.success) {
-        console.warn("[Gateway] chat event validation failed:", parsed.error.message);
+        log.warn({ err: parsed.error.message }, "chat event validation failed");
         return;
       }
       const { runId, seq, state, message, errorMessage } = parsed.data;
@@ -692,15 +693,15 @@ export class GatewayRelay {
       30_000,
     );
     this.reconnectAttempt++;
-    console.log(`[Gateway] Reconnecting in ${delay}ms...`);
+    log.info({ delayMs: delay }, "scheduling reconnect");
 
     this.reconnectTimer = setTimeout(async () => {
       try {
         await this.connect(this.url, this.token);
-        console.log("[Gateway] Reconnected");
+        log.info("reconnected");
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.error("[Gateway] Reconnect failed:", msg);
+        log.error({ err: msg }, "reconnect failed");
       }
     }, delay);
   }

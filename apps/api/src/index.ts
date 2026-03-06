@@ -1,8 +1,9 @@
 import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { Hono } from "hono";
-import { logger } from "hono/logger";
 import { cors } from "hono/cors";
+import { requestLogger } from "./middleware/request-logger";
+import { logger } from "./lib/logger";
 import health from "./routes/health";
 import workspaces from "./routes/workspaces";
 import team from "./routes/team";
@@ -29,7 +30,7 @@ initSentry();
 
 const app = new Hono();
 
-app.use("*", logger());
+app.use("*", requestLogger);
 app.use(
   "*",
   cors({
@@ -68,7 +69,7 @@ app.route("/webhooks", webhooks);
 
 app.onError((err, c) => {
   Sentry.captureException(err);
-  console.error("[API] Unhandled error:", err.message);
+  logger.error({ err: err.message }, "unhandled error");
   return c.json({ error: "Internal server error" }, 500);
 });
 
@@ -85,7 +86,7 @@ app.get("/", (c) => {
 const port = Number(process.env.PORT || 3001);
 
 serve({ fetch: app.fetch, port }, () => {
-  console.log(`Godinez Studio API running on port ${port}`);
+  logger.info({ port }, "Godinez Studio API running");
 });
 
 // Gateway connections are now lazy via GatewayPool — no startup connection needed.

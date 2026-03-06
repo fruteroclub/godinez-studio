@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import type { AgentConfig } from "@godinez/types";
 import type { AuthEnv } from "../types";
+import { logger } from "../lib/logger";
 import { requireAuth } from "../middleware/auth";
 import { resolveUser } from "../middleware/resolve-user";
 import { getAllAgents, getAgentById, updateAgent } from "../dal/agents";
@@ -206,7 +207,7 @@ app.put(
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Failed to inject SOUL.md";
-      console.warn("[AgentConfig] SOUL.md injection failed (non-fatal):", msg);
+      logger.warn({ err: msg }, "SOUL.md injection failed (non-fatal)");
     }
 
     return c.json(updated);
