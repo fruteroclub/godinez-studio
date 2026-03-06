@@ -14,6 +14,8 @@ export interface ChatMessage {
   createdAt?: string;
 }
 
+export type ConnectionStatus = "idle" | "connected" | "reconnecting" | "disconnected" | "timeout";
+
 export function useChat(
   conversationId: number,
   workspaceId: number,
@@ -23,6 +25,7 @@ export function useChat(
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [agentOffline, setAgentOffline] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("idle");
   const { getToken } = useAuth();
 
   // Load history on mount
@@ -178,6 +181,7 @@ export function useChat(
               ),
             );
             setIsStreaming(false);
+            setConnectionStatus("idle");
             options?.onComplete?.();
           },
           onError: () => {
@@ -189,6 +193,13 @@ export function useChat(
               ),
             );
             setIsStreaming(false);
+            setConnectionStatus("disconnected");
+          },
+          onStatus: (status) => {
+            setConnectionStatus(status);
+          },
+          onTimeout: () => {
+            setConnectionStatus("timeout");
           },
         },
         token,
@@ -197,5 +208,5 @@ export function useChat(
     [conversationId, workspaceId, getToken],
   );
 
-  return { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction };
+  return { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction, connectionStatus };
 }

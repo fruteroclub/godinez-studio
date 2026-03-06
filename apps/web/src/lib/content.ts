@@ -242,6 +242,10 @@ export const content = {
       gatewayOffline: "El servicio de agentes no está disponible.",
       genericError: "Ocurrió un error al crear tu agente. Intenta de nuevo.",
     },
+    connection: {
+      reconnecting: "Reconectando...",
+      timeout: "El agente está tardando más de lo esperado. La respuesta se guardará automáticamente.",
+    },
   },
   toast: {
     configSaved: "Configuración guardada",
