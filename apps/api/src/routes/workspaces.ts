@@ -16,6 +16,9 @@ import {
   updateWorkspace,
   deleteWorkspace,
   getMemberRole,
+  getWorkspacePreview,
+  saveWorkspacePreview,
+  getRecentChatMessages,
 } from "../dal/workspaces";
 import { pool } from "../services/gateway-pool";
 import { decrementUsedSlots } from "../dal/instances";
@@ -112,5 +115,58 @@ app.delete(
     return c.json({ deleted: true });
   },
 );
+
+// GET /workspaces/:slug/preview — Get active preview URL for workspace
+app.get("/:slug/preview", async (c) => {
+  const userId = c.get("userId");
+  const slug = c.req.param("slug");
+  
+  const workspace = await getWorkspaceBySlug(slug);
+  if (!workspace) return c.json({ error: "Workspace not found" }, 404);
+
+  const role = await getMemberRole(workspace.id, userId);
+  if (!role) return c.json({ error: "Not a workspace member" }, 403);
+
+  const preview = await getWorkspacePreview(workspace.id);
+  if (!preview) return c.json({ error: "No preview available" }, 404);
+
+  return c.json({ previewUrl: preview.previewUrl, projectName: preview.name });
+});
+
+// POST /workspaces/:slug/preview — Save preview URL (auto-detected from chat)
+app.post(
+  "/:slug/preview",
+  zValidator("json", z.object({ previewUrl: z.string().url() })),
+  async (c) => {
+    const userId = c.get("userId");
+    const slug = c.req.param("slug");
+    const { previewUrl } = c.req.valid("json");
+    
+    const workspace = await getWorkspaceBySlug(slug);
+    if (!workspace) return c.json({ error: "Workspace not found" }, 404);
+
+    const role = await getMemberRole(workspace.id, userId);
+    if (!role) return c.json({ error: "Not a workspace member" }, 403);
+
+    // Update the most recent active project, or create one
+    const saved = await saveWorkspacePreview(workspace.id, previewUrl);
+    return c.json({ ok: true, project: saved });
+  },
+);
+
+// GET /workspaces/:slug/chat/recent — Get recent chat messages for tunnel URL extraction
+app.get("/:slug/chat/recent", async (c) => {
+  const userId = c.get("userId");
+  const slug = c.req.param("slug");
+  
+  const workspace = await getWorkspaceBySlug(slug);
+  if (!workspace) return c.json({ error: "Workspace not found" }, 404);
+
+  const role = await getMemberRole(workspace.id, userId);
+  if (!role) return c.json({ error: "Not a workspace member" }, 403);
+
+  const messages = await getRecentChatMessages(workspace.id, 20);
+  return c.json({ messages });
+});
 
 export default app;
