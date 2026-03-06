@@ -270,6 +270,7 @@ type RunHandler = {
   onDelta: (text: string, message?: Record<string, unknown>) => void;
   onFinal: (text: string, message?: Record<string, unknown>) => void;
   onError: (error: string) => void;
+  lastSeq: number;
 };
 
 // ─── Gateway Relay ──────────────────────────────────────────────────
@@ -573,9 +574,9 @@ export class GatewayRelay {
 
   // ─── Run handlers for streaming ───────────────────────────────
 
-  onRun(runId: string, handlers: RunHandler): void {
+  onRun(runId: string, handlers: Omit<RunHandler, "lastSeq">): void {
     this.lastActivityAt = new Date();
-    this.pendingRuns.set(runId, handlers);
+    this.pendingRuns.set(runId, { ...handlers, lastSeq: -1 });
   }
 
   offRun(runId: string): void {
@@ -603,9 +604,13 @@ export class GatewayRelay {
         console.warn("[Gateway] chat event validation failed:", parsed.error.message);
         return;
       }
-      const { runId, state, message, errorMessage } = parsed.data;
+      const { runId, seq, state, message, errorMessage } = parsed.data;
       const handler = this.pendingRuns.get(runId);
       if (!handler) return;
+
+      // Deduplicate by seq — skip events we've already seen
+      if (seq <= handler.lastSeq) return;
+      handler.lastSeq = seq;
 
       // Extract text from message content blocks
       const text = this.extractText(message);
