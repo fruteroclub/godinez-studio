@@ -14,6 +14,7 @@ import {
   getConversationsByWorkspaceId,
   getConversationsByProject,
   updateConversationTitle,
+  deleteConversation,
 } from "../dal/conversations";
 import { getProjectById } from "../dal/projects";
 import { getWorkspaceById } from "../dal/workspaces";
@@ -92,6 +93,19 @@ app.patch(
     return c.json(updated);
   },
 );
+
+// DELETE /api/conversations/:id — Delete conversation + messages
+app.delete("/:id", async (c) => {
+  const userId = c.get("userId");
+  const id = parseInt(c.req.param("id"));
+  const conversation = await getConversationById(id);
+  if (!conversation) return c.json({ error: "Conversation not found" }, 404);
+  if (!(await verifyWorkspaceAccess(userId, conversation.workspaceId))) {
+    return c.json({ error: "Not a workspace member" }, 403);
+  }
+  await deleteConversation(id);
+  return c.json({ deleted: true });
+});
 
 export default app;
 

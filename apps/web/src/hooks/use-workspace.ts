@@ -52,6 +52,29 @@ export function useDashboard(workspaceId: number | undefined) {
   });
 }
 
+interface WorkspaceUsage {
+  tier: string;
+  tokens: { used: number; limit: number };
+  storage: { used: number; limit: number };
+  members: { used: number; limit: number };
+}
+
+export function useWorkspaceUsage(workspaceId: number | undefined) {
+  const { getToken } = useAuth();
+  return useQuery({
+    queryKey: ["workspace-usage", workspaceId],
+    queryFn: async () => {
+      const token = await getToken();
+      return apiFetch<WorkspaceUsage>(
+        `/api/workspaces/${workspaceId}/usage`,
+        { token },
+      );
+    },
+    enabled: !!workspaceId,
+    staleTime: 60_000,
+  });
+}
+
 export function useUpdateWorkspace(workspaceId: number) {
   const { getToken } = useAuth();
   const qc = useQueryClient();

@@ -16,6 +16,7 @@ import {
   useAdminWorkspaces,
   useAdminInstances,
   useAdminGrowth,
+  useAdminUsage,
   useInstanceHealth,
   useCreateInstance,
   useUpdateInstance,
@@ -579,10 +580,97 @@ function GrowthSection() {
   );
 }
 
+// --- Section 5: Usage Table ---
+
+function UsageSection() {
+  const [period, setPeriod] = useState("30d");
+  const { data, isLoading } = useAdminUsage(period);
+
+  function fmtBytes(bytes: number) {
+    if (bytes === 0) return "0 B";
+    const k = 1024;
+    const sizes = ["B", "KB", "MB", "GB"];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${(bytes / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+  }
+
+  function fmtTokens(tokens: number) {
+    if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
+    if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}K`;
+    return String(tokens);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        {["7d", "30d", "90d"].map((p) => (
+          <button
+            key={p}
+            onClick={() => setPeriod(p)}
+            className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+              period === p
+                ? "bg-magenta text-white"
+                : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
+            }`}
+          >
+            {p === "7d" ? admin.period7d : p === "30d" ? admin.period30d : admin.period90d}
+          </button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <ListSkeleton rows={5} />
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-[hsl(var(--border))]">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-[hsl(var(--border))] bg-[hsl(var(--muted))]/30">
+                <th className="px-4 py-3 text-left font-medium text-[hsl(var(--muted-foreground))]">{admin.workspace}</th>
+                <th className="px-4 py-3 text-left font-medium text-[hsl(var(--muted-foreground))]">{admin.owner}</th>
+                <th className="px-4 py-3 text-right font-medium text-[hsl(var(--muted-foreground))]">Tokens</th>
+                <th className="px-4 py-3 text-right font-medium text-[hsl(var(--muted-foreground))]">{admin.storage}</th>
+                <th className="px-4 py-3 text-right font-medium text-[hsl(var(--muted-foreground))]">{admin.messages}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data?.data.map((row) => (
+                <tr key={row.id} className="border-b border-[hsl(var(--border))] last:border-0">
+                  <td className="px-4 py-3">
+                    <span className="font-medium text-[hsl(var(--foreground))]">{row.name}</span>
+                    <span className="ml-2 text-xs text-[hsl(var(--muted-foreground))]">{row.tier}</span>
+                  </td>
+                  <td className="px-4 py-3 text-[hsl(var(--muted-foreground))]">{row.ownerEmail ?? "—"}</td>
+                  <td className="px-4 py-3 text-right font-mono text-[hsl(var(--foreground))]">{fmtTokens(row.tokenUsage)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-[hsl(var(--foreground))]">{fmtBytes(row.storageBytes)}</td>
+                  <td className="px-4 py-3 text-right font-mono text-[hsl(var(--foreground))]">{row.messageCount}</td>
+                </tr>
+              ))}
+              {(!data?.data || data.data.length === 0) && (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-[hsl(var(--muted-foreground))]">Sin datos</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // --- Main Admin Page ---
+
+const TABS = [
+  { key: "overview", label: admin.overview },
+  { key: "instances", label: admin.instances },
+  { key: "workspaces", label: admin.workspacesSection },
+  { key: "growth", label: admin.growth },
+  { key: "usage", label: admin.usage },
+] as const;
+
+type TabKey = (typeof TABS)[number]["key"];
 
 export default function Admin() {
   const { data: user, isLoading } = useCurrentUser();
+  const [tab, setTab] = useState<TabKey>("overview");
 
   if (isLoading) return <PageSkeleton />;
   if (user?.role !== "admin") return <Navigate to="/studio" replace />;
@@ -601,12 +689,28 @@ export default function Admin() {
             ← Studio
           </Link>
         </div>
+        <nav className="mt-4 flex gap-1">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                tab === t.key
+                  ? "bg-magenta text-white"
+                  : "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
       </header>
       <main className="mx-auto max-w-7xl space-y-8 p-6">
-        <OverviewSection />
-        <InstancesSection />
-        <WorkspacesSection />
-        <GrowthSection />
+        {tab === "overview" && <OverviewSection />}
+        {tab === "instances" && <InstancesSection />}
+        {tab === "workspaces" && <WorkspacesSection />}
+        {tab === "growth" && <GrowthSection />}
+        {tab === "usage" && <UsageSection />}
       </main>
     </div>
   );

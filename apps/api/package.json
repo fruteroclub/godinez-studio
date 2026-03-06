@@ -20,6 +20,7 @@
     "@godinez/types": "workspace:*",
     "@hono/node-server": "^1.19.9",
     "@hono/zod-validator": "^0.7.6",
+    "@sentry/node": "^10.42.0",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.7.0",
     "postgres": "^3.4.0",
