@@ -87,6 +87,24 @@ export function useCreateInstance() {
   });
 }
 
+export function useUpdateInstance() {
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...data }: { id: number; status?: string }) => {
+      const token = await getToken();
+      return apiFetch<AdminInstanceRow>(`/api/admin/instances/${id}`, {
+        token,
+        method: "PUT",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+  });
+}
+
 export function useInstanceHealth(id: number | null) {
   const { getToken } = useAuth();
   return useQuery({

@@ -2,6 +2,7 @@ import { GatewayRelay } from "./gateway-relay";
 import {
   getInstanceById,
   getInstanceByName,
+  getOfflineInstances,
   pickSharedInstance,
   pickDedicatedInstance,
   markInstanceOffline,
@@ -24,6 +25,7 @@ class GatewayPool {
   constructor() {
     this.healthTimer = setInterval(() => {
       this.reapIdle();
+      this.probeOffline();
     }, POOL_HEALTH_INTERVAL_MS);
   }
 
@@ -106,6 +108,27 @@ class GatewayPool {
         console.log(`[GatewayPool] Reaping idle relay for instance ${id} (${idle}ms idle)`);
         relay.disconnect();
         this.relays.delete(id);
+      }
+    }
+  }
+
+  private async probeOffline(): Promise<void> {
+    let instances: Awaited<ReturnType<typeof getOfflineInstances>>;
+    try {
+      instances = await getOfflineInstances();
+    } catch {
+      return;
+    }
+    for (const instance of instances) {
+      try {
+        const relay = new GatewayRelay(instance.id);
+        await relay.connect(instance.url, instance.token);
+        this.relays.set(instance.id, relay);
+        this.failureCounts.delete(instance.id);
+        await markInstanceActive(instance.id);
+        console.log(`[GatewayPool] Instance ${instance.name} recovered, marking active`);
+      } catch {
+        // Still unreachable — leave offline
       }
     }
   }
