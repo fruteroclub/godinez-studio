@@ -1,4 +1,5 @@
 import {
+  index,
   integer,
   pgTable,
   serial,
@@ -24,5 +25,8 @@ export const workspaceMembers = pgTable(
       .notNull()
       .defaultNow(),
   },
-  (t) => [unique().on(t.workspaceId, t.userId)],
+  (t) => [
+    unique().on(t.workspaceId, t.userId),
+    index("workspace_members_user_id_idx").on(t.userId),
+  ],
 );

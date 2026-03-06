@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, lt } from "drizzle-orm";
 import { agentLogs } from "@godinez/db";
 import type { AuthEnv } from "../types";
 import { requireAuth } from "../middleware/auth";
@@ -17,16 +17,25 @@ app.get("/:id/activity", requireWorkspaceMember, async (c) => {
   const limit = Math.min(parseInt(c.req.query("limit") || "50"), 200);
   const level = c.req.query("level");
 
+  const cursor = c.req.query("cursor") ? parseInt(c.req.query("cursor")!) : undefined;
+
   const conditions = [eq(agentLogs.workspaceId, workspaceId)];
   if (level) conditions.push(eq(agentLogs.level, level));
+  if (cursor) conditions.push(lt(agentLogs.id, cursor));
 
-  const logs = await db.query.agentLogs.findMany({
+  const items = await db.query.agentLogs.findMany({
     where: and(...conditions),
-    orderBy: desc(agentLogs.createdAt),
-    limit,
+    orderBy: desc(agentLogs.id),
+    limit: limit + 1,
   });
 
-  return c.json({ logs });
+  const hasMore = items.length > limit;
+  const page = hasMore ? items.slice(0, limit) : items;
+
+  return c.json({
+    items: page,
+    nextCursor: hasMore ? page[page.length - 1].id : null,
+  });
 });
 
 export default app;
