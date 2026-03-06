@@ -7,9 +7,14 @@ import { Toaster } from "sonner";
 import QueryProvider from "./providers/QueryProvider";
 import ErrorBoundary from "./components/ui/ErrorBoundary";
 import { router } from "./App";
+import { initSentry } from "@/lib/sentry";
+import { initPostHog } from "@/lib/posthog";
 import "./index.css";
 
 const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
+initSentry();
+initPostHog();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

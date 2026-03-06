@@ -23,6 +23,9 @@ import referralCodes from "./routes/referral-codes";
 import admin from "./routes/admin";
 import users from "./routes/users";
 import "./services/gateway-pool"; // initialize pool (lazy connections)
+import { initSentry, Sentry } from "./lib/sentry";
+
+initSentry();
 
 const app = new Hono();
 
@@ -62,6 +65,12 @@ app.route("/api/referral-codes", referralCodes);
 app.route("/api/admin", admin);
 app.route("/api/users", users);
 app.route("/webhooks", webhooks);
+
+app.onError((err, c) => {
+  Sentry.captureException(err);
+  console.error("[API] Unhandled error:", err.message);
+  return c.json({ error: "Internal server error" }, 500);
+});
 
 // Serve uploaded files in development (in production, R2 serves files directly)
 app.use("/uploads/*", serveStatic({ root: "./" }));

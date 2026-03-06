@@ -34,6 +34,7 @@ import {
   prependContext,
 } from "../services/message-context";
 import { syncWorkspaceFile } from "../services/workspace-sync";
+import { requireQuota } from "../middleware/require-quota";
 
 const app = new Hono<AuthEnv>();
 
@@ -42,6 +43,7 @@ app.use("*", requireAuth, resolveUser);
 // POST /api/chat/send — Send a message and get a runId for streaming
 app.post(
   "/send",
+  requireQuota("tokens"),
   zValidator(
     "json",
     z.object({

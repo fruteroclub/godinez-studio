@@ -47,6 +47,29 @@ export function useAdminInstances() {
   });
 }
 
+export function useAdminUsage(period: string) {
+  const { getToken } = useAuth();
+  return useQuery({
+    queryKey: ["admin", "usage", period],
+    queryFn: async () => {
+      const token = await getToken();
+      return apiFetch<{
+        data: Array<{
+          id: number;
+          name: string;
+          slug: string;
+          tier: string;
+          ownerEmail: string | null;
+          tokenUsage: number;
+          storageBytes: number;
+          messageCount: number;
+        }>;
+        nextCursor: number | null;
+      }>(`/api/admin/usage?period=${period}`, { token });
+    },
+  });
+}
+
 export function useAdminGrowth(period: "7d" | "30d" | "90d") {
   const { getToken } = useAuth();
   return useQuery({
@@ -101,6 +124,47 @@ export function useUpdateInstance() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin"] });
+    },
+  });
+}
+
+interface ReferralCode {
+  id: number;
+  code: string;
+  email: string;
+  name: string | null;
+  used: boolean;
+  source: string | null;
+  expiresAt: string;
+  createdAt: string;
+  usedAt: string | null;
+}
+
+export function useAdminReferralCodes() {
+  const { getToken } = useAuth();
+  return useQuery({
+    queryKey: ["admin", "referral-codes"],
+    queryFn: async () => {
+      const token = await getToken();
+      return apiFetch<ReferralCode[]>("/api/admin/referral-codes", { token });
+    },
+  });
+}
+
+export function useCreateReferralCode() {
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { email: string; name?: string; source?: string }) => {
+      const token = await getToken();
+      return apiFetch<ReferralCode>("/api/admin/referral-codes", {
+        token,
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "referral-codes"] });
     },
   });
 }

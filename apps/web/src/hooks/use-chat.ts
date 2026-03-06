@@ -4,6 +4,7 @@ import type { ActionCard } from "@godinez/types";
 import { apiFetch } from "@/lib/api";
 import { connectSSE } from "@/lib/sse";
 import { parseActionBlocks } from "@/lib/action-parser";
+import { trackEvent } from "@/lib/posthog";
 
 export interface ChatMessage {
   id: number | string;
@@ -115,6 +116,7 @@ export function useChat(
         ...prev,
         { id: tempUserId, role: "user", content },
       ]);
+      trackEvent("chat_message_sent", { conversationId, workspaceId });
 
       // POST to send
       let runId: string;

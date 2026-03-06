@@ -4,6 +4,7 @@ import type { FileRecord } from "@godinez/types";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 import { content } from "@/lib/content";
+import { trackEvent } from "@/lib/posthog";
 
 interface StorageQuota {
   usedBytes: number;
@@ -61,6 +62,7 @@ export function useUploadFile(workspaceId: number) {
       qc.invalidateQueries({ queryKey: ["files", workspaceId] });
       qc.invalidateQueries({ queryKey: ["storage-quota", workspaceId] });
       toast.success(content.toast.fileUploaded);
+      trackEvent("file_uploaded");
     },
   });
 }

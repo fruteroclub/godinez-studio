@@ -1,4 +1,4 @@
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, desc } from "drizzle-orm";
 import { referralCodes } from "@godinez/db";
 import { db } from "../db";
 
@@ -35,6 +35,13 @@ export async function createReferralCode(data: {
     })
     .returning();
   return created;
+}
+
+export async function listReferralCodes() {
+  return db.query.referralCodes.findMany({
+    orderBy: desc(referralCodes.createdAt),
+    limit: 100,
+  });
 }
 
 export async function validateReferralCode(code: string) {

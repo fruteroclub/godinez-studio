@@ -11,6 +11,7 @@ import {
   requireRole,
 } from "../middleware/require-workspace";
 import { getMembers } from "../dal/workspaces";
+import { requireQuota } from "../middleware/require-quota";
 import { db } from "../db";
 
 const app = new Hono<AuthEnv>();
@@ -29,6 +30,7 @@ app.post(
   "/:id/members",
   requireWorkspaceMember,
   requireRole("owner", "admin"),
+  requireQuota("members"),
   zValidator(
     "json",
     z.object({

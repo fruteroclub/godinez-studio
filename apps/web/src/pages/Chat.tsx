@@ -4,6 +4,7 @@ import { useWorkspace } from "@/providers/WorkspaceProvider";
 import {
   useConversations,
   useCreateConversation,
+  useDeleteConversation,
 } from "@/hooks/use-conversations";
 import { useProjects } from "@/hooks/use-projects";
 import { content } from "@/lib/content";
@@ -17,6 +18,7 @@ export default function Chat() {
   const { data: conversations, isLoading } = useConversations(workspace?.id);
   const { data: projects } = useProjects(workspace?.id);
   const createConversation = useCreateConversation(workspace?.id ?? 0);
+  const deleteConversation = useDeleteConversation(workspace?.id ?? 0);
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
@@ -66,12 +68,14 @@ export default function Chat() {
               ? projectMap.get(conv.projectId)
               : undefined;
             return (
-              <button
+              <div
                 key={conv.id}
-                onClick={() => navigate(`/studio/${slug}/chat/${conv.id}`)}
-                className="flex w-full items-center justify-between rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 text-left transition-colors hover:border-magenta/30"
+                className="flex items-center justify-between rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 transition-colors hover:border-magenta/30"
               >
-                <div className="min-w-0 flex-1">
+                <button
+                  onClick={() => navigate(`/studio/${slug}/chat/${conv.id}`)}
+                  className="min-w-0 flex-1 text-left"
+                >
                   <p className="font-medium text-[hsl(var(--foreground))] truncate">
                     {conv.title ?? "Conversación"}
                   </p>
@@ -85,13 +89,27 @@ export default function Chat() {
                       {conv.channel}
                     </span>
                   </div>
+                </button>
+                <div className="ml-4 flex items-center gap-3">
+                  {conv.lastMessageAt && (
+                    <span className="shrink-0 text-xs text-[hsl(var(--muted-foreground))]">
+                      {new Date(conv.lastMessageAt).toLocaleDateString("es-MX")}
+                    </span>
+                  )}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (window.confirm(chat.deleteConfirm)) {
+                        deleteConversation.mutate(conv.id);
+                      }
+                    }}
+                    className="rounded p-1 text-[hsl(var(--muted-foreground))] hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                    title="Eliminar"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                  </button>
                 </div>
-                {conv.lastMessageAt && (
-                  <span className="ml-4 shrink-0 text-xs text-[hsl(var(--muted-foreground))]">
-                    {new Date(conv.lastMessageAt).toLocaleDateString("es-MX")}
-                  </span>
-                )}
-              </button>
+              </div>
             );
           })}
         </div>
