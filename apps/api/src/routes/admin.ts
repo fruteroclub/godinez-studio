@@ -13,6 +13,7 @@ import {
 } from "../dal/admin";
 import {
   getAllInstances,
+  getInstanceById,
   getInstanceWithWorkspaces,
   createInstance,
   updateInstance,
@@ -109,6 +110,20 @@ app.post("/instances", async (c) => {
 app.put("/instances/:id", async (c) => {
   const id = Number(c.req.param("id"));
   const body = updateInstanceSchema.parse(await c.req.json());
+
+  // Validate: customerId can only be set on dedicated instances
+  if (body.customerId !== undefined) {
+    const existing = await getInstanceById(id);
+    if (!existing) return c.json({ error: "Instance not found" }, 404);
+    const effectiveTier = body.tier ?? existing.tier;
+    if (effectiveTier !== "dedicated") {
+      return c.json(
+        { error: "customerId can only be assigned to dedicated instances" },
+        400,
+      );
+    }
+  }
+
   const instance = await updateInstance(id, body);
   if (!instance) return c.json({ error: "Instance not found" }, 404);
   return c.json(instance);

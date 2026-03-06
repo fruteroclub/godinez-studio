@@ -29,3 +29,14 @@ export const TIER_LIMITS: Record<string, TierLimits> = {
 export function getTierLimits(tier: string): TierLimits {
   return TIER_LIMITS[tier] ?? TIER_LIMITS.beta_tester;
 }
+
+/** Maps workspace tier → instance tier for routing decisions. */
+export const TIER_INSTANCE_MAP: Record<string, "shared" | "dedicated"> = {
+  beta_tester: "shared",
+  starter: "shared",
+  pro: "dedicated",
+};
+
+export function getInstanceTier(workspaceTier: string): "shared" | "dedicated" {
+  return TIER_INSTANCE_MAP[workspaceTier] ?? "shared";
+}

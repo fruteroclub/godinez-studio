@@ -15,6 +15,7 @@ import { updateUser } from "../dal/users";
 import { incrementUsedSlots } from "../dal/instances";
 import { pool } from "../services/gateway-pool";
 import { buildSoulMd } from "../services/agent-soul-template";
+import { getInstanceTier } from "@godinez/types";
 import { AGENT_MAX_SLOTS } from "../lib/config";
 import { logger } from "../lib/logger";
 
@@ -64,8 +65,8 @@ app.post(
     }
 
     // 4. Pick an instance from the pool
-    const tier = workspace.tier === "pro" ? "dedicated" as const : "shared" as const;
-    const instance = await pool.pickInstance(tier);
+    const instanceTier = getInstanceTier(workspace.tier);
+    const instance = await pool.pickInstance(instanceTier, workspace.id);
     if (!instance) {
       return c.json(
         { error: "CAPACITY_FULL", message: "No hay instancias disponibles. Intenta más tarde." },

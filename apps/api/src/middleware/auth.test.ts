@@ -9,10 +9,12 @@ vi.mock("@clerk/backend", () => ({
 import { verifyToken } from "@clerk/backend";
 import { requireAuth } from "./auth";
 
-const mockedVerify = vi.mocked(verifyToken);
+const mockedVerify = vi.mocked(verifyToken) as unknown as ReturnType<typeof vi.fn>;
+
+type TestEnv = { Variables: { clerkUserId: string } };
 
 function createApp() {
-  const app = new Hono();
+  const app = new Hono<TestEnv>();
   app.use("*", requireAuth);
   app.get("/test", (c) => c.json({ userId: c.get("clerkUserId") }));
   return app;
