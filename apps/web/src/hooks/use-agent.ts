@@ -8,6 +8,7 @@ import {
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 import { content } from "@/lib/content";
+import { trackEvent } from "@/lib/posthog";
 
 export interface AgentFile {
   name: string;
@@ -117,6 +118,7 @@ export function useUpdateAgentConfig(agentId: number | null) {
         queryKey: ["agent-file", agentId, "SOUL.md"],
       });
       toast.success(content.toast.configSaved);
+      trackEvent("agent_config_updated");
     },
   });
 }
