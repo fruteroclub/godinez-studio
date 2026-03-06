@@ -237,15 +237,27 @@ app.get("/stream/:runId", async (c) => {
     }
 
     let streamClosed = false;
+    let accumulated = "";
 
     await new Promise<void>((resolve) => {
       relay.onRun(runId, {
         onDelta: async (text) => {
           if (streamClosed) return;
+          // Accumulate text — OpenClaw may send incremental or full deltas.
+          // If text is longer than accumulated, treat it as the full snapshot;
+          // otherwise append the new chunk.
+          if (text.length >= accumulated.length && accumulated.length > 0 && text.startsWith(accumulated)) {
+            accumulated = text;
+          } else if (accumulated.endsWith(text)) {
+            // Duplicate of last chunk — skip
+            return;
+          } else {
+            accumulated += text;
+          }
           try {
             await stream.writeSSE({
               event: "delta",
-              data: JSON.stringify({ type: "delta", text }),
+              data: JSON.stringify({ type: "delta", text: accumulated }),
             });
           } catch {
             streamClosed = true;
