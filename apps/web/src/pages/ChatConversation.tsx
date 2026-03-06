@@ -8,6 +8,7 @@ import { useActionExecutor } from "@/hooks/use-action-executor";
 import { ActionCard } from "@/components/chat/ActionCard";
 import { ManualActionMenu } from "@/components/chat/ManualActionMenu";
 import { stripActionBlocks } from "@/lib/action-parser";
+import AgentOfflineBanner from "@/components/AgentOfflineBanner";
 import { content } from "@/lib/content";
 import type { ActionType } from "@godinez/types";
 
@@ -21,7 +22,7 @@ export default function ChatConversation() {
     () => qc.invalidateQueries({ queryKey: ["conversations", workspace?.id] }),
     [qc, workspace?.id],
   );
-  const { messages, sendMessage, isStreaming, isLoading, updateAction } =
+  const { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction } =
     useChat(Number(conversationId), workspace?.id ?? 0, { onComplete });
   const { execute } = useActionExecutor(updateAction);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -62,6 +63,12 @@ export default function ChatConversation() {
 
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col">
+      {agentOffline && (
+        <div className="px-4 pt-3">
+          <AgentOfflineBanner />
+        </div>
+      )}
+
       {/* Typing indicator */}
       {isStreaming && (
         <div className="border-b border-[hsl(var(--border))] px-4 py-1.5">
@@ -143,14 +150,14 @@ export default function ChatConversation() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={chat.placeholder}
-            disabled={isStreaming}
+            placeholder={agentOffline ? "Agente no disponible" : chat.placeholder}
+            disabled={isStreaming || agentOffline}
             rows={1}
             className="flex-1 resize-none rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-4 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20 disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={isStreaming || !input.trim()}
+            disabled={isStreaming || agentOffline || !input.trim()}
             className="rounded-md bg-magenta px-4 py-2 text-sm font-medium text-white hover:bg-magenta/90 transition-colors disabled:opacity-50"
           >
             {chat.send}

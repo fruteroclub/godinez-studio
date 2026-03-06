@@ -22,6 +22,7 @@ export function useChat(
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [agentOffline, setAgentOffline] = useState(false);
   const { getToken } = useAuth();
 
   // Load history on mount
@@ -104,14 +105,29 @@ export function useChat(
       ]);
 
       // POST to send
-      const { runId, messageId } = await apiFetch<{
-        runId: string;
-        messageId: number;
-      }>("/api/chat/send", {
-        method: "POST",
-        body: JSON.stringify({ conversationId, workspaceId, content }),
-        token,
-      });
+      let runId: string;
+      let messageId: number;
+      try {
+        const res = await apiFetch<{ runId: string; messageId: number }>(
+          "/api/chat/send",
+          {
+            method: "POST",
+            body: JSON.stringify({ conversationId, workspaceId, content }),
+            token,
+          },
+        );
+        runId = res.runId;
+        messageId = res.messageId;
+        setAgentOffline(false);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "";
+        if (msg.includes("AGENT_OFFLINE") || msg.includes("GATEWAY_OFFLINE")) {
+          setAgentOffline(true);
+          // Remove the optimistic user message
+          setMessages((prev) => prev.filter((m) => m.id !== tempUserId));
+        }
+        return;
+      }
 
       // Replace temp user message with real ID
       setMessages((prev) =>
@@ -181,5 +197,5 @@ export function useChat(
     [conversationId, workspaceId, getToken],
   );
 
-  return { messages, sendMessage, isStreaming, isLoading, updateAction };
+  return { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction };
 }

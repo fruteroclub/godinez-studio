@@ -238,4 +238,49 @@ export interface InviteMemberRequest {
   role?: MemberRole;
 }
 
+// Instance enums
+export type InstanceTier = "shared" | "dedicated";
+export type InstanceStatus = "active" | "offline" | "draining" | "decommissioned";
+
+// Admin API response types
+export interface AdminOverviewStats {
+  workspaces: { total: number; active: number; suspended: number; provisioning: number };
+  users: number;
+  agents: { total: number; active: number; paused: number; provisioning: number; error: number; archived: number };
+  conversations: number;
+  messages: number;
+  files: number;
+  storageBytes: number;
+}
+
+export interface AdminWorkspaceRow {
+  id: number; name: string; slug: string; status: WorkspaceStatus; tier: string;
+  createdAt: string; ownerEmail: string | null; memberCount: number; messageCount: number;
+  lastActivity: string | null;
+}
+
+export interface AdminInstanceRow {
+  id: number; name: string; url: string; tier: InstanceTier; status: InstanceStatus;
+  maxSlots: number; usedSlots: number; utilizationPercent: number;
+  region: string | null; customerId: number | null;
+  metadata: unknown; createdAt: string; updatedAt: string;
+}
+
+export interface AdminInstanceHealth extends AdminInstanceRow {
+  gatewayReachable: boolean;
+  workspaces: {
+    id: number; name: string; slug: string; status: string;
+    ownerEmail: string | null; agentStatus: string | null; lastMessageAt: string | null;
+  }[];
+}
+
+export interface AdminGrowthPoint {
+  date: string; newUsers: number; newWorkspaces: number;
+  newConversations: number; messagesSent: number;
+}
+
+export interface CurrentUser {
+  id: number; email: string; role: UserRole; name: string | null;
+}
+
 export { studioContent } from "./content";
