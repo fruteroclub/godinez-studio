@@ -177,6 +177,18 @@ export async function markInstanceActive(id: number) {
     .where(eq(gatewayInstances.id, id));
 }
 
+export async function getOfflineInstances() {
+  return db
+    .select({
+      id: gatewayInstances.id,
+      name: gatewayInstances.name,
+      url: gatewayInstances.url,
+      token: gatewayInstances.token,
+    })
+    .from(gatewayInstances)
+    .where(eq(gatewayInstances.status, "offline"));
+}
+
 export async function deleteInstance(id: number) {
   const instance = await db.query.gatewayInstances.findFirst({
     where: eq(gatewayInstances.id, id),
