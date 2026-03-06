@@ -15,34 +15,16 @@ app.use("*", requireAuth, resolveUser);
 app.get("/:id/dashboard", requireWorkspaceMember, async (c) => {
   const workspaceId = parseInt(c.req.param("id"));
 
-  const [activeProjects] = await db
-    .select({ count: count() })
-    .from(projects)
-    .where(
-      and(
-        eq(projects.workspaceId, workspaceId),
-        eq(projects.status, "active"),
-      ),
-    );
-
-  const [pendingTasks] = await db
-    .select({ count: count() })
-    .from(tasks)
-    .where(
-      and(
-        eq(tasks.workspaceId, workspaceId),
-        eq(tasks.status, "pending"),
-      ),
-    );
-
-  const [totalMessages] = await db
-    .select({ count: count() })
-    .from(messages)
-    .where(eq(messages.workspaceId, workspaceId));
-
-  const workspace = await db.query.workspaces.findFirst({
-    where: eq(workspaces.id, workspaceId),
-  });
+  const [[activeProjects], [pendingTasks], [totalMessages], workspace] =
+    await Promise.all([
+      db.select({ count: count() }).from(projects)
+        .where(and(eq(projects.workspaceId, workspaceId), eq(projects.status, "active"))),
+      db.select({ count: count() }).from(tasks)
+        .where(and(eq(tasks.workspaceId, workspaceId), eq(tasks.status, "pending"))),
+      db.select({ count: count() }).from(messages)
+        .where(eq(messages.workspaceId, workspaceId)),
+      db.query.workspaces.findFirst({ where: eq(workspaces.id, workspaceId) }),
+    ]);
 
   let agent = null;
   if (workspace?.agentId) {
@@ -50,11 +32,7 @@ app.get("/:id/dashboard", requireWorkspaceMember, async (c) => {
       where: eq(agents.id, workspace.agentId),
     });
     if (found) {
-      agent = {
-        name: found.name,
-        template: found.template,
-        status: found.status,
-      };
+      agent = { name: found.name, template: found.template, status: found.status };
     }
   }
 
