@@ -1,10 +1,13 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
+import { eq, and, desc, lt } from "drizzle-orm";
+import { conversations as conversationsTable } from "@godinez/db";
 import type { AuthEnv } from "../types";
 import { requireAuth } from "../middleware/auth";
 import { resolveUser } from "../middleware/resolve-user";
 import { requireWorkspaceMember } from "../middleware/require-workspace";
+import { db } from "../db";
 import {
   createConversation,
   getConversationById,
@@ -115,13 +118,30 @@ export const workspaceConversations = new Hono<AuthEnv>();
 
 workspaceConversations.use("*", requireAuth, resolveUser);
 
-// GET /api/workspaces/:id/conversations — List workspace conversations
+// GET /api/workspaces/:id/conversations — List workspace conversations (paginated)
 workspaceConversations.get(
   "/:id/conversations",
   requireWorkspaceMember,
   async (c) => {
     const workspaceId = parseInt(c.req.param("id"));
-    const conversations = await getConversationsByWorkspaceId(workspaceId);
-    return c.json(conversations);
+    const limit = Math.min(parseInt(c.req.query("limit") || "50"), 100);
+    const cursor = c.req.query("cursor") ? parseInt(c.req.query("cursor")!) : undefined;
+
+    const conditions = [eq(conversationsTable.workspaceId, workspaceId)];
+    if (cursor) conditions.push(lt(conversationsTable.id, cursor));
+
+    const items = await db.query.conversations.findMany({
+      where: and(...conditions),
+      orderBy: desc(conversationsTable.id),
+      limit: limit + 1,
+    });
+
+    const hasMore = items.length > limit;
+    const page = hasMore ? items.slice(0, limit) : items;
+
+    return c.json({
+      items: page,
+      nextCursor: hasMore ? page[page.length - 1].id : null,
+    });
   },
 );

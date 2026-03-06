@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc, lt } from "drizzle-orm";
 import { tasks as tasksTable, projects } from "@godinez/db";
 import type { AuthEnv } from "../types";
 import { requireAuth } from "../middleware/auth";
@@ -124,21 +124,32 @@ export const workspaceTasks = new Hono<AuthEnv>();
 
 workspaceTasks.use("*", requireAuth, resolveUser);
 
-// GET /api/workspaces/:id/tasks — List workspace tasks with filters
+// GET /api/workspaces/:id/tasks — List workspace tasks with filters (paginated)
 workspaceTasks.get("/:id/tasks", requireWorkspaceMember, async (c) => {
   const workspaceId = parseInt(c.req.param("id"));
   const status = c.req.query("status");
   const priority = c.req.query("priority");
+  const limit = Math.min(parseInt(c.req.query("limit") || "50"), 100);
+  const cursor = c.req.query("cursor") ? parseInt(c.req.query("cursor")!) : undefined;
 
   const conditions = [eq(tasksTable.workspaceId, workspaceId)];
   if (status) conditions.push(eq(tasksTable.status, status));
   if (priority) conditions.push(eq(tasksTable.priority, priority));
+  if (cursor) conditions.push(lt(tasksTable.id, cursor));
 
-  const tasks = await db.query.tasks.findMany({
+  const items = await db.query.tasks.findMany({
     where: and(...conditions),
-    orderBy: tasksTable.createdAt,
+    orderBy: desc(tasksTable.id),
+    limit: limit + 1,
   });
-  return c.json(tasks);
+
+  const hasMore = items.length > limit;
+  const page = hasMore ? items.slice(0, limit) : items;
+
+  return c.json({
+    items: page,
+    nextCursor: hasMore ? page[page.length - 1].id : null,
+  });
 });
 
 // Project-scoped task list

@@ -9,9 +9,11 @@ export function useTasks(workspaceId: number | undefined) {
     queryKey: ["tasks", workspaceId],
     queryFn: async () => {
       const token = await getToken();
-      return apiFetch<Task[]>(`/api/workspaces/${workspaceId}/tasks`, {
-        token,
-      });
+      const res = await apiFetch<{ items: Task[]; nextCursor: number | null }>(
+        `/api/workspaces/${workspaceId}/tasks`,
+        { token },
+      );
+      return res.items;
     },
     enabled: !!workspaceId,
   });
