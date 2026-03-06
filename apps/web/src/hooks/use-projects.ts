@@ -2,6 +2,8 @@ import { useAuth } from "@clerk/clerk-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Project, Task, FileRecord, Conversation } from "@godinez/types";
 import { apiFetch } from "@/lib/api";
+import { toast } from "sonner";
+import { content } from "@/lib/content";
 
 interface ProjectDetail extends Project {
   stats: {
@@ -92,7 +94,9 @@ export function useCreateProject(workspaceId: number) {
         token,
       });
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["projects", workspaceId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["projects", workspaceId] });
+      toast.success(content.toast.projectCreated);
+    },
   });
 }

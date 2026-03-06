@@ -6,6 +6,8 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
+import { toast } from "sonner";
+import { content } from "@/lib/content";
 
 export interface AgentFile {
   name: string;
@@ -114,6 +116,7 @@ export function useUpdateAgentConfig(agentId: number | null) {
       qc.invalidateQueries({
         queryKey: ["agent-file", agentId, "SOUL.md"],
       });
+      toast.success(content.toast.configSaved);
     },
   });
 }
