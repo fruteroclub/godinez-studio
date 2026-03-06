@@ -1,10 +1,12 @@
 import { Hono } from "hono";
 import { eq, and, count } from "drizzle-orm";
 import { projects, tasks, messages, agents, workspaces } from "@godinez/db";
+import { getTierLimits } from "@godinez/types";
 import type { AuthEnv } from "../types";
 import { requireAuth } from "../middleware/auth";
 import { resolveUser } from "../middleware/resolve-user";
 import { requireWorkspaceMember } from "../middleware/require-workspace";
+import { getWorkspaceUsage } from "../dal/quotas";
 import { db } from "../db";
 
 const app = new Hono<AuthEnv>();
@@ -41,6 +43,25 @@ app.get("/:id/dashboard", requireWorkspaceMember, async (c) => {
     pendingTasks: pendingTasks.count,
     totalMessages: totalMessages.count,
     agent,
+  });
+});
+
+// GET /workspaces/:id/usage — Workspace quota usage
+app.get("/:id/usage", requireWorkspaceMember, async (c) => {
+  const workspaceId = parseInt(c.req.param("id"));
+  const workspace = await db.query.workspaces.findFirst({
+    where: eq(workspaces.id, workspaceId),
+  });
+  if (!workspace) return c.json({ error: "Workspace not found" }, 404);
+
+  const usage = await getWorkspaceUsage(workspaceId);
+  const limits = getTierLimits(workspace.tier);
+
+  return c.json({
+    tier: workspace.tier,
+    tokens: { used: usage.tokensUsedThisMonth, limit: limits.monthlyTokens },
+    storage: { used: usage.storageBytesUsed, limit: limits.storageBytes },
+    members: { used: usage.memberCount, limit: limits.maxMembers },
   });
 });
 

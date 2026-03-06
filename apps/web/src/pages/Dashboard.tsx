@@ -1,6 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
-import { useDashboard } from "@/hooks/use-workspace";
+import { useDashboard, useWorkspaceUsage } from "@/hooks/use-workspace";
 import { content } from "@/lib/content";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 
@@ -9,6 +9,7 @@ const { dashboard } = content.studio;
 export default function Dashboard() {
   const { workspace } = useWorkspace();
   const { data: stats, isLoading } = useDashboard(workspace?.id);
+  const { data: usage } = useWorkspaceUsage(workspace?.id);
 
   if (isLoading) return <PageSkeleton />;
 
@@ -72,6 +73,60 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {usage && (
+        <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 space-y-3">
+          <p className="text-sm font-medium text-[hsl(var(--foreground))]">
+            Uso del mes
+          </p>
+          <UsageBar label="Tokens" used={usage.tokens.used} limit={usage.tokens.limit} format="tokens" />
+          <UsageBar label="Almacenamiento" used={usage.storage.used} limit={usage.storage.limit} format="bytes" />
+          <UsageBar label="Miembros" used={usage.members.used} limit={usage.members.limit} format="number" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UsageBar({ label, used, limit, format }: {
+  label: string;
+  used: number;
+  limit: number;
+  format: "tokens" | "bytes" | "number";
+}) {
+  const pct = limit > 0 ? Math.min((used / limit) * 100, 100) : 0;
+  const isHigh = pct >= 80;
+
+  function fmt(value: number) {
+    if (format === "bytes") {
+      if (value === 0) return "0 B";
+      const k = 1024;
+      const sizes = ["B", "KB", "MB", "GB"];
+      const i = Math.floor(Math.log(value) / Math.log(k));
+      return `${(value / Math.pow(k, i)).toFixed(1)} ${sizes[i]}`;
+    }
+    if (format === "tokens") {
+      if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+      if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+      return String(value);
+    }
+    return String(value);
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between text-xs mb-1">
+        <span className="text-[hsl(var(--muted-foreground))]">{label}</span>
+        <span className="text-[hsl(var(--foreground))]">
+          {fmt(used)} / {fmt(limit)}
+        </span>
+      </div>
+      <div className="h-2 rounded-full bg-[hsl(var(--muted))]">
+        <div
+          className={`h-full rounded-full transition-all ${isHigh ? "bg-red-500" : "bg-magenta"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
     </div>
   );
 }
