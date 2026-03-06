@@ -18,6 +18,7 @@ import {
   useAdminGrowth,
   useInstanceHealth,
   useCreateInstance,
+  useUpdateInstance,
 } from "@/hooks/use-admin";
 import { content } from "@/lib/content";
 import { PageSkeleton, ListSkeleton } from "@/components/ui/Skeleton";
@@ -82,6 +83,12 @@ function OverviewSection() {
 function InstanceRow({ instance }: { instance: AdminInstanceRow }) {
   const [expanded, setExpanded] = useState(false);
   const { data: health } = useInstanceHealth(expanded ? instance.id : null);
+  const updateInstance = useUpdateInstance();
+
+  const isOffline = instance.status === "offline";
+  const canReactivate = isOffline || instance.status === "draining";
+  const canDeactivate = instance.status === "active";
+  const showRecoveryHint = isOffline && health?.gatewayReachable;
 
   return (
     <>
@@ -121,17 +128,53 @@ function InstanceRow({ instance }: { instance: AdminInstanceRow }) {
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={7} className="bg-[hsl(var(--muted))]/10 px-8 py-3">
+          <td colSpan={7} className="bg-[hsl(var(--muted))]/10 px-8 py-4">
             {!health ? (
               <ListSkeleton rows={2} />
             ) : (
-              <div className="space-y-2">
-                <p className="text-sm">
-                  Gateway:{" "}
-                  <span className={health.gatewayReachable ? "text-green-400" : "text-red-400"}>
-                    {health.gatewayReachable ? admin.reachable : admin.unreachable}
-                  </span>
-                </p>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm">
+                    Gateway:{" "}
+                    <span className={health.gatewayReachable ? "text-green-400" : "text-red-400"}>
+                      {health.gatewayReachable ? admin.reachable : admin.unreachable}
+                    </span>
+                  </p>
+                  <div className="flex gap-2">
+                    {canReactivate && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          updateInstance.mutate({ id: instance.id, status: "active" });
+                        }}
+                        disabled={updateInstance.isPending}
+                        className="rounded-md bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-500 transition-colors disabled:opacity-50"
+                      >
+                        {updateInstance.isPending ? "..." : admin.activate}
+                      </button>
+                    )}
+                    {canDeactivate && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          updateInstance.mutate({ id: instance.id, status: "offline" });
+                        }}
+                        disabled={updateInstance.isPending}
+                        className="rounded-md bg-red-600/80 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-500 transition-colors disabled:opacity-50"
+                      >
+                        {updateInstance.isPending ? "..." : admin.deactivate}
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {showRecoveryHint && (
+                  <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-sm text-yellow-300">
+                    {admin.recoveryHint}
+                  </div>
+                )}
+                {updateInstance.error && (
+                  <p className="text-sm text-red-400">{updateInstance.error.message}</p>
+                )}
                 {health.workspaces.length > 0 ? (
                   <table className="w-full text-sm">
                     <thead>

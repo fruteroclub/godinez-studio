@@ -176,6 +176,9 @@ export const content = {
       loadMore: "Cargar más",
       reachable: "Alcanzable",
       unreachable: "No alcanzable",
+      activate: "Activar",
+      deactivate: "Desactivar",
+      recoveryHint: "El gateway está alcanzable pero marcado como offline. Haz clic en \"Activar\" para reconectar.",
       sidebar: "Admin",
     },
     onboarding: {
@@ -242,5 +245,17 @@ export const content = {
       gatewayOffline: "El servicio de agentes no está disponible.",
       genericError: "Ocurrió un error al crear tu agente. Intenta de nuevo.",
     },
+    connection: {
+      reconnecting: "Reconectando...",
+      timeout: "El agente está tardando más de lo esperado. La respuesta se guardará automáticamente.",
+    },
+  },
+  toast: {
+    configSaved: "Configuración guardada",
+    fileUploaded: "Archivo subido",
+    projectCreated: "Proyecto creado",
+    taskCreated: "Tarea creada",
+    fetchError: "Error de conexión. Intenta de nuevo.",
+    timeout: "La solicitud tardó demasiado. Intenta de nuevo.",
   },
 };

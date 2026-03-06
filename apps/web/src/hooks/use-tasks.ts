@@ -2,6 +2,8 @@ import { useAuth } from "@clerk/clerk-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Task, TaskStatus } from "@godinez/types";
 import { apiFetch } from "@/lib/api";
+import { toast } from "sonner";
+import { content } from "@/lib/content";
 
 export function useTasks(workspaceId: number | undefined) {
   const { getToken } = useAuth();
@@ -36,8 +38,10 @@ export function useCreateTask(workspaceId: number) {
         token,
       });
     },
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["tasks", workspaceId] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["tasks", workspaceId] });
+      toast.success(content.toast.taskCreated);
+    },
   });
 }
 

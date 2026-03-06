@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import type { ActionCard } from "@godinez/types";
 import { apiFetch } from "@/lib/api";
@@ -14,6 +14,8 @@ export interface ChatMessage {
   createdAt?: string;
 }
 
+export type ConnectionStatus = "idle" | "connected" | "reconnecting" | "disconnected" | "timeout";
+
 export function useChat(
   conversationId: number,
   workspaceId: number,
@@ -23,7 +25,17 @@ export function useChat(
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [agentOffline, setAgentOffline] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("idle");
   const { getToken } = useAuth();
+  const sseCleanupRef = useRef<(() => void) | null>(null);
+
+  // Cleanup SSE on unmount
+  useEffect(() => {
+    return () => {
+      sseCleanupRef.current?.();
+      sseCleanupRef.current = null;
+    };
+  }, []);
 
   // Load history on mount
   useEffect(() => {
@@ -143,8 +155,11 @@ export function useChat(
       ]);
       setIsStreaming(true);
 
+      // Clean up any previous SSE connection
+      sseCleanupRef.current?.();
+
       // Connect SSE (pass token via query param — EventSource can't send headers)
-      connectSSE(
+      sseCleanupRef.current = connectSSE(
         runId,
         {
           onDelta: (text) => {
@@ -178,6 +193,8 @@ export function useChat(
               ),
             );
             setIsStreaming(false);
+            setConnectionStatus("idle");
+            sseCleanupRef.current = null;
             options?.onComplete?.();
           },
           onError: () => {
@@ -189,6 +206,14 @@ export function useChat(
               ),
             );
             setIsStreaming(false);
+            setConnectionStatus("disconnected");
+            sseCleanupRef.current = null;
+          },
+          onStatus: (status) => {
+            setConnectionStatus(status);
+          },
+          onTimeout: () => {
+            setConnectionStatus("timeout");
           },
         },
         token,
@@ -197,5 +222,5 @@ export function useChat(
     [conversationId, workspaceId, getToken],
   );
 
-  return { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction };
+  return { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction, connectionStatus };
 }

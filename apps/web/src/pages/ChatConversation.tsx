@@ -35,7 +35,7 @@ export default function ChatConversation() {
     () => qc.invalidateQueries({ queryKey: ["conversations", workspace?.id] }),
     [qc, workspace?.id],
   );
-  const { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction } =
+  const { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction, connectionStatus } =
     useChat(Number(conversationId), workspace?.id ?? 0, { onComplete });
   const { execute } = useActionExecutor(updateAction);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -174,6 +174,18 @@ export default function ChatConversation() {
       {agentOffline && (
         <div className="px-4 pt-3">
           <AgentOfflineBanner />
+        </div>
+      )}
+
+      {/* Connection status banners */}
+      {connectionStatus === "reconnecting" && (
+        <div className="mx-4 mt-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-sm text-yellow-400">
+          {content.studio.connection.reconnecting}
+        </div>
+      )}
+      {connectionStatus === "timeout" && (
+        <div className="mx-4 mt-3 rounded-lg border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-sm text-orange-400">
+          {content.studio.connection.timeout}
         </div>
       )}
 
