@@ -152,7 +152,7 @@ export default function ProjectDetail() {
                   {file.mimeType?.split("/")[1] ?? "file"}
                 </span>
                 <span className="text-xs text-[hsl(var(--muted-foreground))]">
-                  {formatBytes(file.sizeBytes)}
+                  {file.sizeBytes != null ? formatBytes(file.sizeBytes) : "—"}
                 </span>
                 <span className="text-xs text-[hsl(var(--muted-foreground))]">
                   {formatDate(file.createdAt)}
