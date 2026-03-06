@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { content } from "@/lib/content";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 const { sidebar } = content.studio;
 
@@ -36,8 +37,17 @@ export default function Sidebar({
   onNavigate?: () => void;
 }) {
   const { pathname } = useLocation();
+  const { data: currentUser } = useCurrentUser();
   const navItems = getNavItems(slug);
   const secondaryItems = getSecondaryNavItems(slug);
+
+  if (currentUser?.role === "admin") {
+    secondaryItems.push({
+      label: content.studio.admin.sidebar,
+      href: "/admin",
+      icon: "🔒",
+    });
+  }
 
   function isActive(href: string) {
     if (href === `/studio/${slug}`) return pathname === href;

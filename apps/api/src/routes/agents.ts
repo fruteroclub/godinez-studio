@@ -7,7 +7,7 @@ import { requireAuth } from "../middleware/auth";
 import { resolveUser } from "../middleware/resolve-user";
 import { getAllAgents, getAgentById, updateAgent } from "../dal/agents";
 import { getWorkspaceByAgentId, getMemberRole } from "../dal/workspaces";
-import { gateway } from "../services/gateway-relay";
+import { pool } from "../services/gateway-pool";
 import { buildSoulMd } from "../services/agent-soul-template";
 
 /** Safely extract AgentConfig from the JSONB column */
@@ -46,16 +46,30 @@ app.get("/:id", async (c) => {
   return c.json(agent);
 });
 
+// Helper: resolve relay for an agent's workspace
+async function getRelayForAgent(agentId: number) {
+  const workspace = await getWorkspaceByAgentId(agentId);
+  if (!workspace) return null;
+  return pool.getRelayForWorkspace(workspace.instanceId);
+}
+
 // GET /api/agents/:id/files — List workspace files
 app.get("/:id/files", async (c) => {
   const id = parseInt(c.req.param("id"));
   const agent = await getAgentById(id);
   if (!agent) return c.json({ error: "Agent not found" }, 404);
   if (!agent.openclawId) return c.json({ error: "Agent not linked to OpenClaw" }, 400);
-  if (!gateway.isConnected) return c.json({ error: "Gateway offline" }, 503);
+
+  let relay;
+  try {
+    relay = await getRelayForAgent(id);
+  } catch {
+    return c.json({ error: "AGENT_OFFLINE", message: "Tu agente no está disponible en este momento." }, 503);
+  }
+  if (!relay) return c.json({ error: "AGENT_OFFLINE", message: "Tu agente no está disponible en este momento." }, 503);
 
   try {
-    const result = await gateway.agentsFilesList(agent.openclawId);
+    const result = await relay.agentsFilesList(agent.openclawId);
     return c.json({ files: result.files });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to list files";
@@ -70,10 +84,17 @@ app.get("/:id/files/:name", async (c) => {
   const agent = await getAgentById(id);
   if (!agent) return c.json({ error: "Agent not found" }, 404);
   if (!agent.openclawId) return c.json({ error: "Agent not linked to OpenClaw" }, 400);
-  if (!gateway.isConnected) return c.json({ error: "Gateway offline" }, 503);
+
+  let relay;
+  try {
+    relay = await getRelayForAgent(id);
+  } catch {
+    return c.json({ error: "AGENT_OFFLINE", message: "Tu agente no está disponible en este momento." }, 503);
+  }
+  if (!relay) return c.json({ error: "AGENT_OFFLINE", message: "Tu agente no está disponible en este momento." }, 503);
 
   try {
-    const file = await gateway.agentsFilesGet(agent.openclawId, name);
+    const file = await relay.agentsFilesGet(agent.openclawId, name);
     return c.json({ file });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to read file";
@@ -92,10 +113,17 @@ app.put(
     const agent = await getAgentById(id);
     if (!agent) return c.json({ error: "Agent not found" }, 404);
     if (!agent.openclawId) return c.json({ error: "Agent not linked to OpenClaw" }, 400);
-    if (!gateway.isConnected) return c.json({ error: "Gateway offline" }, 503);
+
+    let relay;
+    try {
+      relay = await getRelayForAgent(id);
+    } catch {
+      return c.json({ error: "AGENT_OFFLINE", message: "Tu agente no está disponible en este momento." }, 503);
+    }
+    if (!relay) return c.json({ error: "AGENT_OFFLINE", message: "Tu agente no está disponible en este momento." }, 503);
 
     try {
-      const file = await gateway.agentsFilesSet(agent.openclawId, name, content);
+      const file = await relay.agentsFilesSet(agent.openclawId, name, content);
       return c.json({ file });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to write file";
@@ -158,10 +186,6 @@ app.put(
     });
 
     // Rebuild and re-inject SOUL.md
-    if (!gateway.isConnected) {
-      return c.json({ error: "Gateway offline" }, 503);
-    }
-
     const soulMd = buildSoulMd({
       workspaceName: workspace.name,
       agentName: resolvedName,
@@ -175,7 +199,10 @@ app.put(
     });
 
     try {
-      await gateway.agentsFilesSet(agent.openclawId, "SOUL.md", soulMd);
+      const relay = await getRelayForAgent(id);
+      if (relay) {
+        await relay.agentsFilesSet(agent.openclawId, "SOUL.md", soulMd);
+      }
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Failed to inject SOUL.md";
@@ -192,7 +219,14 @@ app.post("/:id/reinject-soul", async (c) => {
   const agent = await getAgentById(id);
   if (!agent) return c.json({ error: "Agent not found" }, 404);
   if (!agent.openclawId) return c.json({ error: "Agent not linked to OpenClaw" }, 400);
-  if (!gateway.isConnected) return c.json({ error: "Gateway offline" }, 503);
+
+  let relay;
+  try {
+    relay = await getRelayForAgent(id);
+  } catch {
+    return c.json({ error: "AGENT_OFFLINE", message: "Tu agente no está disponible en este momento." }, 503);
+  }
+  if (!relay) return c.json({ error: "AGENT_OFFLINE", message: "Tu agente no está disponible en este momento." }, 503);
 
   const workspace = await getWorkspaceByAgentId(id);
   const cfg = parseAgentConfig(agent.config);
@@ -210,7 +244,7 @@ app.post("/:id/reinject-soul", async (c) => {
   });
 
   try {
-    const file = await gateway.agentsFilesSet(agent.openclawId, "SOUL.md", soulMd);
+    const file = await relay.agentsFilesSet(agent.openclawId, "SOUL.md", soulMd);
     return c.json({ ok: true, file });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed to inject SOUL.md";

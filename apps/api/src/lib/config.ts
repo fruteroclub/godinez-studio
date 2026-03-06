@@ -11,3 +11,8 @@ export const AGENT_WORKSPACE_BASE =
 export const SYNC_DEBOUNCE_MS = parseInt(process.env.SYNC_DEBOUNCE_MS || "5000", 10);
 export const SYNC_MAX_TASKS = 30;
 export const SYNC_MAX_FILES = 10;
+
+// Gateway pool
+export const POOL_IDLE_TIMEOUT_MS = parseInt(process.env.POOL_IDLE_TIMEOUT_MS || "600000", 10); // 10 min
+export const POOL_HEALTH_INTERVAL_MS = parseInt(process.env.POOL_HEALTH_INTERVAL_MS || "60000", 10); // 60s
+export const LEGACY_INSTANCE_NAME = process.env.LEGACY_INSTANCE_NAME || "godin-001";

@@ -20,7 +20,9 @@ import conversations, {
   projectConversations,
 } from "./routes/conversations";
 import referralCodes from "./routes/referral-codes";
-import { gateway } from "./services/gateway-relay";
+import admin from "./routes/admin";
+import users from "./routes/users";
+import "./services/gateway-pool"; // initialize pool (lazy connections)
 
 const app = new Hono();
 
@@ -57,6 +59,8 @@ app.route("/api/agents", provision);
 app.route("/api/chat", chat);
 app.route("/api/conversations", conversations);
 app.route("/api/referral-codes", referralCodes);
+app.route("/api/admin", admin);
+app.route("/api/users", users);
 app.route("/webhooks", webhooks);
 
 // Serve uploaded files in development (in production, R2 serves files directly)
@@ -75,13 +79,5 @@ serve({ fetch: app.fetch, port }, () => {
   console.log(`Godinez Studio API running on port ${port}`);
 });
 
-// Connect to OpenClaw Gateway if configured
-if (process.env.OPENCLAW_GATEWAY_URL) {
-  gateway
-    .connect(
-      process.env.OPENCLAW_GATEWAY_URL,
-      process.env.OPENCLAW_GATEWAY_TOKEN!,
-    )
-    .then(() => console.log("[Gateway] Connected"))
-    .catch((err) => console.error("[Gateway] Connection failed:", err));
-}
+// Gateway connections are now lazy via GatewayPool — no startup connection needed.
+// Instances are registered in the gateway_instances table and connected on first use.

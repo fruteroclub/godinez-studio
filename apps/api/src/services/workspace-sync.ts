@@ -17,7 +17,7 @@ import {
 import { db } from "../db";
 import { getWorkspaceById } from "../dal/workspaces";
 import { getAgentById } from "../dal/agents";
-import { gateway } from "./gateway-relay";
+import { pool } from "./gateway-pool";
 import { buildSoulMd } from "./agent-soul-template";
 import { SYNC_DEBOUNCE_MS, SYNC_MAX_TASKS, SYNC_MAX_FILES } from "../lib/config";
 
@@ -37,7 +37,6 @@ const pendingTimers = new Map<number, ReturnType<typeof setTimeout>>();
  */
 export function syncWorkspaceFile(workspaceId: number): void {
   if (!isEnabled()) return;
-  if (!gateway.isConnected) return;
 
   // Clear existing timer for this workspace
   const existing = pendingTimers.get(workspaceId);
@@ -74,6 +73,14 @@ async function executeSync(workspaceId: number): Promise<void> {
   const workspace = await getWorkspaceById(workspaceId);
   if (!workspace?.agentSlot) return;
 
+  let relay;
+  try {
+    relay = await pool.getRelayForWorkspace(workspace.instanceId);
+  } catch {
+    console.warn(`[WorkspaceSync] Gateway offline for workspace ${workspaceId}, skipping`);
+    return;
+  }
+
   // First sync for this workspace: also re-inject SOUL.md so existing
   // agents get the workspace-awareness instructions.
   if (!soulInjected.has(workspaceId) && workspace.agentId) {
@@ -86,7 +93,7 @@ async function executeSync(workspaceId: number): Promise<void> {
           agentName: agent.name,
           agentSlot: workspace.agentSlot,
         });
-        await gateway.agentsFilesSet(workspace.agentSlot, "SOUL.md", soulMd);
+        await relay.agentsFilesSet(workspace.agentSlot, "SOUL.md", soulMd);
         console.log(`[WorkspaceSync] Re-injected SOUL.md for workspace ${workspaceId}`);
       }
     } catch (err) {
@@ -97,7 +104,7 @@ async function executeSync(workspaceId: number): Promise<void> {
 
   const content = await buildWorkspaceMd(workspaceId, workspace.name);
 
-  await gateway.agentsFilesSet(workspace.agentSlot, "WORKSPACE.md", content);
+  await relay.agentsFilesSet(workspace.agentSlot, "WORKSPACE.md", content);
   console.log(`[WorkspaceSync] Updated WORKSPACE.md for workspace ${workspaceId}`);
 }
 

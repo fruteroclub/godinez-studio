@@ -10,6 +10,7 @@ import { tasks } from "./tasks";
 import { files } from "./files";
 import { agentLogs } from "./agent-logs";
 import { referralCodes } from "./referral-codes";
+import { gatewayInstances } from "./gateway-instances";
 
 export const usersRelations = relations(users, ({ many }) => ({
   ownedWorkspaces: many(workspaces),
@@ -36,6 +37,10 @@ export const workspacesRelations = relations(workspaces, ({ one, many }) => ({
   agent: one(agents, {
     fields: [workspaces.agentId],
     references: [agents.id],
+  }),
+  instance: one(gatewayInstances, {
+    fields: [workspaces.instanceId],
+    references: [gatewayInstances.id],
   }),
   members: many(workspaceMembers),
   projects: many(projects),
@@ -166,3 +171,10 @@ export const agentLogsRelations = relations(agentLogs, ({ one }) => ({
     references: [agents.id],
   }),
 }));
+
+export const gatewayInstancesRelations = relations(
+  gatewayInstances,
+  ({ many }) => ({
+    workspaces: many(workspaces),
+  }),
+);
