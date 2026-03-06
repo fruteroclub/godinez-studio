@@ -9,6 +9,7 @@ import {
   getWorkspacesList,
   getAgentsList,
   getGrowthTimeSeries,
+  getUsageByWorkspace,
 } from "../dal/admin";
 import {
   getAllInstances,
@@ -17,6 +18,10 @@ import {
   updateInstance,
   deleteInstance,
 } from "../dal/instances";
+import {
+  listReferralCodes,
+  createReferralCode,
+} from "../dal/referral-codes";
 
 const app = new Hono<AuthEnv>();
 
@@ -51,6 +56,18 @@ app.get("/agents", async (c) => {
 app.get("/growth", async (c) => {
   const { period } = growthSchema.parse(c.req.query());
   const result = await getGrowthTimeSeries({ period });
+  return c.json(result);
+});
+
+const usageSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  cursor: z.coerce.number().int().positive().optional(),
+  period: z.enum(["7d", "30d", "90d"]).default("30d"),
+});
+
+app.get("/usage", async (c) => {
+  const params = usageSchema.parse(c.req.query());
+  const result = await getUsageByWorkspace(params);
   return c.json(result);
 });
 
@@ -148,5 +165,27 @@ app.get("/instances/:id/health", async (c) => {
 
   return c.json({ ...data, gatewayReachable });
 });
+
+// --- Referral codes (waitlist pipeline) ---
+
+app.get("/referral-codes", async (c) => {
+  const codes = await listReferralCodes();
+  return c.json(codes);
+});
+
+app.post(
+  "/referral-codes",
+  async (c) => {
+    const body = z
+      .object({
+        email: z.string().email(),
+        name: z.string().optional(),
+        source: z.string().max(100).optional(),
+      })
+      .parse(await c.req.json());
+    const code = await createReferralCode(body);
+    return c.json(code, 201);
+  },
+);
 
 export default app;
