@@ -6,11 +6,10 @@ import { useWorkspace } from "@/providers/WorkspaceProvider";
 import { useChat } from "@/hooks/use-chat";
 import { useActionExecutor } from "@/hooks/use-action-executor";
 import { ActionCard } from "@/components/chat/ActionCard";
-import { ManualActionMenu } from "@/components/chat/ManualActionMenu";
+
 import { stripActionBlocks } from "@/lib/action-parser";
 import AgentOfflineBanner from "@/components/AgentOfflineBanner";
 import { content } from "@/lib/content";
-import type { ActionType } from "@godinez/types";
 
 const { chat } = content.studio;
 
@@ -143,10 +142,6 @@ export default function ChatConversation() {
       handleSubmit(e);
     }
   }, [handleSubmit]);
-
-  const handleManualAction = useCallback((_type: ActionType) => {
-    // TODO Phase 2: open a form dialog
-  }, []);
 
   const handleRefreshPreview = useCallback(() => {
     if (iframeRef.current && previewUrl) {
@@ -284,11 +279,6 @@ export default function ChatConversation() {
                     msg.content
                   )}
                 </div>
-                {msg.role === "agent" && !msg.streaming && (
-                  <div className="ml-1 flex items-end">
-                    <ManualActionMenu onSelect={handleManualAction} />
-                  </div>
-                )}
               </div>
             ))}
 

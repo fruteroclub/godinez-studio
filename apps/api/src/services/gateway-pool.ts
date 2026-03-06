@@ -1,3 +1,4 @@
+import { logger } from "../lib/logger";
 import { GatewayRelay } from "./gateway-relay";
 import {
   getInstanceById,
@@ -56,7 +57,7 @@ class GatewayPool {
       if (this.failureCounts.has(instanceId)) {
         this.failureCounts.delete(instanceId);
         await markInstanceActive(instanceId);
-        console.log(`[GatewayPool] Instance ${instance.name} recovered, marking active`);
+        logger.info({ instance: instance.name }, "gateway instance recovered");
       }
       return relay;
     } catch (err) {
@@ -96,7 +97,7 @@ class GatewayPool {
     this.failureCounts.set(instanceId, count);
     if (count >= MAX_CONNECT_FAILURES) {
       await markInstanceOffline(instanceId);
-      console.log(`[GatewayPool] Instance ${name} marked offline after ${count} failures`);
+      logger.warn({ instance: name, failures: count }, "gateway instance marked offline");
     }
   }
 
@@ -105,7 +106,7 @@ class GatewayPool {
     for (const [id, relay] of this.relays) {
       const idle = now - relay.lastActivityAt.getTime();
       if (idle > POOL_IDLE_TIMEOUT_MS) {
-        console.log(`[GatewayPool] Reaping idle relay for instance ${id} (${idle}ms idle)`);
+        logger.debug({ instanceId: id, idleMs: idle }, "reaping idle relay");
         relay.disconnect();
         this.relays.delete(id);
       }
@@ -126,7 +127,7 @@ class GatewayPool {
         this.relays.set(instance.id, relay);
         this.failureCounts.delete(instance.id);
         await markInstanceActive(instance.id);
-        console.log(`[GatewayPool] Instance ${instance.name} recovered, marking active`);
+        logger.info({ instance: instance.name }, "gateway instance recovered");
       } catch {
         // Still unreachable — leave offline
       }
@@ -140,6 +141,13 @@ class GatewayPool {
       this.legacyInstanceId = instance.id;
     }
     return this.legacyInstanceId;
+  }
+
+  hasConnectedRelays(): boolean {
+    for (const relay of this.relays.values()) {
+      if (relay.isConnected) return true;
+    }
+    return false;
   }
 
   shutdown(): void {
