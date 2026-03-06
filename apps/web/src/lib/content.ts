@@ -243,4 +243,12 @@ export const content = {
       genericError: "Ocurrió un error al crear tu agente. Intenta de nuevo.",
     },
   },
+  toast: {
+    configSaved: "Configuración guardada",
+    fileUploaded: "Archivo subido",
+    projectCreated: "Proyecto creado",
+    taskCreated: "Tarea creada",
+    fetchError: "Error de conexión. Intenta de nuevo.",
+    timeout: "La solicitud tardó demasiado. Intenta de nuevo.",
+  },
 };

@@ -2,6 +2,8 @@ import { useAuth } from "@clerk/clerk-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { FileRecord } from "@godinez/types";
 import { apiFetch } from "@/lib/api";
+import { toast } from "sonner";
+import { content } from "@/lib/content";
 
 interface StorageQuota {
   usedBytes: number;
@@ -58,6 +60,7 @@ export function useUploadFile(workspaceId: number) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["files", workspaceId] });
       qc.invalidateQueries({ queryKey: ["storage-quota", workspaceId] });
+      toast.success(content.toast.fileUploaded);
     },
   });
 }
