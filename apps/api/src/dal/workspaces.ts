@@ -188,7 +188,7 @@ export async function getRecentChatMessages(workspaceId: number, limit: number =
   const recentMessages = await db.query.messages.findMany({
     where: and(
       eq(messages.workspaceId, workspaceId),
-      eq(messages.role, "assistant"),
+      eq(messages.role, "agent"),
     ),
     orderBy: (messages, { desc }) => [desc(messages.createdAt)],
     limit,
