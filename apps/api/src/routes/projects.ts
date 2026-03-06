@@ -19,6 +19,7 @@ import {
 import { createProjectSchema, updateProjectSchema } from "../validators";
 import { db } from "../db";
 import { syncWorkspaceFile } from "../services/workspace-sync";
+import { verifyWorkspaceAccess } from "../middleware/require-resource-access";
 
 const app = new Hono<AuthEnv>();
 
@@ -26,7 +27,11 @@ app.use("*", requireAuth, resolveUser);
 
 // POST /api/projects — Create project
 app.post("/", zValidator("json", createProjectSchema), async (c) => {
+  const userId = c.get("userId");
   const data = c.req.valid("json");
+  if (!(await verifyWorkspaceAccess(userId, data.workspaceId))) {
+    return c.json({ error: "Not a workspace member" }, 403);
+  }
   const project = await createProject(data);
   syncWorkspaceFile(data.workspaceId);
   return c.json(project, 201);
@@ -34,9 +39,13 @@ app.post("/", zValidator("json", createProjectSchema), async (c) => {
 
 // GET /api/projects/:id — Project detail + stats
 app.get("/:id", async (c) => {
+  const userId = c.get("userId");
   const id = parseInt(c.req.param("id"));
   const project = await getProjectById(id);
   if (!project) return c.json({ error: "Project not found" }, 404);
+  if (!(await verifyWorkspaceAccess(userId, project.workspaceId))) {
+    return c.json({ error: "Not a workspace member" }, 403);
+  }
 
   // Get counts
   const [taskCounts] = await db
@@ -72,7 +81,13 @@ app.get("/:id", async (c) => {
 
 // PUT /api/projects/:id — Update project
 app.put("/:id", zValidator("json", updateProjectSchema), async (c) => {
+  const userId = c.get("userId");
   const id = parseInt(c.req.param("id"));
+  const existing = await getProjectById(id);
+  if (!existing) return c.json({ error: "Project not found" }, 404);
+  if (!(await verifyWorkspaceAccess(userId, existing.workspaceId))) {
+    return c.json({ error: "Not a workspace member" }, 403);
+  }
   const data = c.req.valid("json");
   const project = await updateProject(id, data);
   if (!project) return c.json({ error: "Project not found" }, 404);
@@ -82,9 +97,13 @@ app.put("/:id", zValidator("json", updateProjectSchema), async (c) => {
 
 // DELETE /api/projects/:id — Delete project (owner/admin only)
 app.delete("/:id", async (c) => {
+  const userId = c.get("userId");
   const id = parseInt(c.req.param("id"));
   const project = await getProjectById(id);
   if (!project) return c.json({ error: "Project not found" }, 404);
+  if (!(await verifyWorkspaceAccess(userId, project.workspaceId))) {
+    return c.json({ error: "Not a workspace member" }, 403);
+  }
   await deleteProject(id);
   syncWorkspaceFile(project.workspaceId);
   return c.json({ deleted: true });

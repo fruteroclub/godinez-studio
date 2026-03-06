@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq } from "drizzle-orm";
-import { files as filesTable } from "@godinez/db";
+import { files as filesTable, projects as projectsTable } from "@godinez/db";
 import type { AuthEnv } from "../types";
 import { requireAuth } from "../middleware/auth";
 import { resolveUser } from "../middleware/resolve-user";
@@ -9,6 +9,7 @@ import { createFile, deleteFile, getWorkspaceStorageUsage } from "../dal/files";
 import { storage } from "../services/storage";
 import { db } from "../db";
 import { syncWorkspaceFile } from "../services/workspace-sync";
+import { verifyWorkspaceAccess } from "../middleware/require-resource-access";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
@@ -29,6 +30,9 @@ app.post("/upload", async (c) => {
   }
   if (!workspaceId) {
     return c.json({ error: "workspaceId is required" }, 400);
+  }
+  if (!(await verifyWorkspaceAccess(userId, workspaceId))) {
+    return c.json({ error: "Not a workspace member" }, 403);
   }
 
   const arrayBuffer = await file.arrayBuffer();
@@ -71,21 +75,29 @@ app.post("/upload", async (c) => {
 
 // GET /api/files/:id — Get file detail
 app.get("/:id", async (c) => {
+  const userId = c.get("userId");
   const id = parseInt(c.req.param("id"));
   const file = await db.query.files.findFirst({
     where: eq(filesTable.id, id),
   });
   if (!file) return c.json({ error: "File not found" }, 404);
+  if (!(await verifyWorkspaceAccess(userId, file.workspaceId))) {
+    return c.json({ error: "Not a workspace member" }, 403);
+  }
   return c.json(file);
 });
 
 // DELETE /api/files/:id — Delete file
 app.delete("/:id", async (c) => {
+  const userId = c.get("userId");
   const id = parseInt(c.req.param("id"));
   const file = await db.query.files.findFirst({
     where: eq(filesTable.id, id),
   });
   if (!file) return c.json({ error: "File not found" }, 404);
+  if (!(await verifyWorkspaceAccess(userId, file.workspaceId))) {
+    return c.json({ error: "Not a workspace member" }, 403);
+  }
 
   await storage.delete(file.storageKey);
   await deleteFile(id);
@@ -128,7 +140,15 @@ projectFiles.use("*", requireAuth, resolveUser);
 
 // GET /api/projects/:id/files — List project files
 projectFiles.get("/:id/files", async (c) => {
+  const userId = c.get("userId");
   const projectId = parseInt(c.req.param("id"));
+  const project = await db.query.projects.findFirst({
+    where: eq(projectsTable.id, projectId),
+  });
+  if (!project) return c.json({ error: "Project not found" }, 404);
+  if (!(await verifyWorkspaceAccess(userId, project.workspaceId))) {
+    return c.json({ error: "Not a workspace member" }, 403);
+  }
   const files = await db.query.files.findMany({
     where: eq(filesTable.projectId, projectId),
     orderBy: filesTable.createdAt,
