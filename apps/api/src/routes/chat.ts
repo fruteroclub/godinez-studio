@@ -23,6 +23,7 @@ import { pool } from "../services/gateway-pool";
 import { resolveAgentSession } from "../services/agent-mapping";
 import { createStubRun } from "../services/stub-agent";
 import { parseActionBlocks, stripActionBlocks } from "../lib/action-parser";
+import { verifyWorkspaceAccess } from "../middleware/require-resource-access";
 import {
   generateHeuristicTitle,
   parseTitleBlock,
@@ -361,6 +362,11 @@ app.post(
 
     const message = await getMessageById(messageId);
     if (!message) return c.json({ error: "Message not found" }, 404);
+
+    const userId = c.get("userId");
+    if (!(await verifyWorkspaceAccess(userId, message.workspaceId))) {
+      return c.json({ error: "Not a workspace member" }, 403);
+    }
 
     let metadata: Record<string, unknown> = {};
     try {
