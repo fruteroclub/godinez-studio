@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "set -a && . ./.env.local && set +a && drizzle-kit generate",
     "db:push": "set -a && . ./.env.local && set +a && drizzle-kit push",
+    "db:push:dev": "set -a && . ./.env.development && set +a && drizzle-kit push",
     "db:studio": "set -a && . ./.env.local && set +a && drizzle-kit studio"
   },
   "dependencies": {
