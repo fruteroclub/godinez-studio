@@ -32,7 +32,7 @@ export default function Activity() {
     queryKey: ["activity", workspace?.id],
     queryFn: async () => {
       const token = await getToken();
-      return apiFetch<{ logs: LogEntry[] }>(
+      return apiFetch<{ items: LogEntry[]; nextCursor: number | null }>(
         `/api/workspaces/${workspace?.id}/activity`,
         { token },
       );
@@ -40,7 +40,7 @@ export default function Activity() {
     enabled: !!workspace?.id,
   });
 
-  const logs = data?.logs ?? [];
+  const logs = data?.items ?? [];
 
   return (
     <div className="space-y-6">

@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { eq, and } from "drizzle-orm";
-import { tasks as tasksTable } from "@godinez/db";
+import { eq, and, desc, lt } from "drizzle-orm";
+import { tasks as tasksTable, projects } from "@godinez/db";
 import type { AuthEnv } from "../types";
 import { requireAuth } from "../middleware/auth";
 import { resolveUser } from "../middleware/resolve-user";
@@ -23,6 +23,7 @@ import {
 } from "../validators";
 import { db } from "../db";
 import { syncWorkspaceFile } from "../services/workspace-sync";
+import { verifyWorkspaceAccess } from "../middleware/require-resource-access";
 
 const app = new Hono<AuthEnv>();
 
@@ -32,6 +33,9 @@ app.use("*", requireAuth, resolveUser);
 app.post("/", zValidator("json", createTaskSchema), async (c) => {
   const userId = c.get("userId");
   const data = c.req.valid("json");
+  if (!(await verifyWorkspaceAccess(userId, data.workspaceId))) {
+    return c.json({ error: "Not a workspace member" }, 403);
+  }
   const task = await createTask({ ...data, createdByUserId: userId });
   syncWorkspaceFile(data.workspaceId);
   return c.json(task, 201);
@@ -39,15 +43,25 @@ app.post("/", zValidator("json", createTaskSchema), async (c) => {
 
 // GET /api/tasks/:id — Get task detail
 app.get("/:id", async (c) => {
+  const userId = c.get("userId");
   const id = parseInt(c.req.param("id"));
   const task = await getTaskById(id);
   if (!task) return c.json({ error: "Task not found" }, 404);
+  if (!(await verifyWorkspaceAccess(userId, task.workspaceId))) {
+    return c.json({ error: "Not a workspace member" }, 403);
+  }
   return c.json(task);
 });
 
 // PUT /api/tasks/:id — Update task
 app.put("/:id", zValidator("json", updateTaskSchema), async (c) => {
+  const userId = c.get("userId");
   const id = parseInt(c.req.param("id"));
+  const existing = await getTaskById(id);
+  if (!existing) return c.json({ error: "Task not found" }, 404);
+  if (!(await verifyWorkspaceAccess(userId, existing.workspaceId))) {
+    return c.json({ error: "Not a workspace member" }, 403);
+  }
   const data = c.req.valid("json");
 
   const updateData: Record<string, unknown> = { ...data };
@@ -64,11 +78,15 @@ app.put(
   "/:id/status",
   zValidator("json", updateTaskStatusSchema),
   async (c) => {
+    const userId = c.get("userId");
     const id = parseInt(c.req.param("id"));
     const { status } = c.req.valid("json");
 
     const existing = await getTaskById(id);
     if (!existing) return c.json({ error: "Task not found" }, 404);
+    if (!(await verifyWorkspaceAccess(userId, existing.workspaceId))) {
+      return c.json({ error: "Not a workspace member" }, 403);
+    }
 
     const updateData: Record<string, unknown> = { status };
 
@@ -87,9 +105,13 @@ app.put(
 
 // DELETE /api/tasks/:id — Delete task
 app.delete("/:id", async (c) => {
+  const userId = c.get("userId");
   const id = parseInt(c.req.param("id"));
   const task = await getTaskById(id);
   if (!task) return c.json({ error: "Task not found" }, 404);
+  if (!(await verifyWorkspaceAccess(userId, task.workspaceId))) {
+    return c.json({ error: "Not a workspace member" }, 403);
+  }
   await deleteTask(id);
   syncWorkspaceFile(task.workspaceId);
   return c.json({ deleted: true });
@@ -102,21 +124,32 @@ export const workspaceTasks = new Hono<AuthEnv>();
 
 workspaceTasks.use("*", requireAuth, resolveUser);
 
-// GET /api/workspaces/:id/tasks — List workspace tasks with filters
+// GET /api/workspaces/:id/tasks — List workspace tasks with filters (paginated)
 workspaceTasks.get("/:id/tasks", requireWorkspaceMember, async (c) => {
   const workspaceId = parseInt(c.req.param("id"));
   const status = c.req.query("status");
   const priority = c.req.query("priority");
+  const limit = Math.min(parseInt(c.req.query("limit") || "50"), 100);
+  const cursor = c.req.query("cursor") ? parseInt(c.req.query("cursor")!) : undefined;
 
   const conditions = [eq(tasksTable.workspaceId, workspaceId)];
   if (status) conditions.push(eq(tasksTable.status, status));
   if (priority) conditions.push(eq(tasksTable.priority, priority));
+  if (cursor) conditions.push(lt(tasksTable.id, cursor));
 
-  const tasks = await db.query.tasks.findMany({
+  const items = await db.query.tasks.findMany({
     where: and(...conditions),
-    orderBy: tasksTable.createdAt,
+    orderBy: desc(tasksTable.id),
+    limit: limit + 1,
   });
-  return c.json(tasks);
+
+  const hasMore = items.length > limit;
+  const page = hasMore ? items.slice(0, limit) : items;
+
+  return c.json({
+    items: page,
+    nextCursor: hasMore ? page[page.length - 1].id : null,
+  });
 });
 
 // Project-scoped task list
@@ -126,7 +159,15 @@ projectTasks.use("*", requireAuth, resolveUser);
 
 // GET /api/projects/:id/tasks — List project tasks
 projectTasks.get("/:id/tasks", async (c) => {
+  const userId = c.get("userId");
   const projectId = parseInt(c.req.param("id"));
+  const project = await db.query.projects.findFirst({
+    where: eq(projects.id, projectId),
+  });
+  if (!project) return c.json({ error: "Project not found" }, 404);
+  if (!(await verifyWorkspaceAccess(userId, project.workspaceId))) {
+    return c.json({ error: "Not a workspace member" }, 403);
+  }
   const tasks = await getTasksByProjectId(projectId);
   return c.json(tasks);
 });

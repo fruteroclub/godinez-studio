@@ -15,9 +15,11 @@ export function useFiles(workspaceId: number | undefined) {
     queryKey: ["files", workspaceId],
     queryFn: async () => {
       const token = await getToken();
-      return apiFetch<FileRecord[]>(`/api/workspaces/${workspaceId}/files`, {
-        token,
-      });
+      const res = await apiFetch<{ items: FileRecord[]; nextCursor: number | null }>(
+        `/api/workspaces/${workspaceId}/files`,
+        { token },
+      );
+      return res.items;
     },
     enabled: !!workspaceId,
   });
