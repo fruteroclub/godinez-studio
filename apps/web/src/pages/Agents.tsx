@@ -8,6 +8,7 @@ import { useWorkspace } from "@/providers/WorkspaceProvider";
 import { useUpdateAgentConfig } from "@/hooks/use-agent";
 import { useCreateConversation } from "@/hooks/use-conversations";
 import { PageSkeleton } from "@/components/ui/Skeleton";
+import AgentOfflineBanner from "@/components/AgentOfflineBanner";
 
 const { agents: ac, onboarding } = content.studio;
 
@@ -123,6 +124,7 @@ function AgentSettingsForm({
 
   const [saveFlash, setSaveFlash] = useState(false);
   const [needsRestart, setNeedsRestart] = useState(false);
+  const [offlineError, setOfflineError] = useState(false);
 
   // Reset form when agent data changes (e.g. after save invalidation)
   useEffect(() => {
@@ -152,9 +154,16 @@ function AgentSettingsForm({
       },
       {
         onSuccess: () => {
+          setOfflineError(false);
           setNeedsRestart(true);
           setSaveFlash(true);
           setTimeout(() => setSaveFlash(false), 2000);
+        },
+        onError: (err) => {
+          const msg = err instanceof Error ? err.message : "";
+          if (msg.includes("AGENT_OFFLINE")) {
+            setOfflineError(true);
+          }
         },
       },
     );
@@ -175,6 +184,9 @@ function AgentSettingsForm({
 
   return (
     <div className="space-y-6">
+      {offlineError && (
+        <AgentOfflineBanner message="No se puede conectar con el agente. Los cambios se guardarán localmente cuando vuelva a estar disponible." />
+      )}
       <h1 className="text-2xl font-semibold text-[hsl(var(--foreground))]">
         {ac.title}
       </h1>

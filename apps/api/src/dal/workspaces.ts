@@ -100,11 +100,16 @@ export async function deleteWorkspace(id: number) {
 
 export async function linkAgentToWorkspace(
   workspaceId: number,
-  data: { agentId: number; agentSlot: string },
+  data: { agentId: number; agentSlot: string; instanceId?: number },
 ) {
   const [workspace] = await db
     .update(workspaces)
-    .set({ agentId: data.agentId, agentSlot: data.agentSlot, status: "provisioning" })
+    .set({
+      agentId: data.agentId,
+      agentSlot: data.agentSlot,
+      status: "provisioning",
+      ...(data.instanceId != null && { instanceId: data.instanceId }),
+    })
     .where(eq(workspaces.id, workspaceId))
     .returning();
   return workspace;
