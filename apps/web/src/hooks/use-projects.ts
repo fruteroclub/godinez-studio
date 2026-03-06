@@ -1,6 +1,6 @@
 import { useAuth } from "@clerk/clerk-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Project } from "@godinez/types";
+import type { Project, Task, FileRecord, Conversation } from "@godinez/types";
 import { apiFetch } from "@/lib/api";
 
 interface ProjectDetail extends Project {
@@ -39,32 +39,6 @@ export function useProject(projectId: string | undefined) {
   });
 }
 
-interface Task {
-  id: number;
-  title: string;
-  description: string | null;
-  status: string;
-  priority: string;
-  createdAt: string;
-  completedAt: string | null;
-}
-
-interface ProjectFile {
-  id: number;
-  filename: string;
-  mimeType: string | null;
-  sizeBytes: number;
-  url: string;
-  createdAt: string;
-}
-
-interface Conversation {
-  id: number;
-  title: string;
-  lastMessageAt: string | null;
-  createdAt: string;
-}
-
 export function useProjectTasks(projectId: string | undefined) {
   const { getToken } = useAuth();
   return useQuery({
@@ -83,7 +57,7 @@ export function useProjectFiles(projectId: string | undefined) {
     queryKey: ["projectFiles", projectId],
     queryFn: async () => {
       const token = await getToken();
-      return apiFetch<ProjectFile[]>(`/api/projects/${projectId}/files`, {
+      return apiFetch<FileRecord[]>(`/api/projects/${projectId}/files`, {
         token,
       });
     },
