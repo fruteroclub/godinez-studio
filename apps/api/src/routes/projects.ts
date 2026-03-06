@@ -47,26 +47,15 @@ app.get("/:id", async (c) => {
     return c.json({ error: "Not a workspace member" }, 403);
   }
 
-  // Get counts
-  const [taskCounts] = await db
-    .select({ count: count() })
-    .from(tasks)
-    .where(eq(tasks.projectId, id));
-
-  const [completedTasks] = await db
-    .select({ count: count() })
-    .from(tasks)
-    .where(and(eq(tasks.projectId, id), eq(tasks.status, "completed")));
-
-  const [conversationCount] = await db
-    .select({ count: count() })
-    .from(conversations)
-    .where(eq(conversations.projectId, id));
-
-  const [fileCount] = await db
-    .select({ count: count() })
-    .from(files)
-    .where(eq(files.projectId, id));
+  const [[taskCounts], [completedTasks], [conversationCount], [fileCount]] =
+    await Promise.all([
+      db.select({ count: count() }).from(tasks).where(eq(tasks.projectId, id)),
+      db.select({ count: count() }).from(tasks)
+        .where(and(eq(tasks.projectId, id), eq(tasks.status, "completed"))),
+      db.select({ count: count() }).from(conversations)
+        .where(eq(conversations.projectId, id)),
+      db.select({ count: count() }).from(files).where(eq(files.projectId, id)),
+    ]);
 
   return c.json({
     ...project,
