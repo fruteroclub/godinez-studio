@@ -29,7 +29,7 @@ export default function Lab() {
   });
   
   // Polling interval for checking new tunnel URLs from chat
-  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Check if a tunnel URL is alive
   const checkTunnelHealth = useCallback(async (url: string): Promise<boolean> => {
