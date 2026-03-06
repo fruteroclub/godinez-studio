@@ -4,6 +4,7 @@ import type { Task, TaskStatus } from "@godinez/types";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 import { content } from "@/lib/content";
+import { trackEvent } from "@/lib/posthog";
 
 export function useTasks(workspaceId: number | undefined) {
   const { getToken } = useAuth();
@@ -41,6 +42,7 @@ export function useCreateTask(workspaceId: number) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tasks", workspaceId] });
       toast.success(content.toast.taskCreated);
+      trackEvent("task_created");
     },
   });
 }

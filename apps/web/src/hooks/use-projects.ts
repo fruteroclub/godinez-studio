@@ -4,6 +4,7 @@ import type { Project, Task, FileRecord, Conversation } from "@godinez/types";
 import { apiFetch } from "@/lib/api";
 import { toast } from "sonner";
 import { content } from "@/lib/content";
+import { trackEvent } from "@/lib/posthog";
 
 interface ProjectDetail extends Project {
   stats: {
@@ -97,6 +98,7 @@ export function useCreateProject(workspaceId: number) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["projects", workspaceId] });
       toast.success(content.toast.projectCreated);
+      trackEvent("project_created");
     },
   });
 }

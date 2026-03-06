@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
+import { usePostHogIdentify } from "@/hooks/use-posthog-identify";
 
 interface Workspace {
   id: number;
@@ -35,6 +36,7 @@ export default function WorkspaceProvider({
 }: {
   children: React.ReactNode;
 }) {
+  usePostHogIdentify();
   const { slug } = useParams<{ slug: string }>();
   const { getToken } = useAuth();
 
