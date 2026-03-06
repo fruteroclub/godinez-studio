@@ -12,9 +12,10 @@ import {
 import { createAgent } from "../dal/agents";
 import { createConversation } from "../dal/conversations";
 import { updateUser } from "../dal/users";
-import { gateway } from "../services/gateway-relay";
+import { incrementUsedSlots } from "../dal/instances";
+import { pool } from "../services/gateway-pool";
 import { buildSoulMd } from "../services/agent-soul-template";
-import { AGENT_MAX_SLOTS, AGENT_WORKSPACE_BASE } from "../lib/config";
+import { AGENT_MAX_SLOTS } from "../lib/config";
 
 const app = new Hono<AuthEnv>();
 
@@ -59,19 +60,34 @@ app.post(
       return c.json({ error: "Workspace already has an agent" }, 409);
     }
 
-    // 4. Verify gateway is connected
-    if (!gateway.isConnected) {
+    // 4. Pick an instance from the pool
+    const tier = workspace.tier === "pro" ? "dedicated" as const : "shared" as const;
+    const instance = await pool.pickInstance(tier);
+    if (!instance) {
+      return c.json(
+        { error: "CAPACITY_FULL", message: "No hay instancias disponibles. Intenta más tarde." },
+        503,
+      );
+    }
+
+    // 5. Connect to the instance
+    let relay;
+    try {
+      relay = await pool.getRelay(instance.id);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Gateway connection failed";
+      console.error("[Provision] Gateway connection failed:", msg);
       return c.json(
         { error: "GATEWAY_OFFLINE", message: "El servicio de agentes no está disponible." },
         503,
       );
     }
 
-    // 5. Find available slot
+    // 6. Find available slot
     let agents;
     try {
-      console.log("[Provision] Listing agents...");
-      agents = await gateway.agentsList();
+      console.log("[Provision] Listing agents on instance", instance.name);
+      agents = await relay.agentsList();
       console.log("[Provision] Agents:", JSON.stringify(agents.agents.map((a) => a.name)));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "agents.list failed";
@@ -98,14 +114,14 @@ app.post(
       );
     }
 
-    // 6. Create agent on OpenClaw
+    // 7. Create agent on OpenClaw
     const slotName = `godin-slot-${slotNumber}`;
-    console.log("[Provision] Creating agent:", slotName);
+    console.log("[Provision] Creating agent:", slotName, "on instance", instance.name);
     let agentResult;
     try {
-      agentResult = await gateway.agentsCreate({
+      agentResult = await relay.agentsCreate({
         name: slotName,
-        workspace: `${AGENT_WORKSPACE_BASE}/${slotName}`,
+        workspace: `${instance.workspaceBase}/${slotName}`,
       });
       console.log("[Provision] Agent created:", agentResult.agentId);
     } catch (err) {
@@ -114,7 +130,7 @@ app.post(
       return c.json({ error: "PROVISION_FAILED", message: msg }, 502);
     }
 
-    // 7. Inject platform-aware SOUL.md into agent workspace
+    // 8. Inject platform-aware SOUL.md into agent workspace
     const resolvedAgentName = agentName || `${workspace.name} Agent`;
     try {
       const soulMd = buildSoulMd({
@@ -127,7 +143,7 @@ app.post(
         personality,
         needs,
       });
-      await gateway.agentsFilesSet(agentResult.agentId, "SOUL.md", soulMd);
+      await relay.agentsFilesSet(agentResult.agentId, "SOUL.md", soulMd);
       console.log("[Provision] SOUL.md injected for", slotName);
     } catch (err) {
       // Non-fatal — agent still works, just without platform instructions
@@ -135,7 +151,7 @@ app.post(
       console.warn("[Provision] SOUL.md injection failed (non-fatal):", msg);
     }
 
-    // 8. Insert DB agent
+    // 9. Insert DB agent
     console.log("[Provision] Inserting DB agent...");
     const slug = `${workspace.slug}-agent`;
     const agentConfig: Record<string, unknown> = {};
@@ -162,13 +178,17 @@ app.post(
       ...(Object.keys(agentConfig).length > 0 && { config: agentConfig }),
     });
 
-    // 9. Link agent to workspace
+    // 10. Link agent to workspace with instance binding
     await linkAgentToWorkspace(workspaceId, {
       agentId: dbAgent.id,
       agentSlot: agentResult.agentId,
+      instanceId: instance.id,
     });
 
-    // 10. Create onboarding conversation
+    // 11. Increment used_slots on the instance
+    await incrementUsedSlots(instance.id);
+
+    // 12. Create onboarding conversation
     const conversation = await createConversation({
       workspaceId,
       agentId: dbAgent.id,

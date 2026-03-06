@@ -1,4 +1,5 @@
 import {
+  type AnyPgColumn,
   integer,
   pgTable,
   serial,
@@ -8,6 +9,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { users } from "./users";
 import { agents } from "./agents";
+import { gatewayInstances } from "./gateway-instances";
 
 export const workspaces = pgTable("workspaces", {
   id: serial("id").primaryKey(),
@@ -20,6 +22,10 @@ export const workspaces = pgTable("workspaces", {
   tier: text("tier").notNull().default("beta_tester"),
   status: text("status").notNull().default("provisioning"), // active | suspended | provisioning
   agentSlot: varchar("agent_slot", { length: 255 }), // OpenClaw agent ID mapping
+  instanceId: integer("instance_id").references(
+    (): AnyPgColumn => gatewayInstances.id,
+    { onDelete: "set null" },
+  ),
   settings: text("settings"), // JSON string for workspace-level config
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

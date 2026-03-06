@@ -19,7 +19,7 @@ import {
 import { createProject } from "../dal/projects";
 import { createTask } from "../dal/tasks";
 import { getWorkspaceById, activateWorkspace } from "../dal/workspaces";
-import { gateway } from "../services/gateway-relay";
+import { pool } from "../services/gateway-pool";
 import { resolveAgentSession } from "../services/agent-mapping";
 import { createStubRun } from "../services/stub-agent";
 import { parseActionBlocks, stripActionBlocks } from "../lib/action-parser";
@@ -76,11 +76,21 @@ app.post(
     // Send to Gateway or use stub
     let runId: string;
 
-    if (gateway.isConnected) {
+    // Resolve workspace to find its instance
+    const workspace = await getWorkspaceById(workspaceId);
+
+    let relay;
+    try {
+      relay = workspace ? await pool.getRelayForWorkspace(workspace.instanceId) : null;
+    } catch {
+      relay = null;
+    }
+
+    if (relay) {
       try {
         const sessionKey = await resolveAgentSession(workspaceId, conversationId);
-        runId = await gateway.chatSend(sessionKey, enrichedContent);
-        runContexts.set(runId, { conversationId, workspaceId });
+        runId = await relay.chatSend(sessionKey, enrichedContent);
+        runContexts.set(runId, { conversationId, workspaceId, instanceId: workspace!.instanceId });
       } catch (err) {
         const error = err instanceof Error ? err.message : "Gateway error";
         return c.json({ error }, 502);
@@ -89,14 +99,6 @@ app.post(
       // Stub mode — create a stub run and register it
       const stub = createStubRun(enrichedContent);
       runId = stub.runId;
-
-      // Register stub handlers that will be picked up by the SSE endpoint
-      gateway.onRun(runId, {
-        onDelta: () => {},
-        onFinal: () => {},
-        onError: () => {},
-      });
-      // Replace with stub simulation — store on a simple map
       stubRuns.set(runId, { stub, conversationId, workspaceId });
     }
 
@@ -122,9 +124,20 @@ app.get("/stream/:runId", async (c) => {
   return streamSSE(c, async (stream) => {
     let keepaliveTimer: ReturnType<typeof setInterval> | null = null;
 
+    // Resolve the relay for this run (needed for onRun/offRun)
+    const ctx = runContexts.get(runId);
+    let relay;
+    try {
+      relay = ctx?.instanceId != null
+        ? await pool.getRelayForWorkspace(ctx.instanceId)
+        : null;
+    } catch {
+      relay = null;
+    }
+
     const cleanup = () => {
       if (keepaliveTimer) clearInterval(keepaliveTimer);
-      gateway.offRun(runId);
+      relay?.offRun(runId);
     };
 
     // Keepalive every 30 seconds
@@ -140,7 +153,6 @@ app.get("/stream/:runId", async (c) => {
     const stubEntry = stubRuns.get(runId);
     if (stubEntry) {
       stubRuns.delete(runId);
-      gateway.offRun(runId);
 
       stubEntry.stub.simulateStream({
         onDelta: async (text) => {
@@ -213,10 +225,20 @@ app.get("/stream/:runId", async (c) => {
     }
 
     // Real Gateway mode — register handlers
+    if (!relay) {
+      await stream.writeSSE({
+        event: "error",
+        data: JSON.stringify({ type: "error", error: "AGENT_OFFLINE" }),
+      });
+      cleanup();
+      await stream.close();
+      return;
+    }
+
     let streamClosed = false;
 
     await new Promise<void>((resolve) => {
-      gateway.onRun(runId, {
+      relay.onRun(runId, {
         onDelta: async (text) => {
           if (streamClosed) return;
           try {
@@ -326,7 +348,7 @@ app.get("/stream/:runId", async (c) => {
 // Context map for Gateway runs (conversationId + workspaceId needed when saving final message)
 export const runContexts = new Map<
   string,
-  { conversationId: number; workspaceId: number }
+  { conversationId: number; workspaceId: number; instanceId?: number | null }
 >();
 
 // POST /api/chat/actions/:messageId/execute — Execute a pending action

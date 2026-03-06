@@ -8,10 +8,11 @@ import { useActionExecutor } from "@/hooks/use-action-executor";
 import { ActionCard } from "@/components/chat/ActionCard";
 import { ManualActionMenu } from "@/components/chat/ManualActionMenu";
 import { stripActionBlocks } from "@/lib/action-parser";
+import AgentOfflineBanner from "@/components/AgentOfflineBanner";
 import { content } from "@/lib/content";
 import type { ActionType } from "@godinez/types";
 
-const { chat: chatContent } = content.studio;
+const { chat } = content.studio;
 
 // Regex to detect tunnel URLs
 const TUNNEL_URL_REGEX = /(https?:\/\/[a-z0-9-]+\.(?:trycloudflare\.com|ngrok\.io|ngrok-free\.app|localhost\.run)(?:\/[^\s\)\]\*\`\<\>]*)?)/gi;
@@ -34,14 +35,14 @@ export default function ChatConversation() {
     () => qc.invalidateQueries({ queryKey: ["conversations", workspace?.id] }),
     [qc, workspace?.id],
   );
-  const { messages, sendMessage, isStreaming, isLoading, updateAction } =
+  const { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction } =
     useChat(Number(conversationId), workspace?.id ?? 0, { onComplete });
   const { execute } = useActionExecutor(updateAction);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [input, setInput] = useState("");
-  
+
   // Preview state
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [tunnelStatus, setTunnelStatus] = useState<TunnelStatus>("idle");
@@ -90,7 +91,7 @@ export default function ChatConversation() {
     if (detectedUrl && detectedUrl !== previewUrl) {
       setPreviewUrl(detectedUrl);
       checkTunnelHealth(detectedUrl);
-      
+
       // Trigger transition animation on desktop
       if (!isMobile) {
         setIsTransitioning(true);
@@ -169,6 +170,13 @@ export default function ChatConversation() {
 
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col">
+      {/* Agent offline banner */}
+      {agentOffline && (
+        <div className="px-4 pt-3">
+          <AgentOfflineBanner />
+        </div>
+      )}
+
       {/* Mobile banner when preview available */}
       {isMobile && previewUrl && (
         <div className="bg-gradient-to-r from-magenta/10 to-violet/10 border-b border-magenta/20 px-4 py-3 animate-in slide-in-from-top duration-300">
@@ -200,8 +208,8 @@ export default function ChatConversation() {
       }`}>
         {/* Chat panel */}
         <div className={`flex flex-col transition-all duration-500 ease-out ${
-          showPreview && !isMobile 
-            ? "w-1/2 border-r border-[hsl(var(--border))]" 
+          showPreview && !isMobile
+            ? "w-1/2 border-r border-[hsl(var(--border))]"
             : "w-full"
         }`}>
           {/* Typing indicator */}
@@ -291,17 +299,17 @@ export default function ChatConversation() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={chatContent.placeholder}
-                disabled={isStreaming}
+                placeholder={agentOffline ? "Agente no disponible" : chat.placeholder}
+                disabled={isStreaming || agentOffline}
                 rows={1}
                 className="flex-1 resize-none rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-4 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20 disabled:opacity-50"
               />
               <button
                 type="submit"
-                disabled={isStreaming || !input.trim()}
+                disabled={isStreaming || agentOffline || !input.trim()}
                 className="rounded-md bg-magenta px-4 py-2 text-sm font-medium text-white hover:bg-magenta/90 transition-colors disabled:opacity-50"
               >
-                {chatContent.send}
+                {chat.send}
               </button>
             </div>
           </form>
@@ -373,7 +381,7 @@ export default function ChatConversation() {
             {/* Preview content */}
             <div className="flex-1 relative flex items-center justify-center bg-[hsl(var(--muted))] p-4">
               {tunnelStatus === "live" && previewUrl ? (
-                <div 
+                <div
                   className={`bg-white rounded-lg shadow-2xl overflow-hidden transition-all duration-300 ${
                     previewDevice === "mobile" ? "h-[667px]" : "w-full h-full"
                   }`}

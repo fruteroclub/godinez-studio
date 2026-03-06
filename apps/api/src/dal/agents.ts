@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import type { AgentConfig } from "@godinez/types";
 import { agents } from "@godinez/db";
 import { db } from "../db";
 
@@ -28,7 +29,7 @@ export async function createAgent(data: {
   template: string;
   status: string;
   openclawId?: string;
-  config?: Record<string, unknown>;
+  config?: AgentConfig;
 }) {
   const [agent] = await db.insert(agents).values(data).returning();
   return agent;
@@ -36,7 +37,7 @@ export async function createAgent(data: {
 
 export async function updateAgent(
   id: number,
-  data: { name?: string; config?: Record<string, unknown> },
+  data: { name?: string; config?: AgentConfig },
 ) {
   const [agent] = await db
     .update(agents)
