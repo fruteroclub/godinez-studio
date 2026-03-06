@@ -185,3 +185,60 @@ export async function getGrowthTimeSeries({
     })),
   };
 }
+
+export async function getUsageByWorkspace({
+  limit,
+  cursor,
+  period,
+}: {
+  limit: number;
+  cursor?: number;
+  period: string;
+}) {
+  const days = PERIOD_DAYS[period] ?? 30;
+
+  const rows = await db
+    .select({
+      id: workspaces.id,
+      name: workspaces.name,
+      slug: workspaces.slug,
+      tier: workspaces.tier,
+      ownerEmail: users.email,
+      tokenUsage:
+        sql<number>`coalesce((
+          select sum(al.tokens_used)
+          from ${agentLogs} al
+          where al.workspace_id = ${workspaces.id}
+          and al.created_at >= now() - interval '1 day' * ${days}
+        ), 0)`.mapWith(Number),
+      storageBytes:
+        sql<number>`coalesce((
+          select sum(f.size_bytes)
+          from ${files} f
+          where f.workspace_id = ${workspaces.id}
+        ), 0)`.mapWith(Number),
+      messageCount:
+        sql<number>`coalesce((
+          select count(*)
+          from ${messages} m
+          where m.workspace_id = ${workspaces.id}
+          and m.created_at >= now() - interval '1 day' * ${days}
+        ), 0)`.mapWith(Number),
+    })
+    .from(workspaces)
+    .leftJoin(users, eq(workspaces.ownerId, users.id))
+    .where(cursor ? gt(workspaces.id, cursor) : undefined)
+    .orderBy(sql`coalesce((
+      select sum(al.tokens_used)
+      from ${agentLogs} al
+      where al.workspace_id = ${workspaces.id}
+      and al.created_at >= now() - interval '1 day' * ${days}
+    ), 0) desc`)
+    .limit(limit + 1);
+
+  const hasMore = rows.length > limit;
+  const data = hasMore ? rows.slice(0, limit) : rows;
+  const nextCursor = hasMore ? data[data.length - 1].id : null;
+
+  return { data, nextCursor };
+}
