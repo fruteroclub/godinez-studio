@@ -35,3 +35,19 @@ export function useCreateConversation(workspaceId: number) {
       qc.invalidateQueries({ queryKey: ["conversations", workspaceId] }),
   });
 }
+
+export function useDeleteConversation(workspaceId: number) {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (conversationId: number) => {
+      const token = await getToken();
+      return apiFetch(`/api/conversations/${conversationId}`, {
+        method: "DELETE",
+        token,
+      });
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["conversations", workspaceId] }),
+  });
+}

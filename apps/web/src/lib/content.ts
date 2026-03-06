@@ -25,6 +25,7 @@ export const content = {
       placeholder: "Escribe un mensaje...",
       send: "Enviar",
       newConversation: "Nueva conversación",
+      deleteConfirm: "¿Eliminar esta conversación? Se perderán todos los mensajes.",
     },
     actions: {
       pending: "Pendiente",
@@ -180,6 +181,7 @@ export const content = {
       deactivate: "Desactivar",
       recoveryHint: "El gateway está alcanzable pero marcado como offline. Haz clic en \"Activar\" para reconectar.",
       sidebar: "Admin",
+      usage: "Uso",
     },
     onboarding: {
       // Navigation

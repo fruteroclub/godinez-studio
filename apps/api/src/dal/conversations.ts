@@ -122,3 +122,9 @@ export async function getMessageCountForConversation(
     .where(eq(messages.conversationId, conversationId));
   return result?.total ?? 0;
 }
+
+export async function deleteConversation(id: number) {
+  // Messages cascade via FK, but explicit delete for clarity
+  await db.delete(messages).where(eq(messages.conversationId, id));
+  await db.delete(conversations).where(eq(conversations.id, id));
+}
