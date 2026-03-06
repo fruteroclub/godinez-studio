@@ -176,6 +176,9 @@ export const content = {
       loadMore: "Cargar más",
       reachable: "Alcanzable",
       unreachable: "No alcanzable",
+      activate: "Activar",
+      deactivate: "Desactivar",
+      recoveryHint: "El gateway está alcanzable pero marcado como offline. Haz clic en \"Activar\" para reconectar.",
       sidebar: "Admin",
     },
     onboarding: {
