@@ -1,0 +1,47 @@
+name: Agent label lifecycle
+
+on:
+  pull_request:
+    types: [opened, closed]
+
+jobs:
+  update-labels:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: read
+    steps:
+      - name: Extract issue number from branch
+        id: extract
+        env:
+          BRANCH: ${{ github.head_ref }}
+        run: |
+          ISSUE=$(echo "$BRANCH" | grep -oP '(?<=issue-)\d+' || true)
+          echo "issue=$ISSUE" >> "$GITHUB_OUTPUT"
+
+      - name: PR opened — mark agent-done
+        if: github.event.action == 'opened' && steps.extract.outputs.issue != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ steps.extract.outputs.issue }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh issue edit "$ISSUE" --repo "$REPO" --add-label agent-done --remove-label agent-claimed 2>/dev/null || true
+
+      - name: PR merged — close issue
+        if: github.event.action == 'closed' && github.event.pull_request.merged == true && steps.extract.outputs.issue != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ steps.extract.outputs.issue }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh issue close "$ISSUE" --repo "$REPO" 2>/dev/null || true
+
+      - name: PR closed without merge — re-queue
+        if: github.event.action == 'closed' && github.event.pull_request.merged == false && steps.extract.outputs.issue != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ steps.extract.outputs.issue }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh issue edit "$ISSUE" --repo "$REPO" --add-label agent-ok --remove-label agent-done 2>/dev/null || true
