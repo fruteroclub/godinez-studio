@@ -1,0 +1,2 @@
+[build]
+watchPatterns = ["apps/api/**", "packages/**", "pnpm-lock.yaml", "turbo.json", "package.json"]
