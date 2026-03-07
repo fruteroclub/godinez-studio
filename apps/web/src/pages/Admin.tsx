@@ -18,6 +18,8 @@ import {
   useAdminGrowth,
   useAdminUsage,
   useAdminAlerts,
+  useAdminCapacity,
+  useAdminAgentActivity,
   useInstanceHealth,
   useCreateInstance,
   useUpdateInstance,
@@ -689,9 +691,208 @@ function UsageSection() {
 
 // --- Main Admin Page ---
 
+// --- Section: Capacity Planning ---
+
+function CapacitySection() {
+  const { data, isLoading } = useAdminCapacity();
+
+  if (isLoading) return <PageSkeleton />;
+  if (!data) return null;
+
+  return (
+    <section className="space-y-6">
+      <h2 className="text-lg font-semibold text-[hsl(var(--foreground))]">Capacidad</h2>
+
+      {/* Aggregate stats */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+        <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">Slots totales</p>
+          <p className="mt-1 text-2xl font-semibold text-[hsl(var(--foreground))]">
+            {data.aggregate.usedSlots}/{data.aggregate.totalSlots}
+          </p>
+        </div>
+        <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">Utilización</p>
+          <p className="mt-1 text-2xl font-semibold text-[hsl(var(--foreground))]">
+            {data.aggregate.utilization}%
+          </p>
+        </div>
+        <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">Slots libres</p>
+          <p className="mt-1 text-2xl font-semibold text-[hsl(var(--foreground))]">
+            {data.projection.remainingSlots}
+          </p>
+        </div>
+        <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">Crecimiento semanal</p>
+          <p className="mt-1 text-2xl font-semibold text-[hsl(var(--foreground))]">
+            +{data.projection.weeklyGrowthRate}
+          </p>
+        </div>
+      </div>
+
+      {/* Projection banner */}
+      {data.projection.daysUntilFull !== null && (
+        <div className={`rounded-lg border px-4 py-3 text-sm ${
+          data.projection.daysUntilFull < 14
+            ? "border-red-500/30 bg-red-500/10 text-red-400"
+            : data.projection.daysUntilFull < 30
+              ? "border-yellow-500/30 bg-yellow-500/10 text-yellow-400"
+              : "border-blue-500/30 bg-blue-500/10 text-blue-400"
+        }`}>
+          Capacidad compartida se llena en ~{data.projection.daysUntilFull} días al ritmo actual
+        </div>
+      )}
+
+      {/* Per-instance utilization */}
+      <div>
+        <h3 className="mb-3 text-sm font-medium text-[hsl(var(--muted-foreground))]">Por instancia</h3>
+        <div className="space-y-2">
+          {data.instances.map((inst) => (
+            <div key={inst.id} className="flex items-center gap-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-4 py-3">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-medium ${statusColors[inst.status] ?? "text-gray-400"}`}>
+                    {inst.name}
+                  </span>
+                  <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                    {inst.tier} · {inst.region}
+                  </span>
+                </div>
+                <div className="mt-1.5 h-2 w-full rounded-full bg-[hsl(var(--muted))]">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      inst.utilization > 80 ? "bg-red-500" :
+                      inst.utilization > 60 ? "bg-yellow-500" : "bg-green-500"
+                    }`}
+                    style={{ width: `${inst.utilization}%` }}
+                  />
+                </div>
+              </div>
+              <span className="text-sm text-[hsl(var(--foreground))] tabular-nums">
+                {inst.usedSlots}/{inst.maxSlots}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Token consumption chart */}
+      {data.trends.dailyTokens.length > 0 && (
+        <div>
+          <h3 className="mb-3 text-sm font-medium text-[hsl(var(--muted-foreground))]">
+            Consumo de tokens (30d)
+          </h3>
+          <div className="h-64 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data.trends.dailyTokens}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Line type="monotone" dataKey="tokens" stroke="#E91E8C" dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+// --- Section: Agent Activity ---
+
+function AgentActivitySection() {
+  const { data, isLoading } = useAdminAgentActivity();
+
+  if (isLoading) return <PageSkeleton />;
+  if (!data) return null;
+
+  return (
+    <section className="space-y-6">
+      <h2 className="text-lg font-semibold text-[hsl(var(--foreground))]">Actividad de agentes</h2>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+        <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">Agentes activos</p>
+          <p className="mt-1 text-2xl font-semibold text-[hsl(var(--foreground))]">{data.summary.activeAgents}</p>
+        </div>
+        <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">Eventos (30d)</p>
+          <p className="mt-1 text-2xl font-semibold text-[hsl(var(--foreground))]">{data.summary.totalEvents.toLocaleString()}</p>
+        </div>
+        <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">Tokens (30d)</p>
+          <p className="mt-1 text-2xl font-semibold text-[hsl(var(--foreground))]">{data.summary.totalTokens.toLocaleString()}</p>
+        </div>
+        <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
+          <p className="text-sm text-[hsl(var(--muted-foreground))]">Errores (30d)</p>
+          <p className={`mt-1 text-2xl font-semibold ${data.summary.errorCount > 0 ? "text-red-400" : "text-[hsl(var(--foreground))]"}`}>
+            {data.summary.errorCount}
+          </p>
+        </div>
+      </div>
+
+      {/* Daily events chart */}
+      {data.dailyEvents.length > 0 && (
+        <div className="h-64 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data.dailyEvents}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis dataKey="day" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip />
+              <Legend />
+              <Line type="monotone" dataKey="events" name="Eventos" stroke="#8B5CF6" dot={false} />
+              <Line type="monotone" dataKey="tokens" name="Tokens" stroke="#FFB800" dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Agent table */}
+      {data.agents.length > 0 && (
+        <div className="overflow-x-auto rounded-lg border border-[hsl(var(--border))]">
+          <table className="w-full text-sm">
+            <thead className="bg-[hsl(var(--muted))]">
+              <tr>
+                <th className="px-4 py-2 text-left text-[hsl(var(--muted-foreground))]">Agent</th>
+                <th className="px-4 py-2 text-left text-[hsl(var(--muted-foreground))]">Workspace</th>
+                <th className="px-4 py-2 text-right text-[hsl(var(--muted-foreground))]">Eventos</th>
+                <th className="px-4 py-2 text-right text-[hsl(var(--muted-foreground))]">Tokens</th>
+                <th className="px-4 py-2 text-right text-[hsl(var(--muted-foreground))]">Errores</th>
+                <th className="px-4 py-2 text-right text-[hsl(var(--muted-foreground))]">Ultima actividad</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.agents.map((a) => (
+                <tr key={`${a.agentId}-${a.workspaceId}`} className="border-t border-[hsl(var(--border))]">
+                  <td className="px-4 py-2 text-[hsl(var(--foreground))]">#{a.agentId}</td>
+                  <td className="px-4 py-2 text-[hsl(var(--muted-foreground))]">#{a.workspaceId}</td>
+                  <td className="px-4 py-2 text-right text-[hsl(var(--foreground))] tabular-nums">{a.totalEvents}</td>
+                  <td className="px-4 py-2 text-right text-[hsl(var(--foreground))] tabular-nums">{a.totalTokens.toLocaleString()}</td>
+                  <td className={`px-4 py-2 text-right tabular-nums ${a.errorCount > 0 ? "text-red-400" : "text-[hsl(var(--foreground))]"}`}>
+                    {a.errorCount}
+                  </td>
+                  <td className="px-4 py-2 text-right text-[hsl(var(--muted-foreground))] text-xs">
+                    {new Date(a.lastActivity).toLocaleDateString("es-MX", { day: "numeric", month: "short" })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
+
 const TABS = [
   { key: "overview", label: admin.overview },
   { key: "instances", label: admin.instances },
+  { key: "capacity", label: "Capacidad" },
+  { key: "activity", label: "Actividad" },
   { key: "workspaces", label: admin.workspacesSection },
   { key: "growth", label: admin.growth },
   { key: "usage", label: admin.usage },
@@ -740,6 +941,8 @@ export default function Admin() {
         <AlertsBanner />
         {tab === "overview" && <OverviewSection />}
         {tab === "instances" && <InstancesSection />}
+        {tab === "capacity" && <CapacitySection />}
+        {tab === "activity" && <AgentActivitySection />}
         {tab === "workspaces" && <WorkspacesSection />}
         {tab === "growth" && <GrowthSection />}
         {tab === "usage" && <UsageSection />}
