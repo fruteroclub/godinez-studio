@@ -15,7 +15,11 @@ import { updateUser } from "../dal/users";
 import { incrementUsedSlots } from "../dal/instances";
 import { pool } from "../services/gateway-pool";
 import { buildSoulMd } from "../services/agent-soul-template";
+import { getInstanceTier } from "@godinez/types";
 import { AGENT_MAX_SLOTS } from "../lib/config";
+import { logger } from "../lib/logger";
+
+const log = logger.child({ service: "provision" });
 
 const app = new Hono<AuthEnv>();
 
@@ -61,8 +65,8 @@ app.post(
     }
 
     // 4. Pick an instance from the pool
-    const tier = workspace.tier === "pro" ? "dedicated" as const : "shared" as const;
-    const instance = await pool.pickInstance(tier);
+    const instanceTier = getInstanceTier(workspace.tier);
+    const instance = await pool.pickInstance(instanceTier, workspace.id);
     if (!instance) {
       return c.json(
         { error: "CAPACITY_FULL", message: "No hay instancias disponibles. Intenta más tarde." },
@@ -76,7 +80,7 @@ app.post(
       relay = await pool.getRelay(instance.id);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Gateway connection failed";
-      console.error("[Provision] Gateway connection failed:", msg);
+      log.error({ err: msg }, "gateway connection failed");
       return c.json(
         { error: "GATEWAY_OFFLINE", message: "El servicio de agentes no está disponible." },
         503,
@@ -86,12 +90,12 @@ app.post(
     // 6. Find available slot
     let agents;
     try {
-      console.log("[Provision] Listing agents on instance", instance.name);
+      log.info({ instance: instance.name }, "listing agents");
       agents = await relay.agentsList();
-      console.log("[Provision] Agents:", JSON.stringify(agents.agents.map((a) => a.name)));
+      log.debug({ agents: agents.agents.map((a) => a.name) }, "agent list");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "agents.list failed";
-      console.error("[Provision] agents.list failed:", msg);
+      log.error({ err: msg }, "agents.list failed");
       return c.json({ error: "GATEWAY_ERROR", message: msg }, 502);
     }
 
@@ -116,17 +120,17 @@ app.post(
 
     // 7. Create agent on OpenClaw
     const slotName = `godin-slot-${slotNumber}`;
-    console.log("[Provision] Creating agent:", slotName, "on instance", instance.name);
+    log.info({ slot: slotName, instance: instance.name }, "creating agent");
     let agentResult;
     try {
       agentResult = await relay.agentsCreate({
         name: slotName,
         workspace: `${instance.workspaceBase}/${slotName}`,
       });
-      console.log("[Provision] Agent created:", agentResult.agentId);
+      log.info({ agentId: agentResult.agentId }, "agent created");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "agents.create failed";
-      console.error("[Provision] agents.create failed:", msg);
+      log.error({ err: msg }, "agents.create failed");
       return c.json({ error: "PROVISION_FAILED", message: msg }, 502);
     }
 
@@ -144,15 +148,15 @@ app.post(
         needs,
       });
       await relay.agentsFilesSet(agentResult.agentId, "SOUL.md", soulMd);
-      console.log("[Provision] SOUL.md injected for", slotName);
+      log.info({ slot: slotName }, "SOUL.md injected");
     } catch (err) {
       // Non-fatal — agent still works, just without platform instructions
       const msg = err instanceof Error ? err.message : "agents.files.set failed";
-      console.warn("[Provision] SOUL.md injection failed (non-fatal):", msg);
+      log.warn({ slot: slotName, err: msg }, "SOUL.md injection failed (non-fatal)");
     }
 
     // 9. Insert DB agent
-    console.log("[Provision] Inserting DB agent...");
+    log.debug("inserting DB agent");
     const slug = `${workspace.slug}-agent`;
     const agentConfig: Record<string, unknown> = {};
     if (userName) agentConfig.userName = userName;

@@ -284,5 +284,5 @@ export interface CurrentUser {
 }
 
 export { studioContent } from "./content";
-export { TIER_LIMITS, getTierLimits } from "./quotas";
+export { TIER_LIMITS, getTierLimits, TIER_INSTANCE_MAP, getInstanceTier } from "./quotas";
 export type { TierLimits } from "./quotas";
