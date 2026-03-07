@@ -24,6 +24,7 @@ import {
   createReferralCode,
 } from "../dal/referral-codes";
 import { getActiveAlerts } from "../services/alerts";
+import { getCapacityOverview, getAgentActivity } from "../dal/capacity";
 
 const app = new Hono<AuthEnv>();
 
@@ -180,6 +181,20 @@ app.get("/instances/:id/health", async (c) => {
   }
 
   return c.json({ ...data, gatewayReachable });
+});
+
+// --- Capacity planning ---
+
+app.get("/capacity", async (c) => {
+  const data = await getCapacityOverview();
+  return c.json(data);
+});
+
+// --- Agent activity ---
+
+app.get("/agent-activity", async (c) => {
+  const data = await getAgentActivity();
+  return c.json(data);
 });
 
 // --- Alerts ---

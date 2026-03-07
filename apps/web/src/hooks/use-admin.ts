@@ -179,6 +179,53 @@ interface Alert {
   timestamp: string;
 }
 
+export function useAdminCapacity() {
+  const { getToken } = useAuth();
+  return useQuery({
+    queryKey: ["admin", "capacity"],
+    queryFn: async () => {
+      const token = await getToken();
+      return apiFetch<{
+        instances: Array<{
+          id: number; name: string; tier: string; status: string;
+          maxSlots: number; usedSlots: number; utilization: number; region: string | null;
+        }>;
+        aggregate: { totalSlots: number; usedSlots: number; utilization: number };
+        trends: {
+          dailyActiveWorkspaces: Array<{ day: string; count: number }>;
+          dailyTokens: Array<{ day: string; tokens: number }>;
+        };
+        projection: {
+          weeklyGrowthRate: number;
+          remainingSlots: number;
+          daysUntilFull: number | null;
+        };
+      }>("/api/admin/capacity", { token });
+    },
+  });
+}
+
+export function useAdminAgentActivity() {
+  const { getToken } = useAuth();
+  return useQuery({
+    queryKey: ["admin", "agent-activity"],
+    queryFn: async () => {
+      const token = await getToken();
+      return apiFetch<{
+        agents: Array<{
+          agentId: number; workspaceId: number;
+          totalEvents: number; totalTokens: number; errorCount: number;
+          lastActivity: string;
+        }>;
+        dailyEvents: Array<{ day: string; events: number; tokens: number }>;
+        summary: {
+          totalEvents: number; totalTokens: number; errorCount: number; activeAgents: number;
+        };
+      }>("/api/admin/agent-activity", { token });
+    },
+  });
+}
+
 export function useAdminAlerts() {
   const { getToken } = useAuth();
   return useQuery({
