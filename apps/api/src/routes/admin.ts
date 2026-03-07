@@ -23,6 +23,7 @@ import {
   listReferralCodes,
   createReferralCode,
 } from "../dal/referral-codes";
+import { getActiveAlerts } from "../services/alerts";
 
 const app = new Hono<AuthEnv>();
 
@@ -179,6 +180,13 @@ app.get("/instances/:id/health", async (c) => {
   }
 
   return c.json({ ...data, gatewayReachable });
+});
+
+// --- Alerts ---
+
+app.get("/alerts", async (c) => {
+  const alerts = getActiveAlerts();
+  return c.json(alerts);
 });
 
 // --- Referral codes (waitlist pipeline) ---

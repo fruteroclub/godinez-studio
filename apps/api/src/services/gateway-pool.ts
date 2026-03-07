@@ -1,5 +1,6 @@
 import { logger } from "../lib/logger";
 import { GatewayRelay } from "./gateway-relay";
+import { checkAlerts } from "./alerts";
 import {
   getInstanceById,
   getInstanceByName,
@@ -27,6 +28,7 @@ class GatewayPool {
     this.healthTimer = setInterval(() => {
       this.reapIdle();
       this.probeOffline();
+      checkAlerts();
     }, POOL_HEALTH_INTERVAL_MS);
   }
 
