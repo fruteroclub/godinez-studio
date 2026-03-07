@@ -17,6 +17,7 @@ import {
   useAdminInstances,
   useAdminGrowth,
   useAdminUsage,
+  useAdminAlerts,
   useInstanceHealth,
   useCreateInstance,
   useUpdateInstance,
@@ -40,6 +41,36 @@ const statusColors: Record<string, string> = {
   draining: "text-yellow-400",
   decommissioned: "text-gray-400",
 };
+
+// --- Alerts Banner ---
+
+function AlertsBanner() {
+  const { data: alerts } = useAdminAlerts();
+  if (!alerts?.length) return null;
+
+  return (
+    <section className="space-y-2">
+      {alerts.map((alert) => (
+        <div
+          key={alert.id}
+          className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${
+            alert.level === "error"
+              ? "border-red-500/30 bg-red-500/10 text-red-400"
+              : "border-yellow-500/30 bg-yellow-500/10 text-yellow-400"
+          }`}
+        >
+          <span className="mt-0.5 text-base">{alert.level === "error" ? "!!!" : "(!)"}</span>
+          <div>
+            <p className="font-medium">{alert.message}</p>
+            <p className="mt-0.5 text-xs opacity-70">
+              {alert.condition} — {new Date(alert.timestamp).toLocaleTimeString("es-MX")}
+            </p>
+          </div>
+        </div>
+      ))}
+    </section>
+  );
+}
 
 // --- Section 1: Overview Cards ---
 
@@ -706,6 +737,7 @@ export default function Admin() {
         </nav>
       </header>
       <main className="mx-auto max-w-7xl space-y-8 p-6">
+        <AlertsBanner />
         {tab === "overview" && <OverviewSection />}
         {tab === "instances" && <InstancesSection />}
         {tab === "workspaces" && <WorkspacesSection />}

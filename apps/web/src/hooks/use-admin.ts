@@ -169,6 +169,28 @@ export function useCreateReferralCode() {
   });
 }
 
+interface Alert {
+  id: string;
+  level: "warn" | "error";
+  condition: string;
+  message: string;
+  instanceId?: number;
+  instanceName?: string;
+  timestamp: string;
+}
+
+export function useAdminAlerts() {
+  const { getToken } = useAuth();
+  return useQuery({
+    queryKey: ["admin", "alerts"],
+    queryFn: async () => {
+      const token = await getToken();
+      return apiFetch<Alert[]>("/api/admin/alerts", { token });
+    },
+    refetchInterval: 60_000,
+  });
+}
+
 export function useInstanceHealth(id: number | null) {
   const { getToken } = useAuth();
   return useQuery({
