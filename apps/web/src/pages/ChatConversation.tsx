@@ -2,15 +2,14 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
+import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
 import { useChat } from "@/hooks/use-chat";
 import { useActionExecutor } from "@/hooks/use-action-executor";
 import { ActionCard } from "@/components/chat/ActionCard";
-import { ManualActionMenu } from "@/components/chat/ManualActionMenu";
 import { stripActionBlocks } from "@/lib/action-parser";
 import AgentOfflineBanner from "@/components/AgentOfflineBanner";
 import { content } from "@/lib/content";
-import type { ActionType } from "@godinez/types";
 
 const { chat } = content.studio;
 
@@ -38,7 +37,7 @@ export default function ChatConversation() {
   const { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction, connectionStatus } =
     useChat(Number(conversationId), workspace?.id ?? 0, { onComplete });
   const { execute } = useActionExecutor(updateAction);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [input, setInput] = useState("");
@@ -116,11 +115,6 @@ export default function ChatConversation() {
     return () => clearTimeout(timeout);
   }, [previewUrl, slug]);
 
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
   // Auto-resize textarea
   useEffect(() => {
     const el = textareaRef.current;
@@ -143,10 +137,6 @@ export default function ChatConversation() {
       handleSubmit(e);
     }
   }, [handleSubmit]);
-
-  const handleManualAction = useCallback((_type: ActionType) => {
-    // TODO Phase 2: open a form dialog
-  }, []);
 
   const handleRefreshPreview = useCallback(() => {
     if (iframeRef.current && previewUrl) {
@@ -240,65 +230,62 @@ export default function ChatConversation() {
             </div>
           )}
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {isLoading && (
+          <div className="flex-1 overflow-hidden">
+            {isLoading ? (
               <div className="flex justify-center py-8">
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-magenta border-t-transparent" />
               </div>
-            )}
-
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
-                    msg.role === "user"
-                      ? "bg-magenta text-white rounded-br-md whitespace-pre-wrap"
-                      : msg.role === "agent"
-                        ? "bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded-bl-md prose prose-invert prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2 prose-pre:my-2"
-                        : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] text-xs italic whitespace-pre-wrap"
-                  }`}
-                >
-                  {msg.role === "agent" ? (
-                    <>
-                      <ReactMarkdown>
-                        {stripActionBlocks(msg.content)}
-                      </ReactMarkdown>
-                      {msg.actions && msg.actions.length > 0 && (
-                        <div className="mt-2 not-prose">
-                          {msg.actions.map((action) => (
-                            <ActionCard
-                              key={action.id}
-                              action={action}
-                              messageId={msg.id}
-                              onExecute={execute}
-                              disabled={msg.streaming}
-                            />
-                          ))}
-                        </div>
+            ) : messages.length === 0 ? (
+              <div className="flex h-full items-center justify-center">
+                <p className="text-center text-sm text-[hsl(var(--muted-foreground))] py-8">
+                  Envía un mensaje para empezar la conversación
+                </p>
+              </div>
+            ) : (
+              <Virtuoso
+                ref={virtuosoRef}
+                data={messages}
+                initialTopMostItemIndex={messages.length - 1}
+                followOutput="smooth"
+                className="h-full"
+                itemContent={(_index, msg) => (
+                  <div className={`flex px-4 py-1.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
+                        msg.role === "user"
+                          ? "bg-magenta text-white rounded-br-md whitespace-pre-wrap"
+                          : msg.role === "agent"
+                            ? "bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded-bl-md prose prose-invert prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2 prose-pre:my-2"
+                            : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] text-xs italic whitespace-pre-wrap"
+                      }`}
+                    >
+                      {msg.role === "agent" ? (
+                        <>
+                          <ReactMarkdown>
+                            {stripActionBlocks(msg.content)}
+                          </ReactMarkdown>
+                          {msg.actions && msg.actions.length > 0 && (
+                            <div className="mt-2 not-prose">
+                              {msg.actions.map((action) => (
+                                <ActionCard
+                                  key={action.id}
+                                  action={action}
+                                  messageId={msg.id}
+                                  onExecute={execute}
+                                  disabled={msg.streaming}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        msg.content
                       )}
-                    </>
-                  ) : (
-                    msg.content
-                  )}
-                </div>
-                {msg.role === "agent" && !msg.streaming && (
-                  <div className="ml-1 flex items-end">
-                    <ManualActionMenu onSelect={handleManualAction} />
+                    </div>
                   </div>
                 )}
-              </div>
-            ))}
-
-            {messages.length === 0 && !isLoading && (
-              <p className="text-center text-sm text-[hsl(var(--muted-foreground))] py-8">
-                Envía un mensaje para empezar la conversación
-              </p>
+              />
             )}
-
-            <div ref={bottomRef} />
           </div>
 
           <form

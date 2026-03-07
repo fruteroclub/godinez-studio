@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import type { AuthEnv } from "../types";
+import { logger } from "../lib/logger";
 import { requireAuth } from "../middleware/auth";
 import { resolveUser } from "../middleware/resolve-user";
 import {
@@ -99,14 +100,14 @@ app.delete(
       try {
         const relay = await pool.getRelayForWorkspace(workspace.instanceId);
         await relay.agentsDelete(workspace.agentSlot, true);
-        console.log("[Workspace] Deleted OpenClaw agent:", workspace.agentSlot);
+        logger.info({ agentSlot: workspace.agentSlot }, "deleted OpenClaw agent");
         // Decrement used_slots on the instance
         if (workspace.instanceId) {
           await decrementUsedSlots(workspace.instanceId);
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : "agents.delete failed";
-        console.warn("[Workspace] Agent cleanup failed (non-fatal):", msg);
+        logger.warn({ err: msg }, "agent cleanup failed (non-fatal)");
       }
     }
 

@@ -20,6 +20,9 @@ import { getAgentById } from "../dal/agents";
 import { pool } from "./gateway-pool";
 import { buildSoulMd } from "./agent-soul-template";
 import { SYNC_DEBOUNCE_MS, SYNC_MAX_TASKS, SYNC_MAX_FILES } from "../lib/config";
+import { logger } from "../lib/logger";
+
+const log = logger.child({ service: "workspace-sync" });
 
 // ─── Feature flag ────────────────────────────────────────────────────
 
@@ -65,7 +68,7 @@ async function executeSyncSafe(workspaceId: number): Promise<void> {
     await executeSync(workspaceId);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[WorkspaceSync] Failed for workspace ${workspaceId}:`, msg);
+    log.warn({ workspaceId, err: msg }, "sync failed");
   }
 }
 
@@ -77,7 +80,7 @@ async function executeSync(workspaceId: number): Promise<void> {
   try {
     relay = await pool.getRelayForWorkspace(workspace.instanceId);
   } catch {
-    console.warn(`[WorkspaceSync] Gateway offline for workspace ${workspaceId}, skipping`);
+    log.warn({ workspaceId }, "gateway offline, skipping sync");
     return;
   }
 
@@ -94,18 +97,18 @@ async function executeSync(workspaceId: number): Promise<void> {
           agentSlot: workspace.agentSlot,
         });
         await relay.agentsFilesSet(workspace.agentSlot, "SOUL.md", soulMd);
-        console.log(`[WorkspaceSync] Re-injected SOUL.md for workspace ${workspaceId}`);
+        log.info({ workspaceId }, "re-injected SOUL.md");
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.warn(`[WorkspaceSync] SOUL.md reinject failed (non-fatal):`, msg);
+      log.warn({ workspaceId, err: msg }, "SOUL.md reinject failed (non-fatal)");
     }
   }
 
   const content = await buildWorkspaceMd(workspaceId, workspace.name);
 
   await relay.agentsFilesSet(workspace.agentSlot, "WORKSPACE.md", content);
-  console.log(`[WorkspaceSync] Updated WORKSPACE.md for workspace ${workspaceId}`);
+  log.info({ workspaceId }, "updated WORKSPACE.md");
 }
 
 // ─── Markdown builder ────────────────────────────────────────────────

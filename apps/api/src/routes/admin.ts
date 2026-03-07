@@ -13,6 +13,7 @@ import {
 } from "../dal/admin";
 import {
   getAllInstances,
+  getInstanceById,
   getInstanceWithWorkspaces,
   createInstance,
   updateInstance,
@@ -22,6 +23,8 @@ import {
   listReferralCodes,
   createReferralCode,
 } from "../dal/referral-codes";
+import { getActiveAlerts } from "../services/alerts";
+import { getCapacityOverview, getAgentActivity } from "../dal/capacity";
 
 const app = new Hono<AuthEnv>();
 
@@ -109,6 +112,20 @@ app.post("/instances", async (c) => {
 app.put("/instances/:id", async (c) => {
   const id = Number(c.req.param("id"));
   const body = updateInstanceSchema.parse(await c.req.json());
+
+  // Validate: customerId can only be set on dedicated instances
+  if (body.customerId !== undefined) {
+    const existing = await getInstanceById(id);
+    if (!existing) return c.json({ error: "Instance not found" }, 404);
+    const effectiveTier = body.tier ?? existing.tier;
+    if (effectiveTier !== "dedicated") {
+      return c.json(
+        { error: "customerId can only be assigned to dedicated instances" },
+        400,
+      );
+    }
+  }
+
   const instance = await updateInstance(id, body);
   if (!instance) return c.json({ error: "Instance not found" }, 404);
   return c.json(instance);
@@ -164,6 +181,27 @@ app.get("/instances/:id/health", async (c) => {
   }
 
   return c.json({ ...data, gatewayReachable });
+});
+
+// --- Capacity planning ---
+
+app.get("/capacity", async (c) => {
+  const data = await getCapacityOverview();
+  return c.json(data);
+});
+
+// --- Agent activity ---
+
+app.get("/agent-activity", async (c) => {
+  const data = await getAgentActivity();
+  return c.json(data);
+});
+
+// --- Alerts ---
+
+app.get("/alerts", async (c) => {
+  const alerts = getActiveAlerts();
+  return c.json(alerts);
 });
 
 // --- Referral codes (waitlist pipeline) ---

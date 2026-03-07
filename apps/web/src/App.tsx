@@ -1,23 +1,35 @@
+import { lazy, Suspense } from "react";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PageLayout from "./components/layout/PageLayout";
 import Shell from "./components/layout/Shell";
-import SignIn from "./pages/SignIn";
-import SignUp from "./pages/SignUp";
-import WorkspaceSelector from "./pages/WorkspaceSelector";
-import OnboardingWizard from "./pages/OnboardingWizard";
-import Dashboard from "./pages/Dashboard";
-import Chat from "./pages/Chat";
-import ChatConversation from "./pages/ChatConversation";
-import Projects from "./pages/Projects";
-import ProjectDetail from "./pages/ProjectDetail";
-import Tasks from "./pages/Tasks";
-import Files from "./pages/Files";
-import Agents from "./pages/Agents";
-import Activity from "./pages/Activity";
-import Team from "./pages/Team";
-import Settings from "./pages/Settings";
-import Admin from "./pages/Admin";
+import { PageSkeleton } from "./components/ui/Skeleton";
+
+// Lazy-loaded pages
+const SignIn = lazy(() => import("./pages/SignIn"));
+const SignUp = lazy(() => import("./pages/SignUp"));
+const WorkspaceSelector = lazy(() => import("./pages/WorkspaceSelector"));
+const OnboardingWizard = lazy(() => import("./pages/OnboardingWizard"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Chat = lazy(() => import("./pages/Chat"));
+const ChatConversation = lazy(() => import("./pages/ChatConversation"));
+const Projects = lazy(() => import("./pages/Projects"));
+const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
+const Tasks = lazy(() => import("./pages/Tasks"));
+const Files = lazy(() => import("./pages/Files"));
+const Agents = lazy(() => import("./pages/Agents"));
+const Activity = lazy(() => import("./pages/Activity"));
+const Team = lazy(() => import("./pages/Team"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Admin = lazy(() => import("./pages/Admin"));
+
+function SuspenseWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<div className="p-6"><PageSkeleton /></div>}>
+      {children}
+    </Suspense>
+  );
+}
 
 export const router = createBrowserRouter([
   {
@@ -25,17 +37,17 @@ export const router = createBrowserRouter([
     children: [
       {
         path: "/sign-in/*",
-        element: <SignIn />,
+        element: <SuspenseWrapper><SignIn /></SuspenseWrapper>,
       },
       {
         path: "/sign-up/*",
-        element: <SignUp />,
+        element: <SuspenseWrapper><SignUp /></SuspenseWrapper>,
       },
       {
         path: "/studio",
         element: (
           <ProtectedRoute>
-            <WorkspaceSelector />
+            <SuspenseWrapper><WorkspaceSelector /></SuspenseWrapper>
           </ProtectedRoute>
         ),
       },
@@ -43,7 +55,7 @@ export const router = createBrowserRouter([
         path: "/studio/new",
         element: (
           <ProtectedRoute>
-            <OnboardingWizard />
+            <SuspenseWrapper><OnboardingWizard /></SuspenseWrapper>
           </ProtectedRoute>
         ),
       },
@@ -57,24 +69,24 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <Dashboard /> },
-      { path: "chat", element: <Chat /> },
-      { path: "chat/:conversationId", element: <ChatConversation /> },
-      { path: "projects", element: <Projects /> },
-      { path: "projects/:projectId", element: <ProjectDetail /> },
-      { path: "tasks", element: <Tasks /> },
-      { path: "files", element: <Files /> },
-      { path: "agents", element: <Agents /> },
-      { path: "activity", element: <Activity /> },
-      { path: "team", element: <Team /> },
-      { path: "settings", element: <Settings /> },
+      { index: true, element: <SuspenseWrapper><Dashboard /></SuspenseWrapper> },
+      { path: "chat", element: <SuspenseWrapper><Chat /></SuspenseWrapper> },
+      { path: "chat/:conversationId", element: <SuspenseWrapper><ChatConversation /></SuspenseWrapper> },
+      { path: "projects", element: <SuspenseWrapper><Projects /></SuspenseWrapper> },
+      { path: "projects/:projectId", element: <SuspenseWrapper><ProjectDetail /></SuspenseWrapper> },
+      { path: "tasks", element: <SuspenseWrapper><Tasks /></SuspenseWrapper> },
+      { path: "files", element: <SuspenseWrapper><Files /></SuspenseWrapper> },
+      { path: "agents", element: <SuspenseWrapper><Agents /></SuspenseWrapper> },
+      { path: "activity", element: <SuspenseWrapper><Activity /></SuspenseWrapper> },
+      { path: "team", element: <SuspenseWrapper><Team /></SuspenseWrapper> },
+      { path: "settings", element: <SuspenseWrapper><Settings /></SuspenseWrapper> },
     ],
   },
   {
     path: "/admin",
     element: (
       <ProtectedRoute>
-        <Admin />
+        <SuspenseWrapper><Admin /></SuspenseWrapper>
       </ProtectedRoute>
     ),
   },
