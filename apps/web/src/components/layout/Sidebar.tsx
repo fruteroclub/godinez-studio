@@ -16,6 +16,7 @@ function getNavItems(slug: string): NavItem[] {
     { label: sidebar.chat, href: `/studio/${slug}/chat`, icon: "💬" },
     { label: sidebar.projects, href: `/studio/${slug}/projects`, icon: "📁" },
     { label: sidebar.agent, href: `/studio/${slug}/agents`, icon: "🤖" },
+    { label: "Hackathon", href: `/studio/${slug}/hackathon`, icon: "🏆" },
     { label: sidebar.tasks, href: `/studio/${slug}/tasks`, icon: "✓" },
     { label: sidebar.files, href: `/studio/${slug}/files`, icon: "📄" },
     { label: sidebar.activity, href: `/studio/${slug}/activity`, icon: "📊" },

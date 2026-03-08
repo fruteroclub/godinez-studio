@@ -3,9 +3,8 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PageLayout from "./components/layout/PageLayout";
 import Shell from "./components/layout/Shell";
-import { PageSkeleton } from "./components/ui/Skeleton";
 
-// Lazy-loaded pages
+// Lazy load pages for code splitting
 const SignIn = lazy(() => import("./pages/SignIn"));
 const SignUp = lazy(() => import("./pages/SignUp"));
 const WorkspaceSelector = lazy(() => import("./pages/WorkspaceSelector"));
@@ -22,13 +21,20 @@ const Activity = lazy(() => import("./pages/Activity"));
 const Team = lazy(() => import("./pages/Team"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Admin = lazy(() => import("./pages/Admin"));
+const Hackathon = lazy(() => import("./pages/Hackathon").then(m => ({ default: m.Hackathon })));
 
-function SuspenseWrapper({ children }: { children: React.ReactNode }) {
+// Loading fallback
+function PageLoader() {
   return (
-    <Suspense fallback={<div className="p-6"><PageSkeleton /></div>}>
-      {children}
-    </Suspense>
+    <div className="flex items-center justify-center h-full min-h-[200px]">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-magenta" />
+    </div>
   );
+}
+
+// Wrap lazy component with Suspense
+function LazyPage({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
 }
 
 export const router = createBrowserRouter([
@@ -37,17 +43,17 @@ export const router = createBrowserRouter([
     children: [
       {
         path: "/sign-in/*",
-        element: <SuspenseWrapper><SignIn /></SuspenseWrapper>,
+        element: <LazyPage><SignIn /></LazyPage>,
       },
       {
         path: "/sign-up/*",
-        element: <SuspenseWrapper><SignUp /></SuspenseWrapper>,
+        element: <LazyPage><SignUp /></LazyPage>,
       },
       {
         path: "/studio",
         element: (
           <ProtectedRoute>
-            <SuspenseWrapper><WorkspaceSelector /></SuspenseWrapper>
+            <LazyPage><WorkspaceSelector /></LazyPage>
           </ProtectedRoute>
         ),
       },
@@ -55,7 +61,7 @@ export const router = createBrowserRouter([
         path: "/studio/new",
         element: (
           <ProtectedRoute>
-            <SuspenseWrapper><OnboardingWizard /></SuspenseWrapper>
+            <LazyPage><OnboardingWizard /></LazyPage>
           </ProtectedRoute>
         ),
       },
@@ -69,24 +75,25 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <SuspenseWrapper><Dashboard /></SuspenseWrapper> },
-      { path: "chat", element: <SuspenseWrapper><Chat /></SuspenseWrapper> },
-      { path: "chat/:conversationId", element: <SuspenseWrapper><ChatConversation /></SuspenseWrapper> },
-      { path: "projects", element: <SuspenseWrapper><Projects /></SuspenseWrapper> },
-      { path: "projects/:projectId", element: <SuspenseWrapper><ProjectDetail /></SuspenseWrapper> },
-      { path: "tasks", element: <SuspenseWrapper><Tasks /></SuspenseWrapper> },
-      { path: "files", element: <SuspenseWrapper><Files /></SuspenseWrapper> },
-      { path: "agents", element: <SuspenseWrapper><Agents /></SuspenseWrapper> },
-      { path: "activity", element: <SuspenseWrapper><Activity /></SuspenseWrapper> },
-      { path: "team", element: <SuspenseWrapper><Team /></SuspenseWrapper> },
-      { path: "settings", element: <SuspenseWrapper><Settings /></SuspenseWrapper> },
+      { index: true, element: <LazyPage><Dashboard /></LazyPage> },
+      { path: "chat", element: <LazyPage><Chat /></LazyPage> },
+      { path: "chat/:conversationId", element: <LazyPage><ChatConversation /></LazyPage> },
+      { path: "projects", element: <LazyPage><Projects /></LazyPage> },
+      { path: "projects/:projectId", element: <LazyPage><ProjectDetail /></LazyPage> },
+      { path: "tasks", element: <LazyPage><Tasks /></LazyPage> },
+      { path: "files", element: <LazyPage><Files /></LazyPage> },
+      { path: "agents", element: <LazyPage><Agents /></LazyPage> },
+      { path: "hackathon", element: <LazyPage><Hackathon /></LazyPage> },
+      { path: "activity", element: <LazyPage><Activity /></LazyPage> },
+      { path: "team", element: <LazyPage><Team /></LazyPage> },
+      { path: "settings", element: <LazyPage><Settings /></LazyPage> },
     ],
   },
   {
     path: "/admin",
     element: (
       <ProtectedRoute>
-        <SuspenseWrapper><Admin /></SuspenseWrapper>
+        <LazyPage><Admin /></LazyPage>
       </ProtectedRoute>
     ),
   },

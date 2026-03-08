@@ -10,4 +10,5 @@ export { files } from "./files";
 export { agentLogs } from "./agent-logs";
 export { referralCodes } from "./referral-codes";
 export { gatewayInstances } from "./gateway-instances";
+export { hackathonProgress, type HackathonPhase } from "./hackathon-progress";
 export * from "./relations";

@@ -23,8 +23,11 @@ import conversations, {
 import referralCodes from "./routes/referral-codes";
 import admin from "./routes/admin";
 import users from "./routes/users";
+import hackathons from "./routes/hackathons";
 import "./services/gateway-pool"; // initialize pool (lazy connections)
 import { initSentry, Sentry } from "./lib/sentry";
+import { isAppError, formatErrorResponse } from "./lib/errors";
+import { rateLimits } from "./middleware/rate-limit";
 
 initSentry();
 
@@ -60,21 +63,50 @@ app.route("/api/tasks", tasks);
 app.route("/api/files", files);
 app.route("/api/agents", agents);
 app.route("/api/agents", provision);
+// Rate-limited routes
+app.use("/api/chat/*", rateLimits.chat);
+app.use("/api/hackathons/*", rateLimits.hackathon);
+
 app.route("/api/chat", chat);
 app.route("/api/conversations", conversations);
 app.route("/api/referral-codes", referralCodes);
 app.route("/api/admin", admin);
 app.route("/api/users", users);
+app.route("/api/hackathons", hackathons);
 app.route("/webhooks", webhooks);
 
 app.onError((err, c) => {
   Sentry.captureException(err);
+  
+  if (isAppError(err)) {
+    if (err.statusCode >= 500) {
+      logger.error({ err: err.message, code: err.code }, "server error");
+    } else {
+      logger.warn({ code: err.code, details: err.details }, err.message);
+    }
+    const response = formatErrorResponse(err);
+    return c.json(response, err.statusCode as 400 | 401 | 403 | 404 | 429 | 500);
+  }
+  
   logger.error({ err: err.message }, "unhandled error");
-  return c.json({ error: "Internal server error" }, 500);
+  return c.json({ 
+    error: "Algo salió mal. Por favor, intenta de nuevo.",
+    code: "INTERNAL_ERROR",
+    message: err.message 
+  }, 500);
 });
 
 // Serve uploaded files in development (in production, R2 serves files directly)
 app.use("/uploads/*", serveStatic({ root: "./" }));
+
+// 404 handler for undefined routes
+app.notFound((c) => {
+  return c.json({
+    error: "La página que buscas no existe",
+    code: "NOT_FOUND",
+    message: `Route ${c.req.path} not found`,
+  }, 404);
+});
 
 app.get("/", (c) => {
   return c.json({
