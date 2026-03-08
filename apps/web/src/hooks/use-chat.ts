@@ -20,7 +20,7 @@ export type ConnectionStatus = "idle" | "connected" | "reconnecting" | "disconne
 export function useChat(
   conversationId: number,
   workspaceId: number,
-  options?: { onComplete?: () => void },
+  options?: { onComplete?: () => void; hackathonContext?: { name: string; deadline: string; currentPhase: number; phases: Array<{ number: number; status: string; notes: string[] }>; hackathonUrl?: string; resourcesUrl?: string; } | null },
 ) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -106,7 +106,7 @@ export function useChat(
   );
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, hackathonContext?: { name: string; deadline: string; currentPhase: number; phases: Array<{ number: number; status: string; notes: string[] }>; hackathonUrl?: string; resourcesUrl?: string; active?: boolean; timeRemaining?: string; } | null) => {
       const token = await getToken();
       const tempUserId = `temp-${Date.now()}`;
       const tempAgentId = `temp-agent-${Date.now()}`;
@@ -126,7 +126,7 @@ export function useChat(
           "/api/chat/send",
           {
             method: "POST",
-            body: JSON.stringify({ conversationId, workspaceId, content }),
+            body: JSON.stringify({ conversationId, workspaceId, content, hackathonContext: hackathonContext || undefined }),
             token,
           },
         );
@@ -212,7 +212,7 @@ export function useChat(
             sseCleanupRef.current = null;
           },
           onStatus: (status) => {
-            setConnectionStatus(status);
+            setConnectionStatus(status as ConnectionStatus);
           },
           onTimeout: () => {
             setConnectionStatus("timeout");

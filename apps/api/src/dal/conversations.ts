@@ -40,12 +40,52 @@ export async function createConversation(data: {
   agentId: number;
   projectId?: number;
   title?: string;
+  isHackathon?: boolean;
+  hackathonId?: number;
 }) {
   const [conversation] = await db
     .insert(conversations)
     .values(data)
     .returning();
   return conversation;
+}
+
+// Get or create hackathon conversation for a SPECIFIC hackathon
+export async function getOrCreateHackathonConversation(
+  workspaceId: number,
+  agentId: number,
+  hackathonId: number,
+  hackathonName: string,
+) {
+  // First, try to find existing conversation for this specific hackathon
+  const existing = await db.query.conversations.findFirst({
+    where: eq(conversations.hackathonId, hackathonId),
+  });
+  
+  if (existing) {
+    return existing;
+  }
+  
+  // Create new hackathon conversation
+  const [conversation] = await db
+    .insert(conversations)
+    .values({
+      workspaceId,
+      agentId,
+      hackathonId,
+      title: `🏆 ${hackathonName}`,
+      isHackathon: true,
+    })
+    .returning();
+  
+  return conversation;
+}
+
+// Get hackathon conversation by hackathonId
+export async function getHackathonConversation(hackathonId: number) {
+  return db.query.conversations.findFirst({
+    where: eq(conversations.hackathonId, hackathonId),
+  });
 }
 
 export async function createMessage(data: {
@@ -127,4 +167,20 @@ export async function deleteConversation(id: number) {
   // Messages cascade via FK, but explicit delete for clarity
   await db.delete(messages).where(eq(messages.conversationId, id));
   await db.delete(conversations).where(eq(conversations.id, id));
+}
+
+// Delete hackathon conversation by hackathonId
+export async function deleteHackathonConversation(hackathonId: number) {
+  const existing = await db.query.conversations.findFirst({
+    where: eq(conversations.hackathonId, hackathonId),
+  });
+  
+  if (existing) {
+    // Delete messages first (foreign key constraint)
+    await db.delete(messages).where(eq(messages.conversationId, existing.id));
+    // Delete conversation
+    await db.delete(conversations).where(eq(conversations.id, existing.id));
+  }
+  
+  return { deleted: !!existing };
 }
