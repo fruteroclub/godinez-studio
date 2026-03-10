@@ -80,6 +80,11 @@ export default function Chat() {
                     {conv.title ?? "Conversación"}
                   </p>
                   <div className="mt-1 flex items-center gap-2">
+                    {conv.isHackathon && (
+                      <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-400">
+                        hackathon
+                      </span>
+                    )}
                     {projName && (
                       <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-medium text-violet-400">
                         {projName}

@@ -1,0 +1,2 @@
+ALTER TABLE "conversations" ADD COLUMN "is_hackathon" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "gateway_instances" ADD COLUMN "workspace_base" text DEFAULT '/home/openclaw/.openclaw/workspaces' NOT NULL;

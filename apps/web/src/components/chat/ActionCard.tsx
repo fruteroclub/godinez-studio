@@ -1,18 +1,24 @@
 import type { ActionCard as ActionCardType } from "@godinez/types";
 import { content } from "@/lib/content";
 
+// Hackathon action types
+const HACKATHON_TYPES = new Set(["hackathon_advance", "hackathon_note"]);
+
 const { actions: t } = content.studio;
 
 const TYPE_ICONS: Record<string, string> = {
   create_project: "📁",
   create_task: "✅",
   create_file: "📄",
+  hackathon_advance: "🚀",
+  hackathon_note: "📝",
 };
 
 interface ActionCardProps {
   action: ActionCardType;
   messageId: number | string;
   onExecute: (messageId: number, actionId: string) => void;
+  onHackathonExecute?: (action: ActionCardType) => Promise<boolean | void>;
   disabled?: boolean;
 }
 
@@ -20,8 +26,18 @@ export function ActionCard({
   action,
   messageId,
   onExecute,
+  onHackathonExecute,
   disabled,
 }: ActionCardProps) {
+  const isHackathonAction = HACKATHON_TYPES.has(action.type);
+  
+  const handleClick = async () => {
+    if (isHackathonAction && onHackathonExecute) {
+      await onHackathonExecute(action);
+    } else {
+      onExecute(Number(messageId), action.id);
+    }
+  };
   const icon = TYPE_ICONS[action.type] || "⚡";
   const isPending = action.status === "pending";
   const isExecuting = action.status === "executing";
@@ -48,7 +64,7 @@ export function ActionCard({
 
         {isPending && (
           <button
-            onClick={() => onExecute(Number(messageId), action.id)}
+            onClick={handleClick}
             disabled={disabled}
             className="rounded-md bg-magenta px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-magenta/90 disabled:opacity-50"
           >
@@ -80,7 +96,7 @@ export function ActionCard({
               {t.error}
             </span>
             <button
-              onClick={() => onExecute(Number(messageId), action.id)}
+              onClick={handleClick}
               disabled={disabled}
               className="rounded-md border border-red-500/30 px-2 py-0.5 text-xs text-red-400 transition-colors hover:bg-red-500/10 disabled:opacity-50"
             >

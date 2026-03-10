@@ -1,3 +1,6 @@
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@clerk/clerk-react";
+import { apiFetch } from "@/lib/api";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
@@ -6,6 +9,7 @@ import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
 import { useChat } from "@/hooks/use-chat";
 import { useActionExecutor } from "@/hooks/use-action-executor";
+import { useHackathonActions } from "@/hooks/use-hackathon-actions";
 import { ActionCard } from "@/components/chat/ActionCard";
 import { stripActionBlocks } from "@/lib/action-parser";
 import AgentOfflineBanner from "@/components/AgentOfflineBanner";
@@ -30,6 +34,46 @@ export default function ChatConversation() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const { workspace, slug } = useWorkspace();
   const qc = useQueryClient();
+  const { getToken } = useAuth();
+  
+  // Fetch conversation to check if it is hackathon
+  const { data: conversationData } = useQuery({
+    queryKey: ["conversation", conversationId],
+    queryFn: async () => {
+      const token = await getToken();
+      return apiFetch<{ id: number; isHackathon: boolean; hackathonId: number | null }>(`/api/conversations/${conversationId}`, { token });
+    },
+    enabled: !!conversationId,
+  });
+  
+  const isHackathon = conversationData?.isHackathon ?? false;
+  const hackathonId = conversationData?.hackathonId ?? null;
+  
+  // Fetch hackathon data if this is a hackathon chat
+  const { data: hackathonData } = useQuery({
+    queryKey: ["hackathon", hackathonId],
+    queryFn: async () => {
+      if (!hackathonId) return null;
+      const token = await getToken();
+      return apiFetch<{ name: string; deadline: string; currentPhase: number; phases: Array<{ number: number; status: string; notes: string[] }>; hackathonUrl?: string; resourcesUrl?: string; } | null>(`/api/hackathons/${hackathonId}`, { token });
+    },
+    enabled: isHackathon && !!hackathonId,
+  });
+  
+  // Calculate time remaining for hackathon
+  const hackathonTimeRemaining = useMemo(() => {
+    if (!hackathonData?.deadline) return null;
+    const deadline = new Date(hackathonData.deadline);
+    const now = new Date();
+    const diff = deadline.getTime() - now.getTime();
+    if (diff <= 0) return "Tiempo terminado";
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const days = Math.floor(hours / 24);
+    if (days > 0) return `${days}d ${hours % 24}h restantes`;
+    if (hours > 0) return `${hours}h ${minutes}min restantes`;
+    return `${minutes}min restantes`;
+  }, [hackathonData?.deadline]);
   const onComplete = useCallback(
     () => qc.invalidateQueries({ queryKey: ["conversations", workspace?.id] }),
     [qc, workspace?.id],
@@ -37,6 +81,53 @@ export default function ChatConversation() {
   const { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction, connectionStatus } =
     useChat(Number(conversationId), workspace?.id ?? 0, { onComplete });
   const { execute } = useActionExecutor(updateAction);
+  
+  // Auto-execute hackathon actions
+  const { executeHackathonAction } = useHackathonActions(
+    hackathonId,
+    () => qc.invalidateQueries({ queryKey: ["hackathon", hackathonId] }),
+  );
+  
+  // Track which message we already processed to avoid re-execution
+  const processedMessageIdRef = useRef<number | string | null>(null);
+
+  // Process hackathon actions when messages change (auto-execute)
+  useEffect(() => {
+    if (!hackathonId || isStreaming || messages.length === 0) return;
+
+    const lastMessage = messages[messages.length - 1];
+
+    // Skip if we already processed this message
+    if (lastMessage.id === processedMessageIdRef.current) return;
+
+    // Skip if not agent or no actions
+    if (lastMessage.role !== "agent" || !lastMessage.actions?.length) return;
+
+    // Mark as processed BEFORE executing
+    processedMessageIdRef.current = lastMessage.id;
+
+    console.log("[Hackathon] Processing actions for message:", lastMessage.id, lastMessage.actions);
+
+    // Execute each hackathon action and mark as completed
+    const processActions = async () => {
+      for (const action of lastMessage.actions ?? []) {
+        if (action.type === "hackathon_advance" || action.type === "hackathon_note") {
+          try {
+            const success = await executeHackathonAction(action);
+            if (success) {
+              // Mark action as completed in UI
+              updateAction(lastMessage.id, action.id, { ...action, status: "completed" });
+            }
+          } catch (err) {
+            console.error("[Hackathon] Action failed:", err);
+            updateAction(lastMessage.id, action.id, { ...action, status: "error" });
+          }
+        }
+      }
+    };
+    
+    processActions();
+  }, [isStreaming, messages, hackathonId, executeHackathonAction, updateAction]);
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -115,6 +206,35 @@ export default function ChatConversation() {
     return () => clearTimeout(timeout);
   }, [previewUrl, slug]);
 
+  // Scroll to bottom when messages finish loading (page refresh)
+  const hasScrolledRef = useRef(false);
+  useEffect(() => {
+    if (!isLoading && messages.length > 0 && !hasScrolledRef.current) {
+      hasScrolledRef.current = true;
+      const scrollToBottom = () => {
+        virtuosoRef.current?.scrollToIndex({
+          index: messages.length - 1,
+          align: "end",
+          behavior: "auto",
+        });
+      };
+      scrollToBottom();
+      setTimeout(scrollToBottom, 50);
+      setTimeout(scrollToBottom, 150);
+      setTimeout(scrollToBottom, 300);
+    }
+  }, [isLoading, messages.length]);
+
+  // Auto-scroll while streaming (keeps up with accelerating text)
+  useEffect(() => {
+    if (isStreaming && messages.length > 0 && virtuosoRef.current) {
+      virtuosoRef.current.scrollToIndex({
+        index: messages.length - 1,
+        align: "end",
+        behavior: "smooth",
+      });
+    }
+  }, [isStreaming, messages]);
   // Auto-resize textarea
   useEffect(() => {
     const el = textareaRef.current;
@@ -128,8 +248,16 @@ export default function ChatConversation() {
     const value = input.trim();
     if (!value || isStreaming) return;
     setInput("");
-    sendMessage(value);
-  }, [input, isStreaming, sendMessage]);
+    const ctx = isHackathon && hackathonData ? {
+      active: true,
+      name: hackathonData.name,
+      deadline: hackathonData.deadline,
+      timeRemaining: hackathonTimeRemaining || undefined,
+      currentPhase: hackathonData.currentPhase,
+      phases: hackathonData.phases.map(p => ({ number: p.number, status: p.status as "done" | "current" | "pending", notes: p.notes })),
+    } : null;
+    sendMessage(value, ctx);
+  }, [input, isStreaming, sendMessage, isHackathon, hackathonData, hackathonTimeRemaining]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -160,6 +288,25 @@ export default function ChatConversation() {
 
   return (
     <div className="flex h-[calc(100vh-8rem)] flex-col">
+      {/* Hackathon Banner */}
+      {isHackathon && hackathonData && (
+        <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-b border-amber-500/30 px-4 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-lg">🏆</span>
+              <span className="font-medium text-amber-200">{hackathonData.name}</span>
+              <span className="text-zinc-500">·</span>
+              <span className="text-sm text-zinc-400">Fase {hackathonData.currentPhase} de 8</span>
+            </div>
+            {hackathonTimeRemaining && (
+              <div className="flex items-center gap-2 text-sm">
+                <span>🏆</span>
+                <span className="text-amber-400">{hackathonTimeRemaining}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {/* Agent offline banner */}
       {agentOffline && (
         <div className="px-4 pt-3">
@@ -272,6 +419,7 @@ export default function ChatConversation() {
                                   action={action}
                                   messageId={msg.id}
                                   onExecute={execute}
+                                  onHackathonExecute={executeHackathonAction}
                                   disabled={msg.streaming}
                                 />
                               ))}

@@ -27,7 +27,7 @@ export type MessageRole = "user" | "agent" | "system";
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 // Action cards — agent-proposed resource CRUD
-export type ActionType = "create_project" | "create_task" | "create_file";
+export type ActionType = "create_project" | "create_task" | "create_file" | "hackathon_advance" | "hackathon_note";
 export type ActionStatus = "pending" | "executing" | "completed" | "error";
 
 export interface CreateProjectPayload {
@@ -90,6 +90,8 @@ export interface Workspace {
   status: WorkspaceStatus;
   agentSlot: string | null;
   createdAt: string;
+  isHackathon: boolean;
+  hackathonId: number | null;
   updatedAt: string;
 }
 
@@ -100,6 +102,8 @@ export interface Project {
   description: string | null;
   status: ProjectStatus;
   createdAt: string;
+  isHackathon: boolean;
+  hackathonId: number | null;
   updatedAt: string;
 }
 
@@ -116,6 +120,8 @@ export interface Task {
   dueAt: string | null;
   completedAt: string | null;
   createdAt: string;
+  isHackathon: boolean;
+  hackathonId: number | null;
   updatedAt: string;
 }
 
@@ -132,6 +138,8 @@ export interface FileRecord {
   uploadedByAgentId: number | null;
   messageId: number | null;
   createdAt: string;
+  isHackathon: boolean;
+  hackathonId: number | null;
 }
 
 export interface Conversation {
@@ -143,6 +151,8 @@ export interface Conversation {
   channel: string;
   lastMessageAt: string | null;
   createdAt: string;
+  isHackathon: boolean;
+  hackathonId: number | null;
 }
 
 export interface Message {
@@ -156,6 +166,8 @@ export interface Message {
   metadata: string | null;
   fileId: number | null;
   createdAt: string;
+  isHackathon: boolean;
+  hackathonId: number | null;
 }
 
 export interface Agent {
@@ -167,6 +179,8 @@ export interface Agent {
   config: AgentConfig | null;
   openclawId: string | null;
   createdAt: string;
+  isHackathon: boolean;
+  hackathonId: number | null;
   updatedAt: string;
 }
 
@@ -176,6 +190,8 @@ export interface WorkspaceMember {
   userId: number;
   role: MemberRole;
   createdAt: string;
+  isHackathon: boolean;
+  hackathonId: number | null;
 }
 
 // Chat streaming events
