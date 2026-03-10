@@ -6,6 +6,8 @@ const VALID_TYPES = new Set<ActionType>([
   "create_project",
   "create_task",
   "create_file",
+  "hackathon_advance",
+  "hackathon_note",
 ]);
 
 /**

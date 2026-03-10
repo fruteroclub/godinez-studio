@@ -33,6 +33,7 @@ import {
   buildMessageContext,
   prependContext,
 } from "../services/message-context";
+import { buildHackathonContext, type HackathonContext } from "../services/hackathon-context";
 import { syncWorkspaceFile } from "../services/workspace-sync";
 import { requireQuota } from "../middleware/require-quota";
 
@@ -50,11 +51,23 @@ app.post(
       conversationId: z.number(),
       workspaceId: z.number(),
       content: z.string().min(1),
+      hackathonContext: z.object({
+        active: z.boolean(),
+        name: z.string(),
+        deadline: z.string(),
+        timeRemaining: z.string().optional(),
+        currentPhase: z.number(),
+        phases: z.array(z.object({
+          number: z.number(),
+          status: z.enum(["done", "current", "pending"]),
+          notes: z.array(z.string()),
+        })),
+      }).optional(),
     }),
   ),
   async (c) => {
     const userId = c.get("userId");
-    const { conversationId, workspaceId, content } = c.req.valid("json");
+    const { conversationId, workspaceId, content, hackathonContext } = c.req.valid("json");
 
     // Save user message
     const message = await createMessage({
@@ -67,14 +80,16 @@ app.post(
 
     // Auto-title: on first message, set a heuristic title from user text
     const msgCount = await getMessageCountForConversation(conversationId);
-    if (msgCount === 1) {
+    if (msgCount === 1 && !hackathonContext?.active) {
       const heuristicTitle = generateHeuristicTitle(content);
       await updateConversationTitle(conversationId, heuristicTitle);
     }
 
     // Build context-enriched content for the agent
     const contextHeader = await buildMessageContext(conversationId, workspaceId);
-    const enrichedContent = prependContext(contextHeader, content);
+    const hackathonHeader = buildHackathonContext(hackathonContext);
+    const combinedHeader = [hackathonHeader, contextHeader].filter(Boolean).join("\n\n");
+    const enrichedContent = prependContext(combinedHeader, content);
 
     // Send to Gateway or use stub
     let runId: string;
@@ -245,16 +260,18 @@ app.get("/stream/:runId", async (c) => {
       relay.onRun(runId, {
         onDelta: async (text) => {
           if (streamClosed) return;
-          // Accumulate text — OpenClaw may send incremental or full deltas.
-          // If text is longer than accumulated, treat it as the full snapshot;
-          // otherwise append the new chunk.
-          if (text.length >= accumulated.length && accumulated.length > 0 && text.startsWith(accumulated)) {
-            accumulated = text;
-          } else if (accumulated.endsWith(text)) {
-            // Duplicate of last chunk — skip
+          // OpenClaw sends full text snapshots (not incremental deltas)
+          // Use simple logic: if new text is longer, it's the latest snapshot
+          if (text === accumulated) {
+            // Exact duplicate - skip
             return;
+          }
+          if (text.length >= accumulated.length) {
+            // New text is same length or longer - use as new snapshot
+            accumulated = text;
           } else {
-            accumulated += text;
+            // Text is shorter - could be a partial, keep the longer version
+            return;
           }
           try {
             await stream.writeSSE({
