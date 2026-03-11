@@ -81,7 +81,7 @@ const createInstanceSchema = z.object({
   url: z.string().url(),
   token: z.string().min(1),
   tier: z.enum(["shared", "dedicated"]).default("shared"),
-  maxSlots: z.number().int().min(1).default(15),
+  maxSlots: z.number().int().min(1).default(25),
   workspaceBase: z.string().min(1).default("/home/openclaw/.openclaw/workspaces"),
   region: z.string().max(20).optional(),
   customerId: z.number().int().positive().optional(),

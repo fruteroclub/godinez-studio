@@ -29,12 +29,16 @@ const app = new Hono<AuthEnv>();
 
 app.use("*", requireAuth, resolveUser);
 
-// POST /workspaces — Create workspace
+// POST /workspaces — Create workspace (max 1 per user)
 app.post(
   "/",
   zValidator("json", z.object({ name: z.string().min(1).max(255) })),
   async (c) => {
     const userId = c.get("userId");
+    const existing = await getWorkspacesByUserId(userId);
+    if (existing.length >= 1) {
+      return c.json({ error: "WORKSPACE_LIMIT", message: "Solo puedes tener un workspace." }, 409);
+    }
     const { name } = c.req.valid("json");
     const slug = await ensureUniqueSlug(name);
     const workspace = await createWorkspace({ name, slug, ownerId: userId });

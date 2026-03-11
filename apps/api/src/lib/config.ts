@@ -3,7 +3,7 @@
  */
 
 // OpenClaw agent provisioning
-export const AGENT_MAX_SLOTS = parseInt(process.env.AGENT_MAX_SLOTS || "15", 10);
+export const AGENT_MAX_SLOTS = parseInt(process.env.AGENT_MAX_SLOTS || "25", 10);
 export const AGENT_WORKSPACE_BASE =
   process.env.AGENT_WORKSPACE_BASE || "/home/devrel-frutero/.openclaw/workspaces";
 
