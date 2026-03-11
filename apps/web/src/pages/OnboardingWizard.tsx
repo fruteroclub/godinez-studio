@@ -122,7 +122,9 @@ export default function OnboardingWizard() {
       navigate(`/studio/${ws.slug}/chat/${result.conversationId}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("CAPACITY_FULL")) {
+      if (msg.includes("WORKSPACE_LIMIT")) {
+        setProvisionError(onboarding.workspaceLimit);
+      } else if (msg.includes("CAPACITY_FULL")) {
         setProvisionError(onboarding.capacityFull);
       } else if (msg.includes("GATEWAY_OFFLINE")) {
         setProvisionError(onboarding.gatewayOffline);
