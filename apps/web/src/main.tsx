@@ -9,12 +9,14 @@ import ErrorBoundary from "./components/ui/ErrorBoundary";
 import { router } from "./App";
 import { initSentry } from "@/lib/sentry";
 import { initPostHog } from "@/lib/posthog";
+import { initClarity } from "@/lib/clarity";
 import "./index.css";
 
 const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 initSentry();
 initPostHog();
+initClarity();
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
