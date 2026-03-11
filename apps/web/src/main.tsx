@@ -1,4 +1,6 @@
 import { initSentry } from "./lib/sentry";
+import { initPostHog } from "./lib/posthog";
+import { initClarity } from "./lib/clarity";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { ClerkProvider } from "@clerk/clerk-react";
@@ -9,8 +11,10 @@ import ErrorBoundary from "./components/ui/ErrorBoundary";
 import { router } from "./App";
 import "./index.css";
 
-// Initialize Sentry for error tracking
+// Initialize tracking & monitoring
 initSentry();
+initPostHog();
+initClarity();
 const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 
 createRoot(document.getElementById("root")!).render(
