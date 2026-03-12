@@ -26,6 +26,15 @@ export async function updateUser(
   return updated;
 }
 
+export async function updateUserRole(id: number, role: "user" | "admin") {
+  const [updated] = await db
+    .update(users)
+    .set({ role })
+    .where(eq(users.id, id))
+    .returning();
+  return updated;
+}
+
 export async function upsertUser(data: {
   clerkId: string;
   email: string;

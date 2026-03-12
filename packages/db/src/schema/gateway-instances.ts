@@ -17,7 +17,7 @@ export const gatewayInstances = pgTable("gateway_instances", {
   token: text("token").notNull(),
   tier: text("tier").notNull().default("shared"),
   status: text("status").notNull().default("active"),
-  maxSlots: integer("max_slots").notNull().default(15),
+  maxSlots: integer("max_slots").notNull().default(25),
   usedSlots: integer("used_slots").notNull().default(0),
   workspaceBase: text("workspace_base").notNull().default("/home/openclaw/.openclaw/workspaces"),
   region: varchar("region", { length: 20 }).default("us-east-1"),

@@ -6,6 +6,7 @@ import type {
   AdminInstanceRow,
   AdminInstanceHealth,
   AdminGrowthPoint,
+  AdminUserRow,
 } from "@godinez/types";
 import { apiFetch } from "@/lib/api";
 
@@ -80,6 +81,40 @@ export function useAdminGrowth(period: "7d" | "30d" | "90d") {
         `/api/admin/growth?period=${period}`,
         { token },
       );
+    },
+  });
+}
+
+export function useAdminUsers(cursor?: number) {
+  const { getToken } = useAuth();
+  return useQuery({
+    queryKey: ["admin", "users", cursor],
+    queryFn: async () => {
+      const token = await getToken();
+      const params = new URLSearchParams({ limit: "50" });
+      if (cursor) params.set("cursor", String(cursor));
+      return apiFetch<{ data: AdminUserRow[]; nextCursor: number | null }>(
+        `/api/admin/users?${params}`,
+        { token },
+      );
+    },
+  });
+}
+
+export function useUpdateUserRole() {
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, role }: { id: number; role: "user" | "admin" }) => {
+      const token = await getToken();
+      return apiFetch(`/api/admin/users/${id}/role`, {
+        token,
+        method: "PUT",
+        body: JSON.stringify({ role }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "users"] });
     },
   });
 }
