@@ -186,6 +186,59 @@ export async function getGrowthTimeSeries({
   };
 }
 
+export async function getAdminUsersList({
+  limit,
+  cursor,
+}: {
+  limit: number;
+  cursor?: number;
+}) {
+  const uid = sql.raw(`"users"."id"`);
+  const uCreatedAt = sql.raw(`"users"."created_at"`);
+
+  const rows = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      role: users.role,
+      jobRole: users.jobRole,
+      createdAt: users.createdAt,
+      workspaceName:
+        sql<string | null>`(select w.name from ${workspaces} w where w.owner_id = ${uid} limit 1)`,
+      workspaceStatus:
+        sql<string | null>`(select w.status from ${workspaces} w where w.owner_id = ${uid} limit 1)`,
+      agentName:
+        sql<string | null>`(select a.name from ${agents} a join ${workspaces} w on w.agent_id = a.id where w.owner_id = ${uid} limit 1)`,
+      agentStatus:
+        sql<string | null>`(select a.status from ${agents} a join ${workspaces} w on w.agent_id = a.id where w.owner_id = ${uid} limit 1)`,
+      totalMessages:
+        sql<number>`coalesce((select count(*) from ${messages} m join ${workspaces} w on w.id = m.workspace_id where w.owner_id = ${uid}), 0)`.mapWith(Number),
+      lastMessageAt:
+        sql<string | null>`(select max(m.created_at) from ${messages} m join ${workspaces} w on w.id = m.workspace_id where w.owner_id = ${uid})`,
+      accountAgeDays:
+        sql<number>`greatest(extract(epoch from now() - ${uCreatedAt}) / 86400, 1)`.mapWith(Number),
+    })
+    .from(users)
+    .where(cursor ? gt(users.id, cursor) : undefined)
+    .orderBy(users.id)
+    .limit(limit + 1);
+
+  const hasMore = rows.length > limit;
+  const data = hasMore ? rows.slice(0, limit) : rows;
+  const nextCursor = hasMore ? data[data.length - 1].id : null;
+
+  return {
+    data: data.map((r) => ({
+      ...r,
+      avgMessagesPerDay: r.accountAgeDays > 0
+        ? Math.round((r.totalMessages / r.accountAgeDays) * 10) / 10
+        : 0,
+    })),
+    nextCursor,
+  };
+}
+
 export async function getUsageByWorkspace({
   limit,
   cursor,
