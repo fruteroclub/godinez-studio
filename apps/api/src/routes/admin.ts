@@ -10,7 +10,9 @@ import {
   getAgentsList,
   getGrowthTimeSeries,
   getUsageByWorkspace,
+  getAdminUsersList,
 } from "../dal/admin";
+import { updateUserRole } from "../dal/users";
 import {
   getAllInstances,
   getInstanceById,
@@ -72,6 +74,22 @@ app.get("/usage", async (c) => {
   const params = usageSchema.parse(c.req.query());
   const result = await getUsageByWorkspace(params);
   return c.json(result);
+});
+
+// --- Users ---
+
+app.get("/users", async (c) => {
+  const { limit, cursor } = paginationSchema.parse(c.req.query());
+  const result = await getAdminUsersList({ limit, cursor });
+  return c.json(result);
+});
+
+app.put("/users/:id/role", async (c) => {
+  const id = Number(c.req.param("id"));
+  const { role } = z.object({ role: z.enum(["user", "admin"]) }).parse(await c.req.json());
+  const updated = await updateUserRole(id, role);
+  if (!updated) return c.json({ error: "User not found" }, 404);
+  return c.json(updated);
 });
 
 // --- Instance registry ---

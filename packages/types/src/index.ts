@@ -290,6 +290,15 @@ export interface AdminInstanceHealth extends AdminInstanceRow {
   }[];
 }
 
+export interface AdminUserRow {
+  id: number; email: string; name: string | null; role: UserRole;
+  jobRole: string | null; createdAt: string;
+  workspaceName: string | null; workspaceStatus: string | null;
+  agentName: string | null; agentStatus: string | null;
+  totalMessages: number; lastMessageAt: string | null;
+  avgMessagesPerDay: number;
+}
+
 export interface AdminGrowthPoint {
   date: string; newUsers: number; newWorkspaces: number;
   newConversations: number; messagesSent: number;

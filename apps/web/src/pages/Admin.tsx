@@ -20,6 +20,8 @@ import {
   useAdminAlerts,
   useAdminCapacity,
   useAdminAgentActivity,
+  useAdminUsers,
+  useUpdateUserRole,
   useInstanceHealth,
   useCreateInstance,
   useUpdateInstance,
@@ -689,6 +691,133 @@ function UsageSection() {
   );
 }
 
+// --- Section: Users ---
+
+function UsersSection() {
+  const [cursor, setCursor] = useState<number | undefined>();
+  const { data, isLoading } = useAdminUsers(cursor);
+  const updateRole = useUpdateUserRole();
+
+  return (
+    <section>
+      <h2 className="mb-4 text-lg font-semibold text-[hsl(var(--foreground))]">
+        {admin.users}
+      </h2>
+      <div className="overflow-x-auto rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+        {isLoading ? (
+          <div className="p-4"><ListSkeleton rows={5} /></div>
+        ) : (
+          <>
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-[hsl(var(--border))] text-sm text-[hsl(var(--muted-foreground))]">
+                  <th className="px-4 py-3">{admin.name}</th>
+                  <th className="px-4 py-3">{admin.email}</th>
+                  <th className="px-4 py-3">{admin.role}</th>
+                  <th className="px-4 py-3">{admin.workspace}</th>
+                  <th className="px-4 py-3">{admin.agentStatus}</th>
+                  <th className="px-4 py-3">{admin.lastActivity}</th>
+                  <th className="px-4 py-3 text-right">{admin.avgMessages}</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {data?.data.map((u) => (
+                  <tr key={u.id} className="border-b border-[hsl(var(--border))] last:border-0">
+                    <td className="px-4 py-3 font-medium text-[hsl(var(--foreground))]">
+                      {u.name || "—"}
+                      {u.jobRole && (
+                        <span className="ml-2 text-xs text-[hsl(var(--muted-foreground))]">
+                          {u.jobRole}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-[hsl(var(--muted-foreground))]">
+                      {u.email}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        u.role === "admin"
+                          ? "bg-magenta/20 text-magenta"
+                          : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))]"
+                      }`}>
+                        {u.role}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {u.workspaceName ? (
+                        <span className="text-[hsl(var(--foreground))]">
+                          {u.workspaceName}
+                          <span className={`ml-2 text-xs ${
+                            u.workspaceStatus === "active" ? "text-green-400" : "text-yellow-400"
+                          }`}>
+                            {u.workspaceStatus}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-[hsl(var(--muted-foreground))]">{admin.noWorkspace}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {u.agentName ? (
+                        <span className="text-[hsl(var(--foreground))]">
+                          {u.agentName}
+                          <span className={`ml-2 text-xs ${
+                            u.agentStatus === "active" ? "text-green-400" :
+                            u.agentStatus === "error" ? "text-red-400" : "text-yellow-400"
+                          }`}>
+                            {u.agentStatus}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-[hsl(var(--muted-foreground))]">{admin.noAgent}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-[hsl(var(--muted-foreground))]">
+                      {u.lastMessageAt
+                        ? new Date(u.lastMessageAt).toLocaleDateString("es-MX", { day: "numeric", month: "short" })
+                        : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right text-sm tabular-nums text-[hsl(var(--foreground))]">
+                      {u.avgMessagesPerDay}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        onClick={() => updateRole.mutate({
+                          id: u.id,
+                          role: u.role === "admin" ? "user" : "admin",
+                        })}
+                        disabled={updateRole.isPending}
+                        className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+                          u.role === "admin"
+                            ? "bg-red-500/10 text-red-400 hover:bg-red-500/20"
+                            : "bg-magenta/10 text-magenta hover:bg-magenta/20"
+                        }`}
+                      >
+                        {u.role === "admin" ? admin.removeAdmin : admin.makeAdmin}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {data?.nextCursor && (
+              <div className="border-t border-[hsl(var(--border))] p-3 text-center">
+                <button
+                  onClick={() => setCursor(data.nextCursor!)}
+                  className="rounded-md bg-magenta px-4 py-2 text-sm font-medium text-white hover:bg-magenta/90 transition-colors"
+                >
+                  {admin.loadMore}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
 // --- Main Admin Page ---
 
 // --- Section: Capacity Planning ---
@@ -890,6 +1019,7 @@ function AgentActivitySection() {
 
 const TABS = [
   { key: "overview", label: admin.overview },
+  { key: "users", label: admin.users },
   { key: "instances", label: admin.instances },
   { key: "capacity", label: "Capacidad" },
   { key: "activity", label: "Actividad" },
@@ -940,6 +1070,7 @@ export default function Admin() {
       <main className="mx-auto max-w-7xl space-y-8 p-6">
         <AlertsBanner />
         {tab === "overview" && <OverviewSection />}
+        {tab === "users" && <UsersSection />}
         {tab === "instances" && <InstancesSection />}
         {tab === "capacity" && <CapacitySection />}
         {tab === "activity" && <AgentActivitySection />}

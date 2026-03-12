@@ -183,6 +183,15 @@ export const content = {
       recoveryHint: "El gateway está alcanzable pero marcado como offline. Haz clic en \"Activar\" para reconectar.",
       sidebar: "Admin",
       usage: "Uso",
+      users: "Usuarios",
+      email: "Email",
+      role: "Rol",
+      agentStatus: "Agente",
+      avgMessages: "Msgs/día",
+      makeAdmin: "Hacer admin",
+      removeAdmin: "Quitar admin",
+      noWorkspace: "Sin workspace",
+      noAgent: "Sin agente",
     },
     onboarding: {
       // Navigation
