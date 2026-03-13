@@ -156,7 +156,7 @@ export async function getUnprocessedErrors(limit = 50) {
   return db
     .select()
     .from(errors)
-    .where(eq(errors.code, "UNPROCESSED"))
+    .where(eq(errors.resolved, false))
     .orderBy(desc(errors.createdAt))
     .limit(limit);
 }
