@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { FeedbackWidget } from "@/components/errors/feedback-widget";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
 import WorkspaceProvider, {
@@ -11,6 +11,7 @@ import WorkspaceProvider, {
 function ShellContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { workspace, isLoading, slug } = useWorkspace();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -52,7 +53,7 @@ function ShellContent() {
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           <Outlet />
         </main>
-        <FeedbackWidget />
+        {!location.pathname.includes("/chat/") && <FeedbackWidget />}
       </div>
     </div>
   );

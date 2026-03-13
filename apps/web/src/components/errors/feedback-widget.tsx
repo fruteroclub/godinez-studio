@@ -1,9 +1,7 @@
 import { useState, Component, type ReactNode } from "react";
 import { useUser } from "@clerk/clerk-react";
 import { useSubmitFeedback } from "@/hooks/use-errors";
-import { MessageSquare, Bug, Lightbulb, X, Send, Check, AlertTriangle, RefreshCw } from "lucide-react";
-
-type FeedbackType = "bug" | "feature" | "comment";
+import { MessageSquare, X, Send, Check, AlertTriangle, RefreshCw } from "lucide-react";
 
 // ============================================
 // ERROR BOUNDARY (captura errores de React)
@@ -30,7 +28,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // Reportar error al backend
     this.reportError(error, errorInfo);
   }
 
@@ -98,16 +95,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
                 Ir al inicio
               </button>
             </div>
-            {import.meta.env.DEV && this.state.error && (
-              <details className="mt-6 text-left">
-                <summary className="text-sm text-zinc-500 cursor-pointer hover:text-zinc-400">
-                  Detalles técnicos
-                </summary>
-                <pre className="mt-2 p-3 bg-zinc-950 rounded-lg text-xs text-red-400 overflow-auto max-h-40">
-                  {this.state.error.stack}
-                </pre>
-              </details>
-            )}
           </div>
         </div>
       );
@@ -118,12 +105,11 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 }
 
 // ============================================
-// FEEDBACK WIDGET
+// FEEDBACK WIDGET - Simplificado
 // ============================================
 
 export function FeedbackWidget() {
   const [isOpen, setIsOpen] = useState(false);
-  const [type, setType] = useState<FeedbackType>("bug");
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
@@ -136,9 +122,8 @@ export function FeedbackWidget() {
 
     try {
       await submitFeedback.mutateAsync({
-        type,
+        type: "comment",
         message: message.trim(),
-        // Auto-capture email from logged-in user
         email: user?.primaryEmailAddress?.emailAddress,
       });
       setSubmitted(true);
@@ -152,18 +137,12 @@ export function FeedbackWidget() {
     }
   };
 
-  const types: { value: FeedbackType; icon: typeof Bug; label: string }[] = [
-    { value: "bug", icon: Bug, label: "Bug" },
-    { value: "feature", icon: Lightbulb, label: "Feature" },
-    { value: "comment", icon: MessageSquare, label: "Comentario" },
-  ];
-
   if (!isOpen) {
     return (
       <button
         onClick={() => setIsOpen(true)}
         className="fixed bottom-6 right-6 w-12 h-12 bg-blue-600 hover:bg-blue-500 rounded-full shadow-lg flex items-center justify-center text-white transition-transform hover:scale-110 z-50"
-        aria-label="Enviar feedback"
+        aria-label="Soporte"
       >
         <MessageSquare className="w-5 h-5" />
       </button>
@@ -174,7 +153,7 @@ export function FeedbackWidget() {
     <div className="fixed bottom-6 right-6 w-80 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-50">
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-        <h3 className="font-semibold text-white">Enviar feedback</h3>
+        <h3 className="font-semibold text-white">Soporte</h3>
         <button
           onClick={() => setIsOpen(false)}
           className="text-zinc-400 hover:text-white"
@@ -189,41 +168,21 @@ export function FeedbackWidget() {
             <Check className="w-6 h-6 text-green-400" />
           </div>
           <p className="text-white font-medium">¡Gracias!</p>
-          <p className="text-sm text-zinc-400 mt-1">Tu feedback ha sido enviado</p>
+          <p className="text-sm text-zinc-400 mt-1">Tu mensaje ha sido enviado</p>
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
-          {/* Type selector */}
-          <div className="flex gap-2">
-            {types.map(({ value, icon: Icon, label }) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setType(value)}
-                className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-sm transition-colors ${
-                  type === value
-                    ? "bg-blue-600 text-white"
-                    : "bg-zinc-800 text-zinc-400 hover:text-white"
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                {label}
-              </button>
-            ))}
-          </div>
+          {/* Greeting */}
+          <p className="text-sm text-zinc-300">
+            ¡Hola! Soy tu asistente técnico. ¿En qué te puedo apoyar? Describe brevemente qué está pasando.
+          </p>
 
           {/* Message */}
           <div>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
-              placeholder={
-                type === "bug"
-                  ? "Describe el problema..."
-                  : type === "feature"
-                  ? "¿Qué te gustaría ver?"
-                  : "Tu comentario..."
-              }
+              placeholder="Escribe tu mensaje..."
               className="w-full h-24 bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-white placeholder-zinc-500 text-sm resize-none focus:outline-none focus:border-blue-500"
               required
             />
