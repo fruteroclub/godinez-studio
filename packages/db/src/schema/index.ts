@@ -12,3 +12,4 @@ export { referralCodes } from "./referral-codes";
 export { gatewayInstances } from "./gateway-instances";
 export { hackathonProgress, type HackathonPhase } from "./hackathon-progress";
 export * from "./relations";
+export { errors, feedback } from "./errors";

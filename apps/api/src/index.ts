@@ -24,6 +24,9 @@ import referralCodes from "./routes/referral-codes";
 import admin from "./routes/admin";
 import users from "./routes/users";
 import hackathons from "./routes/hackathons";
+import errors from "./routes/errors";
+import watchdog from "./routes/watchdog";
+import { logError } from "./dal/errors";
 import "./services/gateway-pool"; // initialize pool (lazy connections)
 import { initSentry, Sentry } from "./lib/sentry";
 import { isAppError, formatErrorResponse } from "./lib/errors";
@@ -74,9 +77,20 @@ app.route("/api/admin", admin);
 app.route("/api/users", users);
 app.route("/api/hackathons", hackathons);
 app.route("/webhooks", webhooks);
+app.route("/api/admin/errors", errors);
+app.route("/api/watchdog", watchdog);
 
 app.onError((err, c) => {
   Sentry.captureException(err);
+  
+  // Log to Error Observatory
+  logError({
+    code: isAppError(err) ? err.code : "INTERNAL_ERROR",
+    message: err.message,
+    userMessage: "Algo salió mal.",
+    priority: "P2",
+    path: c.req.path,
+  }).catch(() => {});
   
   if (isAppError(err)) {
     if (err.statusCode >= 500) {
