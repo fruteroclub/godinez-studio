@@ -25,6 +25,7 @@ import admin from "./routes/admin";
 import users from "./routes/users";
 import hackathons from "./routes/hackathons";
 import errors from "./routes/errors";
+import watchdog from "./routes/watchdog";
 import { logError } from "./dal/errors";
 import "./services/gateway-pool"; // initialize pool (lazy connections)
 import { initSentry, Sentry } from "./lib/sentry";
@@ -77,6 +78,7 @@ app.route("/api/users", users);
 app.route("/api/hackathons", hackathons);
 app.route("/webhooks", webhooks);
 app.route("/api/admin/errors", errors);
+app.route("/api/watchdog", watchdog);
 
 app.onError((err, c) => {
   Sentry.captureException(err);

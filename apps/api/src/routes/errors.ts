@@ -16,6 +16,9 @@ import {
   getFeedback,
   updateFeedbackStatus,
   deleteFeedback,
+  getUnprocessedErrors,
+  updateErrorClassification,
+  logRawError,
 } from "../dal/errors";
 
 const app = new Hono();
@@ -108,5 +111,55 @@ app.delete("/feedback/:id", async (c) => {
   const deleted = await deleteFeedback(id);
   return c.json({ success: true, deleted });
 });
+
+// ============================================
+// WATCHDOG ENDPOINTS
+// ============================================
+
+// GET unprocessed errors (for Watchdog)
+app.get("/unprocessed", async (c) => {
+  const limit = parseInt(c.req.query("limit") || "50");
+  const list = await getUnprocessedErrors(limit);
+  return c.json(list);
+});
+
+// PATCH error classification (for Watchdog)
+app.patch(
+  "/:id",
+  zValidator(
+    "json",
+    z.object({
+      code: z.string().optional(),
+      priority: z.enum(["P0", "P1", "P2", "P3"]).optional(),
+      metadata: z.record(z.unknown()).optional(),
+    })
+  ),
+  async (c) => {
+    const id = parseInt(c.req.param("id"));
+    const data = c.req.valid("json");
+    const updated = await updateErrorClassification(id, data);
+    return c.json(updated);
+  }
+);
+
+// POST raw error (without classification)
+app.post(
+  "/raw",
+  zValidator(
+    "json",
+    z.object({
+      message: z.string(),
+      userMessage: z.string().optional(),
+      userId: z.string().optional(),
+      path: z.string().optional(),
+      metadata: z.record(z.unknown()).optional(),
+    })
+  ),
+  async (c) => {
+    const data = c.req.valid("json");
+    const error = await logRawError(data);
+    return c.json(error, 201);
+  }
+);
 
 export default app;

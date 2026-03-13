@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { FeedbackWidget } from "@/components/errors/feedback-widget";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
@@ -51,6 +52,7 @@ function ShellContent() {
         <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           <Outlet />
         </main>
+        <FeedbackWidget />
       </div>
     </div>
   );

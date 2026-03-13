@@ -146,3 +146,64 @@ export async function deleteFeedback(id: number) {
     .returning();
   return deleted;
 }
+// Agregar al final de dal/errors.ts (antes del último export si hay)
+
+/**
+ * Get unprocessed errors (code is null or 'UNPROCESSED')
+ * Used by Watchdog agent to find errors that need classification
+ */
+export async function getUnprocessedErrors(limit = 50) {
+  return db
+    .select()
+    .from(errors)
+    .where(eq(errors.code, "UNPROCESSED"))
+    .orderBy(desc(errors.createdAt))
+    .limit(limit);
+}
+
+/**
+ * Update error with classification from Watchdog
+ */
+export async function updateErrorClassification(id: number, data: {
+  code?: string;
+  priority?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  const [updated] = await db
+    .update(errors)
+    .set({
+      code: data.code,
+      priority: data.priority,
+      metadata: data.metadata,
+    })
+    .where(eq(errors.id, id))
+    .returning();
+  return updated;
+}
+
+/**
+ * Log raw error without classification (for frontend/middleware to use)
+ */
+export async function logRawError(data: {
+  message: string;
+  userMessage?: string;
+  userId?: string;
+  path?: string;
+  userAgent?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  const [error] = await db
+    .insert(errors)
+    .values({
+      code: "UNPROCESSED", // Watchdog will classify
+      message: data.message,
+      userMessage: data.userMessage || "Error detectado",
+      priority: "P3", // Watchdog will assign
+      userId: data.userId,
+      path: data.path,
+      userAgent: data.userAgent,
+      metadata: data.metadata,
+    })
+    .returning();
+  return error;
+}
