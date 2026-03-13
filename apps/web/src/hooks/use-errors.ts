@@ -180,6 +180,7 @@ export function useUpdateFeedbackStatus() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["errors", "feedback"] });
+      queryClient.invalidateQueries({ queryKey: ["errors", "dashboard"] });
     },
   });
 }
