@@ -22,7 +22,25 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Sentry (monitoreo externo)
     Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } });
+    
+    // Error Observatory (monitoreo interno para Watchdog)
+    fetch("/api/admin/errors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        code: "REACT_ERROR",
+        message: error.message,
+        userMessage: "Algo salió mal en la aplicación. Intenta recargar la página.",
+        priority: "P1",
+        path: typeof window !== "undefined" ? window.location.pathname : undefined,
+        metadata: {
+          stack: error.stack,
+          componentStack: errorInfo.componentStack,
+        },
+      }),
+    }).catch(() => {});
   }
 
   render() {

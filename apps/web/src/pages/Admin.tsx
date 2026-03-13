@@ -27,6 +27,7 @@ import {
   useUpdateInstance,
 } from "@/hooks/use-admin";
 import { content } from "@/lib/content";
+import Errors from "./admin/Errors";
 import { PageSkeleton, ListSkeleton } from "@/components/ui/Skeleton";
 import type { AdminInstanceRow } from "@godinez/types";
 
@@ -1026,6 +1027,7 @@ const TABS = [
   { key: "workspaces", label: admin.workspacesSection },
   { key: "growth", label: admin.growth },
   { key: "usage", label: admin.usage },
+  { key: "errors", label: "Errores" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -1077,6 +1079,7 @@ export default function Admin() {
         {tab === "workspaces" && <WorkspacesSection />}
         {tab === "growth" && <GrowthSection />}
         {tab === "usage" && <UsageSection />}
+        {tab === "errors" && <Errors />}
       </main>
     </div>
   );
