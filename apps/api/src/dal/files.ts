@@ -32,9 +32,16 @@ export async function getFilesByProjectId(projectId: number) {
   });
 }
 
+export async function getFileById(id: number) {
+  return db.query.files.findFirst({
+    where: eq(files.id, id),
+  });
+}
+
 export async function createFile(data: {
   workspaceId: number;
   projectId?: number;
+  conversationId?: number;
   storageKey: string;
   url: string;
   filename: string;
@@ -45,6 +52,18 @@ export async function createFile(data: {
   messageId?: number;
 }) {
   const [file] = await db.insert(files).values(data).returning();
+  return file;
+}
+
+export async function updateFileMessageLink(
+  fileId: number,
+  data: { messageId: number; conversationId: number },
+) {
+  const [file] = await db
+    .update(files)
+    .set(data)
+    .where(eq(files.id, fileId))
+    .returning();
   return file;
 }
 
