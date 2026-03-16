@@ -488,64 +488,27 @@ export class GatewayRelay {
   ): Promise<string> {
     const idempotencyKey = crypto.randomUUID();
     
-    // Build request params
-    const params: Record<string, unknown> = {
-      sessionKey,
-      idempotencyKey,
-    };
-
-    // If attachments present, build content blocks for Claude vision
+    // Build message with attachments prepended as MEDIA: directives
+    // OpenClaw understands MEDIA:<url> format for inline media
+    let fullMessage = message;
     if (attachments?.length) {
-      const contentBlocks: Array<Record<string, unknown>> = [];
-      
-      for (const att of attachments) {
-        if (att.mimeType.startsWith('image/')) {
-          // Image attachment - send as image_url block
-          contentBlocks.push({
-            type: 'image',
-            source: {
-              type: 'url',
-              url: att.url,
-            },
-          });
-        } else if (att.mimeType === 'application/pdf') {
-          // PDF attachment - send as document block
-          contentBlocks.push({
-            type: 'document',
-            source: {
-              type: 'url',
-              url: att.url,
-              media_type: att.mimeType,
-            },
-          });
-        } else {
-          // Other files - mention in text
-          // Text files could be fetched and included inline, but for MVP just reference
-        }
-
-      }
-
-      
-      // Add text message as final block
-      contentBlocks.push({
-        type: 'text',
-        text: message,
-      });
-      
-      params.content = contentBlocks;
-    } else {
-      // No attachments - simple text message
-      params.message = message;
+      const mediaLines = attachments.map(att => {
+        // Use MEDIA: prefix which OpenClaw media pipeline understands
+        return `[Attached: ${att.filename} (${att.mimeType})]\nMEDIA:${att.url}`;
+      }).join('\n\n');
+      fullMessage = `${mediaLines}\n\n${message}`;
     }
 
-
-    const response = await this.sendRequest("chat.send", params);
+    const response = await this.sendRequest("chat.send", {
+      sessionKey,
+      message: fullMessage,
+      idempotencyKey,
+    });
     if (!response.ok) {
       throw new Error(
         response.error?.message ?? "chat.send failed",
       );
     }
-
     const payload = parsePayload(ChatSendPayloadSchema, response.payload, "chat.send");
     return payload.runId ?? idempotencyKey;
   }
@@ -707,6 +670,7 @@ export class GatewayRelay {
 
     // Event broadcast
     if (frame.type === "event" && frame.event === "chat") {
+      log.debug({ payload: frame.payload }, "chat event received");
       const parsed = ChatEventPayloadSchema.safeParse(frame.payload);
       if (!parsed.success) {
         log.warn({ err: parsed.error.message }, "chat event validation failed");
@@ -718,7 +682,8 @@ export class GatewayRelay {
       if (!handler) return;
 
       // Deduplicate by seq — skip events we've already seen
-      if (seq <= handler.lastSeq) return;
+      // Dedupe: skip if seq already processed, BUT allow final event with same seq as last delta
+      if (seq < handler.lastSeq || (seq === handler.lastSeq && state === "delta")) return;
       handler.lastSeq = seq;
 
       // Extract text from message content blocks
@@ -728,6 +693,7 @@ export class GatewayRelay {
         handler.onDelta(text, message as Record<string, unknown>);
       }
 
+      log.debug({ state, runId }, "chat event state");
       if (state === "final") {
         handler.onFinal(text, message as Record<string, unknown>);
         this.pendingRuns.delete(runId);

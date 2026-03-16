@@ -77,7 +77,8 @@ export function FileAttachmentButton({
         );
 
         if (!response.ok) {
-          throw new Error("Error al subir archivo");
+          const errData = await response.json().catch(() => ({}));
+          throw new Error(errData.error || "Error al subir archivo");
         }
 
         const data = await response.json();
@@ -132,7 +133,7 @@ export function FileAttachmentButton({
             ? "text-zinc-500 cursor-not-allowed"
             : "text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
         }`}
-        title="Adjuntar archivo"
+        title="Adjuntar imagen"
       >
         {isUploading ? (
           <div className="w-5 h-5 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
