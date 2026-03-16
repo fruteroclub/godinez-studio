@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { Trash2 } from "lucide-react";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
 import {
   useConversations,
@@ -13,6 +14,11 @@ import { ListSkeleton } from "@/components/ui/Skeleton";
 
 const { chat } = content.studio;
 
+interface ConversationToDelete {
+  id: number;
+  title: string;
+}
+
 export default function Chat() {
   const { workspace, slug } = useWorkspace();
   const { data: conversations, isLoading } = useConversations(workspace?.id);
@@ -21,6 +27,17 @@ export default function Chat() {
   const deleteConversation = useDeleteConversation(workspace?.id ?? 0);
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const [convToDelete, setConvToDelete] = useState<ConversationToDelete | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && convToDelete) setConvToDelete(null);
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [convToDelete]);
 
   const projectMap = new Map(
     (projects ?? []).map((p) => [p.id, p.name]),
@@ -36,8 +53,60 @@ export default function Chat() {
     }
   }
 
+  function handleDeleteClick(conv: { id: number; title: string | null }, e: React.MouseEvent) {
+    e.stopPropagation();
+    setConvToDelete({ id: conv.id, title: conv.title ?? "Conversación" });
+  }
+
+  function handleConfirmDelete() {
+    if (!convToDelete) return;
+    setIsDeleting(true);
+    deleteConversation.mutate(convToDelete.id, {
+      onSettled: () => {
+        setIsDeleting(false);
+        setConvToDelete(null);
+      },
+    });
+  }
+
   return (
     <div className="space-y-6">
+      {/* Delete Confirmation Modal */}
+      {convToDelete && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-800 rounded-xl p-6 max-w-md w-full border border-zinc-700 shadow-xl">
+            <h2 className="text-xl font-semibold text-zinc-100 mb-3">
+              🗑️ ¿Eliminar conversación?
+            </h2>
+            <p className="text-zinc-400 mb-4">
+              Esto eliminará <strong className="text-zinc-200">{convToDelete.title}</strong> y todos sus mensajes. Esta acción no se puede deshacer.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConvToDelete(null)}
+                className="flex-1 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-zinc-500 text-zinc-200"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 text-white disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Eliminando...
+                  </span>
+                ) : (
+                  "Eliminar"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-[hsl(var(--foreground))]">
           {chat.title}
@@ -102,16 +171,11 @@ export default function Chat() {
                     </span>
                   )}
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (window.confirm(chat.deleteConfirm)) {
-                        deleteConversation.mutate(conv.id);
-                      }
-                    }}
-                    className="rounded p-1 text-[hsl(var(--muted-foreground))] hover:bg-red-500/10 hover:text-red-400 transition-colors"
+                    onClick={(e) => handleDeleteClick(conv, e)}
+                    className="rounded p-1.5 text-[hsl(var(--muted-foreground))] hover:bg-red-500/10 hover:text-red-400 transition-colors"
                     title="Eliminar"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>

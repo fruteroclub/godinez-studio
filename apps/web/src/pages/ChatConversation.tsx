@@ -383,7 +383,7 @@ export default function ChatConversation() {
 
   return (
     <DropZone onFileDrop={handleFileDrop} disabled={isStreaming || agentOffline}>
-      <div className="flex h-[calc(100vh-8rem)] flex-col">
+      <div className="flex h-[calc(100vh-4rem)] flex-col">
         {/* Hackathon Banner */}
         {isHackathon && hackathonData && (
           <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-b border-amber-500/30 px-4 py-2">
@@ -539,7 +539,7 @@ export default function ChatConversation() {
               )}
             </div>
 
-            <form onSubmit={handleSubmit} className="border-t border-[hsl(var(--border))] p-4">
+            <form onSubmit={handleSubmit} className="border-t border-[hsl(var(--border))] px-4 py-2">
               {/* Attachment preview */}
               {attachment && (
                 <div className="mb-3">

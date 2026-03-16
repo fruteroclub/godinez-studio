@@ -42,6 +42,20 @@ app.post("/upload", async (c) => {
     return c.json({ error: "File exceeds 10MB limit" }, 413);
   }
 
+  // Check for duplicate filename in workspace
+  const existingFile = await db.query.files.findFirst({
+    where: and(
+      eq(filesTable.workspaceId, workspaceId),
+      eq(filesTable.filename, file.name)
+    ),
+  });
+  if (existingFile) {
+    return c.json(
+      { error: "Ya existe un archivo con ese nombre. Renómbralo o elimina el existente.", code: "DUPLICATE_FILENAME" },
+      409
+    );
+  }
+
   // Check workspace storage quota
   const { usedBytes, quotaBytes } = await getWorkspaceStorageUsage(workspaceId);
   if (usedBytes + buffer.length > quotaBytes) {
@@ -123,7 +137,7 @@ workspaceFiles.get("/:id/storage", requireWorkspaceMember, async (c) => {
   });
 });
 
-// GET /api/workspaces/:id/files — List workspace files (paginated)
+// GET /api/workspaces/:id/files — List workspace files (paginated) with conversation info
 workspaceFiles.get("/:id/files", requireWorkspaceMember, async (c) => {
   const workspaceId = parseInt(c.req.param("id"));
   const limit = Math.min(parseInt(c.req.query("limit") || "50"), 100);
@@ -141,8 +155,25 @@ workspaceFiles.get("/:id/files", requireWorkspaceMember, async (c) => {
   const hasMore = items.length > limit;
   const page = hasMore ? items.slice(0, limit) : items;
 
+  // Fetch conversation titles for files that have conversationId
+  const conversationIds = [...new Set(page.filter(f => f.conversationId).map(f => f.conversationId!))];
+  const conversations = conversationIds.length > 0
+    ? await db.query.conversations.findMany({
+        where: (c, { inArray }) => inArray(c.id, conversationIds),
+        columns: { id: true, title: true },
+      })
+    : [];
+  
+  const convMap = new Map(conversations.map(c => [c.id, c.title]));
+
+  // Enrich files with conversation info
+  const enrichedItems = page.map(file => ({
+    ...file,
+    conversationTitle: file.conversationId ? convMap.get(file.conversationId) ?? null : null,
+  }));
+
   return c.json({
-    items: page,
+    items: enrichedItems,
     nextCursor: hasMore ? page[page.length - 1].id : null,
   });
 });
