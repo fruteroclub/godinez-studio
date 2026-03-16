@@ -1,7 +1,7 @@
 export const content = {
   studio: {
     sidebar: {
-      dashboard: "Dashboard",
+      dashboard: "Espacio de trabajo",
       chat: "Chat",
       projects: "Proyectos",
       agent: "Agente",
