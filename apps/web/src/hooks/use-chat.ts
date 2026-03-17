@@ -6,12 +6,20 @@ import { connectSSE } from "@/lib/sse";
 import { parseActionBlocks } from "@/lib/action-parser";
 import { trackEvent } from "@/lib/posthog";
 
+export interface ChatAttachment {
+  fileId: number;
+  url: string;
+  mimeType: string;
+  filename: string;
+}
+
 export interface ChatMessage {
   id: number | string;
   role: "user" | "agent" | "system";
   content: string;
   streaming?: boolean;
   actions?: ActionCard[];
+  attachments?: ChatAttachment[];
   createdAt?: string;
 }
 
@@ -57,11 +65,15 @@ export function useChat(
           setMessages(
             data.messages.map((m) => {
               let actions: ActionCard[] | undefined;
+              let attachments: ChatAttachment[] | undefined;
               if (m.metadata) {
                 try {
                   const meta = JSON.parse(m.metadata);
                   if (Array.isArray(meta.actions)) {
                     actions = meta.actions;
+                  }
+                  if (Array.isArray(meta.attachments)) {
+                    attachments = meta.attachments;
                   }
                 } catch {
                   // invalid metadata JSON
@@ -72,6 +84,7 @@ export function useChat(
                 role: m.role,
                 content: m.content,
                 actions,
+                attachments,
                 createdAt: m.createdAt,
               };
             }),
@@ -106,17 +119,21 @@ export function useChat(
   );
 
   const sendMessage = useCallback(
-    async (content: string, hackathonContext?: { name: string; deadline: string; currentPhase: number; phases: Array<{ number: number; status: string; notes: string[] }>; hackathonUrl?: string; resourcesUrl?: string; active?: boolean; timeRemaining?: string; } | null) => {
+    async (
+      content: string,
+      hackathonContext?: { name: string; deadline: string; currentPhase: number; phases: Array<{ number: number; status: string; notes: string[] }>; hackathonUrl?: string; resourcesUrl?: string; active?: boolean; timeRemaining?: string; } | null,
+      attachments?: ChatAttachment[],
+    ) => {
       const token = await getToken();
       const tempUserId = `temp-${Date.now()}`;
       const tempAgentId = `temp-agent-${Date.now()}`;
 
-      // Optimistic user message
+      // Optimistic user message (with attachments)
       setMessages((prev) => [
         ...prev,
-        { id: tempUserId, role: "user", content },
+        { id: tempUserId, role: "user", content, attachments },
       ]);
-      trackEvent("chat_message_sent", { conversationId, workspaceId });
+      trackEvent("chat_message_sent", { conversationId, workspaceId, hasAttachment: !!attachments?.length });
 
       // POST to send
       let runId: string;
@@ -126,7 +143,13 @@ export function useChat(
           "/api/chat/send",
           {
             method: "POST",
-            body: JSON.stringify({ conversationId, workspaceId, content, hackathonContext: hackathonContext || undefined }),
+            body: JSON.stringify({
+              conversationId,
+              workspaceId,
+              content,
+              attachments,
+              hackathonContext: hackathonContext || undefined,
+            }),
             token,
           },
         );
@@ -221,7 +244,7 @@ export function useChat(
         token,
       );
     },
-    [conversationId, workspaceId, getToken],
+    [conversationId, workspaceId, getToken, options],
   );
 
   return { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction, connectionStatus };

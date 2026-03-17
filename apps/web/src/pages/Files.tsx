@@ -1,6 +1,7 @@
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
+import { Trash2, MessageSquare, ExternalLink } from "lucide-react";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
-import { useFiles, useUploadFile, useStorageQuota } from "@/hooks/use-files";
+import { useFiles, useUploadFile, useStorageQuota, useDeleteFile } from "@/hooks/use-files";
 import { content } from "@/lib/content";
 import EmptyState from "@/components/ui/EmptyState";
 import { ListSkeleton } from "@/components/ui/Skeleton";
@@ -14,12 +15,29 @@ function formatSize(bytes: number | null) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+interface FileToDelete {
+  id: number;
+  filename: string;
+}
+
 export default function Files() {
-  const { workspace } = useWorkspace();
+  const { workspace, slug } = useWorkspace();
   const { data: files, isLoading } = useFiles(workspace?.id);
   const { data: quota } = useStorageQuota(workspace?.id);
   const upload = useUploadFile(workspace?.id ?? 0);
+  const deleteFile = useDeleteFile(workspace?.id ?? 0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [fileToDelete, setFileToDelete] = useState<FileToDelete | null>(null);
+
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && fileToDelete) setFileToDelete(null);
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [fileToDelete]);
 
   function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -27,8 +45,61 @@ export default function Files() {
     if (inputRef.current) inputRef.current.value = "";
   }
 
+  function handleDeleteClick(file: FileToDelete, e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setFileToDelete(file);
+  }
+
+  function handleConfirmDelete() {
+    if (!fileToDelete) return;
+    setDeletingId(fileToDelete.id);
+    deleteFile.mutate(fileToDelete.id, {
+      onSettled: () => {
+        setDeletingId(null);
+        setFileToDelete(null);
+      },
+    });
+  }
+
   return (
     <div className="space-y-6">
+      {/* Delete Confirmation Modal */}
+      {fileToDelete && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-800 rounded-xl p-6 max-w-md w-full border border-zinc-700 shadow-xl">
+            <h2 className="text-xl font-semibold text-zinc-100 mb-3">
+              🗑️ ¿Eliminar archivo?
+            </h2>
+            <p className="text-zinc-400 mb-4">
+              Esto eliminará <strong className="text-zinc-200">{fileToDelete.filename}</strong> permanentemente. Esta acción no se puede deshacer.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setFileToDelete(null)}
+                className="flex-1 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-zinc-500 text-zinc-200"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={deletingId === fileToDelete.id}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 text-white disabled:opacity-50"
+              >
+                {deletingId === fileToDelete.id ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Eliminando...
+                  </span>
+                ) : (
+                  "Eliminar"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-[hsl(var(--foreground))]">
           {fc.title}
@@ -78,25 +149,53 @@ export default function Files() {
       ) : (
         <div className="space-y-2">
           {files.map((file) => (
-            <a
+            <div
               key={file.id}
-              href={file.url}
-              target="_blank"
-              rel="noopener noreferrer"
               className="flex items-center justify-between rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 transition-colors hover:border-magenta/30"
             >
-              <div className="min-w-0 flex-1">
-                <p className="font-medium text-[hsl(var(--foreground))] truncate">
-                  {file.filename}
-                </p>
+              <a
+                href={file.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-w-0 flex-1 group"
+              >
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-[hsl(var(--foreground))] truncate group-hover:text-magenta transition-colors">
+                    {file.filename}
+                  </p>
+                  <ExternalLink className="w-3 h-3 text-[hsl(var(--muted-foreground))] opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
                 <p className="text-xs text-[hsl(var(--muted-foreground))]">
                   {file.mimeType ?? "archivo"} · {formatSize(file.sizeBytes)}
                 </p>
+                {file.conversationId && (
+                  <a
+                    href={`/studio/${slug}/chat/${file.conversationId}`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex items-center gap-1 mt-1 text-xs text-magenta hover:text-magenta/80 transition-colors"
+                  >
+                    <MessageSquare className="w-3 h-3" />
+                    <span>
+                      {file.conversationTitle
+                        ? `Adjunto en: ${file.conversationTitle}`
+                        : `Adjunto en chat #${file.conversationId}`}
+                    </span>
+                  </a>
+                )}
+              </a>
+              <div className="flex items-center gap-3 ml-3">
+                <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                  {new Date(file.createdAt).toLocaleDateString("es-MX")}
+                </span>
+                <button
+                  onClick={(e) => handleDeleteClick({ id: file.id, filename: file.filename }, e)}
+                  className="p-1.5 text-[hsl(var(--muted-foreground))] hover:text-red-500 hover:bg-red-500/10 rounded transition-colors"
+                  title="Eliminar archivo"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
-              <span className="ml-3 text-xs text-[hsl(var(--muted-foreground))]">
-                {new Date(file.createdAt).toLocaleDateString("es-MX")}
-              </span>
-            </a>
+            </div>
           ))}
         </div>
       )}

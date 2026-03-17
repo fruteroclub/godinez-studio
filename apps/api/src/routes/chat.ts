@@ -18,6 +18,7 @@ import {
 } from "../dal/conversations";
 import { createProject } from "../dal/projects";
 import { createTask } from "../dal/tasks";
+import { updateFileMessageLink, getFileById } from "../dal/files";
 import { getWorkspaceById, activateWorkspace } from "../dal/workspaces";
 import { pool } from "../services/gateway-pool";
 import { resolveAgentSession } from "../services/agent-mapping";
@@ -41,6 +42,14 @@ const app = new Hono<AuthEnv>();
 
 app.use("*", requireAuth, resolveUser);
 
+// Attachment schema for validation
+const attachmentSchema = z.object({
+  fileId: z.number(),
+  url: z.string().url(),
+  mimeType: z.string(),
+  filename: z.string(),
+});
+
 // POST /api/chat/send — Send a message and get a runId for streaming
 app.post(
   "/send",
@@ -51,6 +60,7 @@ app.post(
       conversationId: z.number(),
       workspaceId: z.number(),
       content: z.string().min(1),
+      attachments: z.array(attachmentSchema).optional(),
       hackathonContext: z.object({
         active: z.boolean(),
         name: z.string(),
@@ -67,16 +77,31 @@ app.post(
   ),
   async (c) => {
     const userId = c.get("userId");
-    const { conversationId, workspaceId, content, hackathonContext } = c.req.valid("json");
+    const { conversationId, workspaceId, content, attachments, hackathonContext } = c.req.valid("json");
 
-    // Save user message
+    // Save user message with attachment metadata
+    const messageMetadata = attachments?.length
+      ? { attachments: attachments.map(a => ({ fileId: a.fileId, url: a.url, mimeType: a.mimeType, filename: a.filename })) }
+      : undefined;
+
     const message = await createMessage({
       conversationId,
       workspaceId,
       role: "user",
       content,
       userId,
+      metadata: messageMetadata,
     });
+
+    // Link attachments to this message and conversation
+    if (attachments?.length) {
+      for (const att of attachments) {
+        await updateFileMessageLink(att.fileId, {
+          messageId: message.id,
+          conversationId,
+        });
+      }
+    }
 
     // Auto-title: on first message, set a heuristic title from user text
     const msgCount = await getMessageCountForConversation(conversationId);
@@ -107,7 +132,8 @@ app.post(
     if (relay) {
       try {
         const sessionKey = await resolveAgentSession(workspaceId, conversationId);
-        runId = await relay.chatSend(sessionKey, enrichedContent);
+        // Send with attachments if present
+        runId = await relay.chatSend(sessionKey, enrichedContent, attachments);
         runContexts.set(runId, { conversationId, workspaceId, instanceId: workspace!.instanceId });
       } catch (err) {
         const error = err instanceof Error ? err.message : "Gateway error";
