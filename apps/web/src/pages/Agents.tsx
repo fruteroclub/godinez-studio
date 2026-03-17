@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { Bot } from "lucide-react";
+import { RoleIcon, NeedIcon } from "@/lib/icons";
 import { useAuth } from "@clerk/clerk-react";
 import { useQuery } from "@tanstack/react-query";
 import { Navigate, useNavigate } from "react-router-dom";
@@ -195,7 +197,7 @@ function AgentSettingsForm({
       <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6">
         <div className="flex items-center gap-4">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gradient-brand text-2xl">
-            🤖
+            <Bot className="w-8 h-8 text-white stroke-[1.5]" />
           </div>
           <div className="flex-1">
             <div className="flex items-center gap-3">
@@ -268,7 +270,7 @@ function AgentSettingsForm({
                       : "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] hover:border-white/20"
                   }`}
                 >
-                  {label}
+                  <RoleIcon roleId={id} className="w-4 h-4 stroke-[1.5] inline mr-1.5" />{label}
                 </button>
               );
             })}
@@ -349,7 +351,7 @@ function AgentSettingsForm({
                       ✓
                     </div>
                   )}
-                  <span className="text-2xl">{need.emoji}</span>
+                  <NeedIcon needId={id} className="w-6 h-6 stroke-[1.5] text-white" />
                   <span className="mt-2 text-sm font-medium text-[hsl(var(--foreground))]">
                     {need.title}
                   </span>
