@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useHackathons } from "../../hooks/use-hackathons";
+import { Trophy, Clock } from "lucide-react";
 
 interface HackathonBannerProps {
   workspaceId: number | undefined;
@@ -29,7 +30,7 @@ export function HackathonBanner({ workspaceId }: HackathonBannerProps) {
       "
     >
       <div className="flex items-center gap-2">
-        <span className="text-lg">🏆</span>
+        <Trophy className="w-5 h-5 text-amber-400 stroke-[1.5]" />
         <span className="font-medium text-zinc-200">
           {activeHackathon.name}
         </span>
@@ -48,7 +49,7 @@ export function HackathonBanner({ workspaceId }: HackathonBannerProps) {
       </div>
       {timeRemaining && (
         <div className="flex items-center gap-1 text-zinc-400">
-          <span>⏰</span>
+          <Clock className="w-4 h-4 stroke-[1.5]" />
           <span className="text-sm">{timeRemaining}</span>
         </div>
       )}
