@@ -50,7 +50,7 @@ function ShellContent() {
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <TopBar onMenuToggle={() => setSidebarOpen(true)} />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
+        <main className={`flex-1 overflow-y-auto ${location.pathname.includes("/chat/") ? "" : "p-4 sm:p-6"}`}>
           <Outlet />
         </main>
         {!location.pathname.includes("/chat/") && <FeedbackWidget />}

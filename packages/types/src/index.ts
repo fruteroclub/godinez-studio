@@ -137,6 +137,7 @@ export interface FileRecord {
   uploadedByUserId: number | null;
   uploadedByAgentId: number | null;
   messageId: number | null;
+  conversationId: number | null;
   createdAt: string;
   isHackathon: boolean;
   hackathonId: number | null;
