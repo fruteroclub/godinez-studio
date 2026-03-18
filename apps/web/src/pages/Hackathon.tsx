@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { Trophy, Clock } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import { apiFetch } from "@/lib/api";
 import { useWorkspace } from "../providers/WorkspaceProvider";
@@ -9,6 +10,7 @@ import { PhaseCard } from "../components/hackathon/PhaseCard";
 export function Hackathon() {
   const { workspace, slug } = useWorkspace();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { getToken } = useAuth();
   const {
     hackathons,
@@ -64,6 +66,17 @@ export function Hackathon() {
     }
   }, [hackathons, selectedHackathon?.id]);
 
+
+  // Auto-select hackathon from URL query param
+  useEffect(() => {
+    const selectedId = searchParams.get("selected");
+    if (selectedId && hackathons.length > 0 && !selectedHackathon) {
+      const hackathon = hackathons.find(h => h.id === Number(selectedId));
+      if (hackathon) {
+        setSelectedHackathon(hackathon);
+      }
+    }
+  }, [searchParams, hackathons, selectedHackathon]);
   const openHackathonChat = async (hackathonId: number, hackathonName: string) => {
     if (!workspace?.id) return;
     setIsOpeningChat(true);
@@ -160,7 +173,7 @@ export function Hackathon() {
   if (hackathons.length === 0 && !isConfiguring) {
     return (
       <main className="flex flex-col items-center justify-center h-full p-8" aria-labelledby="empty-heading">
-        <div className="text-6xl mb-6" aria-hidden="true">🏆</div>
+        <Trophy className="w-16 h-16 mb-6 text-amber-400 stroke-[1.5]" aria-hidden="true" />
         <h1 id="empty-heading" className="text-2xl font-bold text-zinc-100 mb-2">
           ¿Estás en un hackathon?
         </h1>
@@ -170,7 +183,7 @@ export function Hackathon() {
         </p>
         <button
           onClick={() => setIsConfiguring(true)}
-          className="px-6 py-3 bg-pink-500 hover:bg-pink-600 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 focus:ring-offset-zinc-900"
+          className="px-6 py-3 bg-pink-500 hover:bg-pink-600 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-magenta focus:ring-offset-2 focus:ring-offset-zinc-900"
           aria-label="Configurar nuevo hackathon"
         >
           Configurar Hackathon
@@ -185,7 +198,7 @@ export function Hackathon() {
       <main className="flex flex-col items-center justify-center h-full p-8" aria-labelledby="form-heading">
         <div className="w-full max-w-md">
           <h1 id="form-heading" className="text-2xl font-bold text-zinc-100 mb-6 text-center">
-            🏆 Nuevo hackathon
+            Nuevo hackathon
           </h1>
           <form onSubmit={handleCreate} className="space-y-4" aria-label="Formulario de nuevo hackathon">
             <div>
@@ -200,12 +213,12 @@ export function Hackathon() {
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 placeholder="Ej: Monad Blitz Monterrey"
-                className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500/50 text-zinc-100"
+                className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-magenta/50 text-zinc-100"
                 aria-invalid={!!formErrors.name}
                 aria-describedby={formErrors.name ? "name-error" : undefined}
               />
               {formErrors.name && (
-                <p id="name-error" className="text-xs text-red-400 mt-1" role="alert">
+                <p id="name-error" className="text-xs text-magenta mt-1" role="alert">
                   ⚠ {formErrors.name}
                 </p>
               )}
@@ -220,12 +233,12 @@ export function Hackathon() {
                 required
                 value={formData.deadline}
                 onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500/50 text-zinc-100"
+                className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-magenta/50 text-zinc-100"
                 aria-invalid={!!formErrors.deadline}
                 aria-describedby={formErrors.deadline ? "deadline-error" : undefined}
               />
               {formErrors.deadline && (
-                <p id="deadline-error" className="text-xs text-red-400 mt-1" role="alert">
+                <p id="deadline-error" className="text-xs text-magenta mt-1" role="alert">
                   ⚠ {formErrors.deadline}
                 </p>
               )}
@@ -240,7 +253,7 @@ export function Hackathon() {
                 value={formData.hackathonUrl}
                 onChange={(e) => setFormData({ ...formData, hackathonUrl: e.target.value })}
                 placeholder="https://..."
-                className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500/50 text-zinc-100"
+                className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-magenta/50 text-zinc-100"
               />
             </div>
             {formData.hackathonUrl && (
@@ -254,7 +267,7 @@ export function Hackathon() {
                   value={formData.resourcesUrl}
                   onChange={(e) => setFormData({ ...formData, resourcesUrl: e.target.value })}
                   placeholder="https://docs..."
-                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-pink-500/50 text-zinc-100"
+                  className="w-full px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg focus:border-pink-500 focus:outline-none focus:ring-2 focus:ring-magenta/50 text-zinc-100"
                 />
               </div>
             )}
@@ -271,7 +284,7 @@ export function Hackathon() {
               </button>
               <button
                 type="submit"
-                className="flex-1 px-6 py-3 bg-pink-500 hover:bg-pink-600 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 focus:ring-offset-zinc-900"
+                className="flex-1 px-6 py-3 bg-pink-500 hover:bg-pink-600 rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-magenta focus:ring-offset-2 focus:ring-offset-zinc-900"
               >
                 Crear
               </button>
@@ -302,7 +315,7 @@ export function Hackathon() {
         <nav aria-label="Navegación de fases">
           <button
             onClick={() => setSelectedPhase(null)}
-            className="text-zinc-400 hover:text-zinc-200 mb-6 flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-pink-500 rounded"
+            className="text-zinc-400 hover:text-zinc-200 mb-6 flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-magenta rounded"
             aria-label="Volver a la lista de fases"
           >
             ← Volver a fases
@@ -310,9 +323,12 @@ export function Hackathon() {
         </nav>
         <article className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-6">
           <header className="flex items-center justify-between mb-4">
-            <h1 id="phase-heading" className="text-xl font-bold">
-              Fase {selectedPhase}: {PHASE_NAMES[selectedPhase]}
-            </h1>
+            <div className="flex flex-col">
+              <span className="text-sm text-zinc-400 uppercase tracking-wider">FASE {selectedPhase}</span>
+              <h1 id="phase-heading" className="text-xl font-bold text-white">
+                {PHASE_NAMES[selectedPhase]}
+              </h1>
+            </div>
             <span
               className={`px-3 py-1 rounded-full text-sm ${
                 phase.status === "done"
@@ -325,17 +341,17 @@ export function Hackathon() {
               aria-label={`Estado: ${phase.status === "done" ? "Completada" : phase.status === "current" ? "En progreso" : "Pendiente"}`}
             >
               {phase.status === "done"
-                ? "✅ Completada"
+                ? "Completada"
                 : phase.status === "current"
-                ? "🔵 En progreso"
-                : "⚪ Pendiente"}
+                ? "En progreso"
+                : "Pendiente"}
             </span>
           </header>
           
           <section aria-label="Notas de la fase">
             {phase.notes.length > 0 ? (
               <div className="mb-4">
-                <h2 className="text-sm font-medium text-zinc-400 mb-2">
+                <h2 className="text-sm font-medium text-zinc-400 mb-2 sr-only">
                   📝 Notas guardadas:
                 </h2>
                 <ul className="space-y-2" aria-label={`${phase.notes.length} notas guardadas`}>
@@ -357,8 +373,8 @@ export function Hackathon() {
             )}
           </section>
 
-          <section className="mb-6" aria-label="Agregar nueva nota">
-            <h2 className="text-sm font-medium text-zinc-400 mb-2">
+          <section className="mb-6 hidden" aria-label="Agregar nueva nota">
+            <h2 className="text-sm font-medium text-zinc-400 mb-2 sr-only">
               ➕ Agregar nota:
             </h2>
             <div className="flex gap-2">
@@ -371,7 +387,7 @@ export function Hackathon() {
                 onChange={(e) => setNewNote(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleAddNote()}
                 placeholder="Ej: Definí la idea del proyecto..."
-                className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/50"
+                className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-magenta/50"
               />
               <button
                 onClick={handleAddNote}
@@ -386,10 +402,10 @@ export function Hackathon() {
 
           <button
             onClick={() => openHackathonChat(selectedHackathon.id, selectedHackathon.name)}
-            className="w-full px-4 py-2 bg-pink-500/20 hover:bg-pink-500/30 border border-pink-500/50 rounded-lg text-pink-400 transition-colors focus:outline-none focus:ring-2 focus:ring-pink-500"
-            aria-label="Continuar trabajando en el chat del hackathon"
+            className="w-full px-4 py-2 bg-magenta/80 hover:bg-magenta rounded-lg text-white font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-magenta"
+            aria-label="Abrir chat del hackathon"
           >
-            💬 Continuar en Chat
+            Abrir Chat
           </button>
         </article>
       </main>
@@ -415,7 +431,7 @@ export function Hackathon() {
               tabIndex={-1}
             >
               <h2 id="delete-dialog-title" className="text-lg font-bold text-zinc-100 mb-2">
-                🗑️ ¿Eliminar hackathon?
+                ¿Eliminar hackathon?
               </h2>
               <p className="text-zinc-400 mb-4">
                 Esto eliminará <strong className="text-zinc-200">{selectedHackathon.name}</strong> y todo su progreso. Esta acción no se puede deshacer.
@@ -429,7 +445,7 @@ export function Hackathon() {
                 </button>
                 <button
                   onClick={handleDelete}
-                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-magenta"
                   aria-label={`Confirmar eliminación de ${selectedHackathon.name}`}
                 >
                   Eliminar
@@ -442,8 +458,8 @@ export function Hackathon() {
         {/* Back button */}
         <nav aria-label="Navegación de hackathons">
           <button
-            onClick={() => setSelectedHackathon(null)}
-            className="text-zinc-400 hover:text-zinc-200 mb-6 flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-pink-500 rounded"
+            onClick={() => { setSelectedHackathon(null); setSearchParams({}); }}
+            className="text-zinc-400 hover:text-zinc-200 mb-6 flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-magenta rounded"
             aria-label="Volver a la lista de hackathons"
           >
             ← Volver a lista
@@ -454,7 +470,7 @@ export function Hackathon() {
         <header className="flex items-center justify-between mb-8">
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <span className="text-2xl" aria-hidden="true">🏆</span>
+              <Trophy className="w-6 h-6 text-amber-400 stroke-[1.5]" />
               <h1 id="hackathon-heading" className="text-2xl font-bold text-zinc-100">
                 {selectedHackathon.name}
               </h1>
@@ -466,7 +482,7 @@ export function Hackathon() {
             </div>
             <div className="flex items-center gap-4 text-zinc-400">
               <span className="text-zinc-300">
-                <span aria-hidden="true">⏰</span> Deadline: {new Date(selectedHackathon.deadline).toLocaleDateString()}
+                <Clock className="w-4 h-4 inline stroke-[1.5]" /> Deadline: {new Date(selectedHackathon.deadline).toLocaleDateString()}
               </span>
               {selectedHackathon.active && getTimeRemaining(selectedHackathon) && (
                 <span className="text-pink-400" role="timer" aria-label="Tiempo restante">
@@ -480,13 +496,13 @@ export function Hackathon() {
               <button
                 onClick={() => openHackathonChat(selectedHackathon.id, selectedHackathon.name)}
                 disabled={isOpeningChat}
-                className="px-4 py-2 bg-amber-500 hover:bg-amber-400 rounded-lg text-sm font-medium text-black transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 focus:ring-offset-zinc-900"
+                className="px-4 py-2 bg-magenta/80 hover:bg-magenta rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-magenta focus:ring-offset-2 focus:ring-offset-zinc-900"
                 aria-label="Abrir chat del hackathon"
               >
-                {isOpeningChat ? "Abriendo..." : "💬 Abrir Chat"}
+                {isOpeningChat ? "Abriendo..." : "Abrir Chat"}
               </button>
             )}
-            <button
+            <button hidden
               onClick={handleToggle}
               className={`px-4 py-2 rounded-lg text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-zinc-900 ${
                 selectedHackathon.active
@@ -500,7 +516,7 @@ export function Hackathon() {
             </button>
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="px-4 py-2 bg-red-600/20 hover:bg-red-600/40 border border-red-600/50 rounded-lg text-sm text-red-400 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="px-4 py-2 bg-magenta/20 hover:bg-magenta/40 border border-magenta/50 rounded-lg text-sm text-magenta transition-colors focus:outline-none focus:ring-2 focus:ring-magenta"
               aria-label="Eliminar hackathon"
             >
               Eliminar
@@ -515,7 +531,7 @@ export function Hackathon() {
               href={selectedHackathon.hackathonUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-pink-400 hover:text-pink-300 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500 rounded"
+              className="text-pink-400 hover:text-pink-300 text-sm focus:outline-none focus:ring-2 focus:ring-magenta rounded"
             >
               🔗 Página del hackathon
             </a>
@@ -525,17 +541,17 @@ export function Hackathon() {
               href={selectedHackathon.resourcesUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-pink-400 hover:text-pink-300 text-sm focus:outline-none focus:ring-2 focus:ring-pink-500 rounded"
+              className="text-pink-400 hover:text-pink-300 text-sm focus:outline-none focus:ring-2 focus:ring-magenta rounded"
             >
-              📚 Recursos
+              Recursos
             </a>
           )}
         </nav>
 
         {/* Phase Grid */}
         <section aria-label="Fases del hackathon">
-          <div className="grid grid-cols-4 gap-4 mb-8" role="list">
-            {selectedHackathon.phases.slice(0, 4).map((phase) => (
+          <div className="grid grid-cols-3 gap-4 mb-8" role="list">
+            {selectedHackathon.phases.slice(0, 3).map((phase) => (
               <PhaseCard
                 key={phase.number}
                 number={phase.number}
@@ -544,8 +560,8 @@ export function Hackathon() {
               />
             ))}
           </div>
-          <div className="grid grid-cols-4 gap-4 mb-8" role="list">
-            {selectedHackathon.phases.slice(4, 8).map((phase) => (
+          <div className="grid grid-cols-3 gap-4 mb-8" role="list">
+            {selectedHackathon.phases.slice(3, 6).map((phase) => (
               <PhaseCard
                 key={phase.number}
                 number={phase.number}
@@ -554,21 +570,22 @@ export function Hackathon() {
               />
             ))}
           </div>
-          <div className="flex justify-center mb-8" role="list">
-            <div className="w-1/4">
+          <div className="grid grid-cols-3 gap-4 mb-8" role="list">
+            {selectedHackathon.phases.slice(6, 9).map((phase) => (
               <PhaseCard
-                number={8}
-                status={selectedHackathon.phases[8].status}
-                onClick={() => setSelectedPhase(8)}
+                key={phase.number}
+                number={phase.number}
+                status={phase.status}
+                onClick={() => setSelectedPhase(phase.number)}
               />
-            </div>
+            ))}
           </div>
         </section>
 
         {/* Progress Bar */}
         <section aria-label="Progreso del hackathon">
           <div 
-            className="bg-zinc-800 rounded-full h-4 overflow-hidden"
+            className="bg-zinc-800/50 rounded-sm h-3 overflow-hidden"
             role="progressbar"
             aria-valuenow={getProgress(selectedHackathon)}
             aria-valuemin={0}
@@ -576,7 +593,7 @@ export function Hackathon() {
             aria-label={`Progreso: ${getProgress(selectedHackathon)}%`}
           >
             <div
-              className="bg-gradient-to-r from-pink-500 to-purple-500 h-full transition-all duration-500"
+              className="bg-magenta h-full transition-all duration-500"
               style={{ width: getProgress(selectedHackathon) + "%" }}
             />
           </div>
@@ -594,7 +611,7 @@ export function Hackathon() {
       <header className="flex items-center justify-between mb-8">
         <div>
           <h1 id="list-heading" className="text-2xl font-bold text-zinc-100 flex items-center gap-3">
-            <span className="text-3xl" aria-hidden="true">🏆</span>
+            <Trophy className="w-8 h-8 text-amber-400 stroke-[1.5]" />
             Mis Hackathons
           </h1>
           <p className="text-zinc-400 mt-1">
@@ -603,7 +620,7 @@ export function Hackathon() {
         </div>
         <button
           onClick={() => setIsConfiguring(true)}
-          className="px-4 py-2 bg-pink-500 hover:bg-pink-600 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 focus:ring-offset-zinc-900"
+          className="px-4 py-2 bg-pink-500 hover:bg-pink-600 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-magenta focus:ring-offset-2 focus:ring-offset-zinc-900"
           aria-label="Crear nuevo hackathon"
         >
           + Nuevo hackathon
@@ -616,7 +633,7 @@ export function Hackathon() {
             <li key={hackathon.id}>
               <button
                 onClick={() => setSelectedHackathon(hackathon)}
-                className="w-full text-left p-6 bg-zinc-800/50 border border-zinc-700 rounded-lg hover:border-pink-500/50 transition-colors focus:outline-none focus:ring-2 focus:ring-pink-500"
+                className="w-full text-left p-6 bg-zinc-800/50 border border-zinc-700 rounded-lg hover:border-pink-500/50 transition-colors focus:outline-none focus:ring-2 focus:ring-magenta"
                 aria-label={`Abrir ${hackathon.name}, ${getProgress(hackathon)}% completado`}
               >
                 <div className="flex items-center justify-between mb-3">
@@ -633,7 +650,7 @@ export function Hackathon() {
                 </div>
                 
                 <div className="flex items-center gap-2 text-sm text-zinc-400 mb-3">
-                  <span aria-hidden="true">⏰</span>
+                  <Clock className="w-4 h-4 inline stroke-[1.5]" />
                   <span>{new Date(hackathon.deadline).toLocaleDateString()}</span>
                   {hackathon.active && (
                     <span className="text-pink-400">• {getTimeRemaining(hackathon)}</span>
@@ -649,7 +666,7 @@ export function Hackathon() {
                   aria-valuemax={100}
                 >
                   <div
-                    className="bg-gradient-to-r from-pink-500 to-purple-500 h-full transition-all"
+                    className="bg-magenta h-full transition-all"
                     style={{ width: getProgress(hackathon) + "%" }}
                   />
                 </div>

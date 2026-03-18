@@ -1,17 +1,19 @@
 import type { ActionCard as ActionCardType } from "@godinez/types";
 import { content } from "@/lib/content";
+import { FolderPlus, CheckSquare, FilePlus, Rocket, StickyNote, Zap } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 // Hackathon action types
 const HACKATHON_TYPES = new Set(["hackathon_advance", "hackathon_note"]);
 
 const { actions: t } = content.studio;
 
-const TYPE_ICONS: Record<string, string> = {
-  create_project: "📁",
-  create_task: "✅",
-  create_file: "📄",
-  hackathon_advance: "🚀",
-  hackathon_note: "📝",
+const TYPE_ICONS: Record<string, LucideIcon> = {
+  create_project: FolderPlus,
+  create_task: CheckSquare,
+  create_file: FilePlus,
+  hackathon_advance: Rocket,
+  hackathon_note: StickyNote,
 };
 
 interface ActionCardProps {
@@ -38,7 +40,7 @@ export function ActionCard({
       onExecute(Number(messageId), action.id);
     }
   };
-  const icon = TYPE_ICONS[action.type] || "⚡";
+  const Icon = TYPE_ICONS[action.type] || Zap;
   const isPending = action.status === "pending";
   const isExecuting = action.status === "executing";
   const isCompleted = action.status === "completed";
@@ -57,7 +59,7 @@ export function ActionCard({
       }`}
     >
       <div className="flex items-center gap-2">
-        <span className="text-base">{icon}</span>
+        <Icon className="w-4 h-4 stroke-[1.5]" />
         <span className="flex-1 text-sm font-medium text-[hsl(var(--foreground))]">
           {action.label}
         </span>

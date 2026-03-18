@@ -203,13 +203,13 @@ export function useHackathons(workspaceId: number | undefined) {
 }
 
 export const PHASE_NAMES = [
-  "Cargar Info",
-  "Idear",
-  "Validar",
-  "Planear MVP",
-  "Construir",
-  "Testear",
-  "Deploy",
-  "Pitch",
-  "Entregar",
+  "Información del hackathon",
+  "Ideación y definición del proyecto",
+  "Planificación y alcance del MVP",
+  "Diseño y estructura (Frontend)",
+  "Funcionalidad core (Backend + lógica)",
+  "Ajustes y testing",
+  "Lanzar el proyecto",
+  "Demo y pitch",
+  "Entrega",
 ];
