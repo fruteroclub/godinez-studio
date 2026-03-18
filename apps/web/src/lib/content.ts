@@ -1,7 +1,7 @@
 export const content = {
   studio: {
     sidebar: {
-      dashboard: "Dashboard",
+      dashboard: "Espacio de trabajo",
       chat: "Chat",
       projects: "Proyectos",
       agent: "Agente",
@@ -207,13 +207,13 @@ export const content = {
       userNamePlaceholder: "Tu nombre",
       userRoleLabel: "¿Cuál es tu rol?",
       roles: {
-        founder: "🚀 Fundador/CEO",
-        marketing: "📣 Marketing",
-        sales: "💼 Ventas",
-        operations: "⚙️ Operaciones",
-        tech: "💻 Tecnología",
-        support: "🎧 Soporte",
-        other: "🧩 Otro",
+        founder: "Fundador/CEO",
+        marketing: "Marketing",
+        sales: "Ventas",
+        operations: "Operaciones",
+        tech: "Tecnología",
+        support: "Soporte",
+        other: "Otro",
       } as Record<string, string>,
       businessDescriptionLabel: "¿A qué se dedica tu negocio?",
       businessDescriptionPlaceholder: "Ej: Vendo ropa por Instagram, Agencia de diseño web...",

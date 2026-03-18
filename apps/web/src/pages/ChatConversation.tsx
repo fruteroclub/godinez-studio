@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
+import { Trophy, Clock } from "lucide-react";
 import { useAuth } from "@clerk/clerk-react";
 import { apiFetch } from "@/lib/api";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
@@ -59,6 +60,7 @@ async function reportError(error: unknown, context: { path: string; action: stri
 export default function ChatConversation() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const { workspace, slug } = useWorkspace();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const { getToken } = useAuth();
   
@@ -386,20 +388,28 @@ export default function ChatConversation() {
       <div className="flex h-[calc(100vh-4rem)] flex-col">
         {/* Hackathon Banner */}
         {isHackathon && hackathonData && (
-          <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-b border-amber-500/30 px-4 py-2">
+          <div className="bg-[#d09306] border-b border-[#b8820a] px-4 py-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="text-lg">🏆</span>
-                <span className="font-medium text-amber-200">{hackathonData.name}</span>
-                <span className="text-zinc-500">·</span>
-                <span className="text-sm text-zinc-400">Fase {hackathonData.currentPhase} de 8</span>
+                <Trophy className="w-5 h-5 text-white stroke-[1.5]" />
+                <span className="font-medium text-white">{hackathonData.name}</span>
+                <span className="text-white/70">·</span>
+                <span className="text-sm text-white/80">Fase {hackathonData.currentPhase} de 8</span>
               </div>
-              {hackathonTimeRemaining && (
-                <div className="flex items-center gap-2 text-sm">
-                  <span>🏆</span>
-                  <span className="text-amber-400">{hackathonTimeRemaining}</span>
-                </div>
-              )}
+              <div className="flex items-center gap-3">
+                {hackathonTimeRemaining && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="w-4 h-4 text-white stroke-[1.5]" />
+                    <span className="text-white">{hackathonTimeRemaining}</span>
+                  </div>
+                )}
+                <button
+                  onClick={() => navigate(`/studio/${slug}/hackathon?selected=${hackathonId}`)}
+                  className="px-3 py-1 text-sm bg-black/20 hover:bg-black/30 rounded-lg text-white transition-colors"
+                >
+                  ← Volver a fases
+                </button>
+              </div>
             </div>
           </div>
         )}
