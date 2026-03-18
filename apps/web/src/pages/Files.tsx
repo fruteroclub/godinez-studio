@@ -67,17 +67,22 @@ export default function Files() {
       {/* Delete Confirmation Modal */}
       {fileToDelete && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-zinc-800 rounded-xl p-6 max-w-md w-full border border-zinc-700 shadow-xl">
-            <h2 className="text-xl font-semibold text-zinc-100 mb-3">
-              🗑️ ¿Eliminar archivo?
-            </h2>
-            <p className="text-zinc-400 mb-4">
-              Esto eliminará <strong className="text-zinc-200">{fileToDelete.filename}</strong> permanentemente. Esta acción no se puede deshacer.
+          <div className="bg-[hsl(var(--card))] rounded-xl p-6 max-w-md w-full border border-[hsl(var(--border))] shadow-xl">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 rounded-full bg-red-500/10">
+                <Trash2 className="w-5 h-5 text-red-500 stroke-[1.5]" />
+              </div>
+              <h2 className="text-xl font-semibold text-[hsl(var(--foreground))]">
+                ¿Eliminar archivo?
+              </h2>
+            </div>
+            <p className="text-[hsl(var(--muted-foreground))] mb-4">
+              Esto eliminará <strong className="text-[hsl(var(--foreground))]">{fileToDelete.filename}</strong> permanentemente. Esta acción no se puede deshacer.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setFileToDelete(null)}
-                className="flex-1 px-4 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-zinc-500 text-zinc-200"
+                className="flex-1 px-4 py-2 bg-[hsl(var(--muted))] hover:bg-[hsl(var(--accent))] rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-[hsl(var(--ring))] text-[hsl(var(--foreground))]"
               >
                 Cancelar
               </button>
@@ -99,7 +104,6 @@ export default function Files() {
           </div>
         </div>
       )}
-
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-[hsl(var(--foreground))]">
           {fc.title}

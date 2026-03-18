@@ -168,7 +168,7 @@ export default function Sidebar({
                     key={item.href}
                     to={item.disabled ? "#" : item.href}
                     onClick={item.disabled ? (e) => e.preventDefault() : onNavigate}
-                    className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+                    className={`flex items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors ${
                       item.disabled
                         ? "opacity-70 cursor-not-allowed text-[hsl(var(--sidebar-foreground))]/[0.27]"
                         : item.highlight === "amber"
@@ -198,7 +198,7 @@ export default function Sidebar({
       </nav>
 
       {/* Configuration Section */}
-      <nav className="space-y-1 border-t border-[hsl(var(--sidebar-border))] px-2 py-2">
+      <nav className="border-t border-[hsl(var(--sidebar-border))] px-2 py-2">
         <div className="px-3 py-1 text-[10px] font-semibold tracking-wider text-[hsl(var(--sidebar-foreground))]/[0.27] uppercase">
           CONFIGURACIÓN
         </div>
@@ -209,7 +209,7 @@ export default function Sidebar({
               key={item.href}
               to={item.disabled ? "#" : item.href}
               onClick={item.disabled ? (e) => e.preventDefault() : onNavigate}
-              className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors ${
+              className={`flex items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors ${
                 item.disabled
                   ? "opacity-70 cursor-not-allowed text-[hsl(var(--sidebar-foreground))]/[0.27]"
                   : isActive(item.href)
