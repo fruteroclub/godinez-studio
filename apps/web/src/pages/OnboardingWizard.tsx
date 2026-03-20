@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@clerk/clerk-react";
 import { useCreateWorkspace } from "@/hooks/use-workspace";
 import { useProvision } from "@/hooks/use-provision";
+import { apiFetch } from "@/lib/api";
 import { content } from "@/lib/content";
+import type { Workspace } from "@godinez/types";
 
 const { onboarding } = content.studio;
 
@@ -38,6 +41,7 @@ type Step = 1 | 2 | 3 | 4;
 
 export default function OnboardingWizard() {
   const navigate = useNavigate();
+  const { getToken } = useAuth();
   const createWorkspace = useCreateWorkspace();
 
   // Form state
@@ -103,28 +107,53 @@ export default function OnboardingWizard() {
     setIsProvisioning(true);
 
     try {
-      // 1. Create workspace
-      const ws = await createWorkspace.mutateAsync(workspaceName.trim());
+      let ws: Workspace;
+
+      // 1. Create workspace — recover gracefully if it already exists
+      try {
+        ws = await createWorkspace.mutateAsync(workspaceName.trim());
+      } catch (createErr) {
+        const createMsg = createErr instanceof Error ? createErr.message : "";
+        if (createMsg.includes("WORKSPACE_LIMIT")) {
+          // Workspace already exists — fetch it and continue with provision
+          const token = await getToken();
+          const workspaces = await apiFetch<Workspace[]>("/api/workspaces", { token });
+          if (!workspaces || workspaces.length === 0) throw createErr;
+          ws = workspaces[0];
+        } else {
+          throw createErr;
+        }
+      }
+
       setProvisionSlug(ws.slug);
 
       // 2. Provision agent
-      const result = await provision.mutateAsync({
-        workspaceId: ws.id,
-        userName: userName.trim(),
-        agentName: agentName.trim(),
-        personality,
-        needs: selectedNeeds,
-        userRole,
-        businessDescription: businessDescription.trim(),
-      });
+      let result: { agent: { id: number; openclawId: string; name: string }; conversationId: number };
+      try {
+        result = await provision.mutateAsync({
+          workspaceId: ws.id,
+          userName: userName.trim(),
+          agentName: agentName.trim(),
+          personality,
+          needs: selectedNeeds,
+          userRole,
+          businessDescription: businessDescription.trim(),
+        });
+      } catch (provisionErr) {
+        const provisionMsg = provisionErr instanceof Error ? provisionErr.message : "";
+        if (provisionMsg.includes("already has an agent")) {
+          // Agent already provisioned — navigate to workspace dashboard
+          navigate(`/studio/${ws.slug}`);
+          return;
+        }
+        throw provisionErr;
+      }
 
       // 3. Navigate to chat
       navigate(`/studio/${ws.slug}/chat/${result.conversationId}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("WORKSPACE_LIMIT")) {
-        setProvisionError(onboarding.workspaceLimit);
-      } else if (msg.includes("CAPACITY_FULL")) {
+      if (msg.includes("CAPACITY_FULL")) {
         setProvisionError(onboarding.capacityFull);
       } else if (msg.includes("GATEWAY_OFFLINE")) {
         setProvisionError(onboarding.gatewayOffline);
