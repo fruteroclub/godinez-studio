@@ -155,6 +155,21 @@ app.post(
       log.warn({ slot: slotName, err: msg }, "SOUL.md injection failed (non-fatal)");
     }
 
+    // 8b. Copy auth-profiles.json from main agent (non-fatal)
+    // Required for external channel integrations (Telegram, Discord per-agent).
+    // Studio WebSocket chat works without it, but we copy proactively for future-proofing.
+    try {
+      const authFile = await relay.agentsFilesGet(agents.mainKey, "agent/auth-profiles.json");
+      if (authFile.content) {
+        await relay.agentsFilesSet(agentResult.agentId, "agent/auth-profiles.json", authFile.content);
+        log.info({ slot: slotName }, "auth-profiles.json copied from main");
+      }
+    } catch (err) {
+      // Non-fatal — Studio chat works via WebSocket without this file
+      const msg = err instanceof Error ? err.message : "auth-profiles copy failed";
+      log.warn({ slot: slotName, err: msg }, "auth-profiles.json copy failed (non-fatal)");
+    }
+
     // 9. Insert DB agent
     log.debug("inserting DB agent");
     const slug = `${workspace.slug}-agent`;
