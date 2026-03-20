@@ -206,92 +206,64 @@ openclaw agents list     # should show "main" agent
 openclaw onboard --install-daemon
 ```
 
-## Step 7 — Provision Agent Slots
+## Step 7 — Prepare Agent Slot Directories
 
-This is the critical step. Each Studio user gets assigned one agent slot. Slots must be pre-provisioned with:
-1. An OpenClaw agent (name + workspace dir)
-2. Auth credentials (`auth-profiles.json` copied from `main`)
+Prepare the workspace and auth directories for each slot. **Do NOT create agents in OpenClaw here** — the Studio API creates them on demand when the first user is provisioned. Pre-creating agents breaks the API's slot detection logic (it uses `agents.list` to find available slots — if all slots already exist, it sees them all as occupied and returns `CAPACITY_FULL`).
 
-> **Why pre-provision?** OpenClaw's `agents.create` does NOT copy auth credentials from the `main` agent. Without `auth-profiles.json`, a slot will accept `chat.send` (return `status: "started"`) but **silently never respond** — no error, no events. This is the #1 cause of "agent created but never responds".
+> **auth-profiles.json:** The Studio API copies this automatically from the `main` agent during provisioning (step 8b in `provision.ts`). You only need to ensure the `main` agent has valid credentials configured before this instance receives traffic.
 
-### Provisioning script
+### Setup script
 
 Run this on the EC2 as the openclaw user:
 
 ```bash
 #!/bin/bash
-# provision-slots.sh — Pre-provision 15 agent slots for Godinez Studio
+# prepare-slots.sh — Prepare workspace directories for Godinez Studio agent slots
 # Run as the openclaw user on the EC2 instance
+# Does NOT create OpenClaw agents — the Studio API handles that on demand.
 
 set -euo pipefail
 
-SLOTS=15
+SLOTS=50
 USER_HOME=$(eval echo ~)
-AUTH_SOURCE="$USER_HOME/.openclaw/agents/main/agent/auth-profiles.json"
 
-# Verify auth source exists
-if [ ! -f "$AUTH_SOURCE" ]; then
-  echo "ERROR: main agent auth-profiles.json not found at $AUTH_SOURCE"
-  echo "Run 'openclaw onboard' first to configure the main agent."
-  exit 1
-fi
-
-echo "Provisioning $SLOTS agent slots..."
+echo "Preparing $SLOTS slot directories..."
 
 for i in $(seq 1 $SLOTS); do
   SLOT="godin-slot-$i"
-  AGENT_DIR="$USER_HOME/.openclaw/agents/$SLOT/agent"
   WORKSPACE_DIR="$USER_HOME/.openclaw/workspaces/$SLOT"
 
-  # Check if agent already exists
-  if openclaw agents list --json 2>/dev/null | grep -q "\"id\":\"$SLOT\""; then
-    echo "[$SLOT] already exists — ensuring auth-profiles"
-  else
-    echo "[$SLOT] creating agent..."
-    openclaw gateway call agents.create \
-      --params "{\"name\":\"$SLOT\",\"workspace\":\"$WORKSPACE_DIR\"}"
-  fi
-
-  # Copy auth credentials
-  mkdir -p "$AGENT_DIR"
-  cp "$AUTH_SOURCE" "$AGENT_DIR/auth-profiles.json"
-  echo "[$SLOT] auth-profiles.json copied"
+  mkdir -p "$WORKSPACE_DIR"
+  echo "[$SLOT] workspace dir ready: $WORKSPACE_DIR"
 done
 
 echo ""
-echo "Done. Restarting gateway..."
-openclaw gateway restart
-
+echo "Done. $SLOTS slot directories prepared."
+echo "Agents will be created on demand by the Studio API."
 echo ""
-echo "Verifying..."
-openclaw agents list
-echo ""
-echo "Expected: main + $SLOTS godin-slot-N agents"
+echo "Verify:"
+ls "$USER_HOME/.openclaw/workspaces/" | grep godin-slot | wc -l
+echo "directories ready (expected: $SLOTS)"
 ```
 
 Save and run:
 
 ```bash
-chmod +x provision-slots.sh
-./provision-slots.sh
+chmod +x prepare-slots.sh
+./prepare-slots.sh
 ```
 
 ### Verify
 
 ```bash
+# Workspace dirs exist
+ls ~/.openclaw/workspaces/ | grep godin-slot | wc -l
+# should show: 50 (or whatever SLOTS is set to)
+
+# Only "main" exists in OpenClaw — no godin-slot-N agents yet
 openclaw agents list
-# should show: main + godin-slot-1 through godin-slot-15
-# each with workspace at ~/.openclaw/workspaces/godin-slot-N
-
-# spot-check auth
-cat ~/.openclaw/agents/godin-slot-1/agent/auth-profiles.json
-cat ~/.openclaw/agents/godin-slot-15/agent/auth-profiles.json
-# both should contain valid credentials
-
-# test one slot responds
-openclaw gateway call chat.send \
-  --params '{"sessionKey":"agent:godin-slot-1:test","message":"hello","idempotencyKey":"verify-1"}'
-# should return: { "runId": "verify-1", "status": "started" }
+# should show: only "main"
+# godin-slot-N agents appear here only AFTER a user provisions via Studio
 ```
 
 ## Step 8 — Register Instance in Godinez Studio
@@ -310,7 +282,7 @@ The API uses a **gateway pool** that connects to instances on demand. No gateway
 | URL | `wss://godin-{NNN}-openclaw-gateway.godinez.ai` | From Step 5 (CF Tunnel) |
 | Token | `<token>` | From Step 4 (`~/.openclaw/openclaw.json` → `gateway.auth.token`) |
 | Tier | `shared` or `dedicated` | `shared` for general use |
-| Max slots | `15` | Matches provisioning script |
+| Max slots | `50` | Matches prepare-slots.sh SLOTS value |
 | Region | `us-east-1` | EC2 region |
 
 4. Click **Guardar**
@@ -346,9 +318,10 @@ pnpm dev:web
 # 3. Sign in, create workspace, go through onboarding
 #    API logs should show:
 #    [Provision] Listing agents...
-#    [Provision] Creating agent: godin-slot-1  (NOTE: this reuses pre-provisioned slot)
+#    [Provision] Creating agent: godin-slot-1
 #    [Provision] Agent created: godin-slot-1
 #    [Provision] SOUL.md injected for godin-slot-1
+#    [Provision] auth-profiles.json copied from main
 
 # 4. Send a chat message — agent should respond with SSE streaming
 
@@ -371,7 +344,7 @@ openclaw gateway restart
 
 | Resource | Value | Notes |
 |----------|-------|-------|
-| Agent slots | 15 | `AGENT_MAX_SLOTS` env var, soft limit |
+| Agent slots | 50 | `AGENT_MAX_SLOTS` env var, matches `max_slots` in DB |
 | Concurrent requests | 4 | `agents.maxConcurrent` in openclaw.json |
 | Subagent concurrency | 8 | `agents.subagents.maxConcurrent` |
 | Workspace disk | ~5 MB/agent | Grows with MEMORY.md, session logs |
