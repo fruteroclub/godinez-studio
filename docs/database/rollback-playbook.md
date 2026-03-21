@@ -1,150 +1,150 @@
-# Playbook de Rollback — Godinez Studio
+# Rollback Playbook — Godinez Studio
 
-## ¿Por qué necesitamos rollbacks?
+## Why do we need rollbacks?
 
-Una migración puede fallar o causar problemas: un campo que rompe la app, un índice que frena queries, una tabla que no debía existir. El rollback es el proceso de **revertir esos cambios** para volver a un estado estable.
+A migration can fail or cause problems: a field that breaks the app, an index that slows down queries, a table that shouldn't exist. A rollback is the process of **reverting those changes** to return to a stable state.
 
-**Drizzle no tiene rollback nativo.** No genera archivos `down`. Esto significa que los rollbacks son manuales — por eso es crítico tener procedimientos claros.
+**Drizzle has no native rollback.** It doesn't generate `down` files. This means rollbacks are manual — that's why it's critical to have clear procedures.
 
-## Niveles de severidad
+## Severity levels
 
-| Nivel | Situación | Tiempo para actuar | Quién actúa |
-|-------|-----------|-------------------|-------------|
-| 🟢 **Bajo** | Migración agregó algo innecesario (columna, tabla) — la app funciona | Horas/días | Cualquier dev |
-| 🟡 **Medio** | Migración rompió una feature — la app funciona parcialmente | Minutos | Tech Lead (Scarf) |
-| 🔴 **Crítico** | Migración tiró la app o corrompió datos | Inmediato | Tech Lead + Mel |
+| Level | Situation | Time to act | Who acts |
+|-------|-----------|-------------|----------|
+| 🟢 **Low** | Migration added something unnecessary (column, table) — app works fine | Hours/days | Any dev |
+| 🟡 **Medium** | Migration broke a feature — app works partially | Minutes | Tech Lead (Scarf) |
+| 🔴 **Critical** | Migration took down the app or corrupted data | Immediate | Tech Lead + Mel |
 
-## Procedimiento general de rollback
+## General rollback procedure
 
-### Antes de hacer cualquier cosa
+### Before doing anything
 
 ```
-1. NO entrar en pánico
-2. Verificar qué migración causó el problema
-3. Revisar el archivo SQL de esa migración en apps/api/drizzle/
-4. Determinar el nivel de severidad
-5. Elegir la estrategia de rollback apropiada
+1. DON'T panic
+2. Identify which migration caused the problem
+3. Review the SQL file for that migration in apps/api/drizzle/
+4. Determine the severity level
+5. Choose the appropriate rollback strategy
 ```
 
-## Estrategias de rollback
+## Rollback strategies
 
-### Estrategia 1 — Revertir SQL manualmente (más común)
+### Strategy 1 — Revert SQL manually (most common)
 
-Para cuando la migración hizo cambios estructurales (ALTER, CREATE, DROP) y necesitas deshacerlos.
+For when the migration made structural changes (ALTER, CREATE, DROP) and you need to undo them.
 
-**Paso 1:** Identifica qué hizo la migración. Abre el archivo SQL correspondiente.
+**Step 1:** Identify what the migration did. Open the corresponding SQL file.
 
-**Paso 2:** Escribe el SQL inverso. La lógica es simple:
+**Step 2:** Write the inverse SQL. The logic is simple:
 
-| La migración hizo... | El rollback hace... |
+| The migration did... | The rollback does... |
 |----------------------|---------------------|
 | `CREATE TABLE x` | `DROP TABLE x` |
 | `ALTER TABLE x ADD COLUMN y` | `ALTER TABLE x DROP COLUMN y` |
 | `CREATE INDEX idx` | `DROP INDEX idx` |
-| `ALTER TABLE x ALTER COLUMN y SET DEFAULT z` | `ALTER TABLE x ALTER COLUMN y SET DEFAULT <valor_anterior>` |
+| `ALTER TABLE x ALTER COLUMN y SET DEFAULT z` | `ALTER TABLE x ALTER COLUMN y SET DEFAULT <previous_value>` |
 | `ALTER TABLE x ADD CONSTRAINT fk` | `ALTER TABLE x DROP CONSTRAINT fk` |
 
-**Paso 3:** Pide a Mel la `DATABASE_URL` del entorno afectado (dev o prod).
+**Step 3:** Ask Mel for the `DATABASE_URL` of the affected environment (dev or prod).
 
-**Paso 4:** Ejecuta el SQL de rollback. Puedes usar Drizzle Studio o conectarte directo:
+**Step 4:** Execute the rollback SQL. You can use Drizzle Studio or connect directly:
 
 ```bash
-# Opción A: Drizzle Studio (visual, más seguro para verificar)
+# Option A: Drizzle Studio (visual, safer for verification)
 cd apps/api
 pnpm db:studio
-# → Abre la UI → usa la consola SQL para ejecutar el rollback
+# → Open the UI → use the SQL console to execute the rollback
 
-# Opción B: psql directo (más rápido)
-psql "postgresql://user:pass@host:port/dbname" -c "TU SQL DE ROLLBACK AQUÍ"
+# Option B: psql directly (faster)
+psql "postgresql://user:pass@host:port/dbname" -c "YOUR ROLLBACK SQL HERE"
 ```
 
-**Paso 5:** Verifica que el rollback se aplicó correctamente en Drizzle Studio.
+**Step 5:** Verify that the rollback was applied correctly in Drizzle Studio.
 
-**Paso 6:** Revierte el commit del schema TypeScript en el PR (o crea un PR nuevo con el revert).
+**Step 6:** Revert the TypeScript schema commit in the PR (or create a new PR with the revert).
 
-### Estrategia 2 — Restaurar backup de la DB (emergencias)
+### Strategy 2 — Restore DB backup (emergencies)
 
-Para cuando la migración corrompió datos o es demasiado compleja para revertir manualmente.
+For when the migration corrupted data or is too complex to revert manually.
 
-> **Solo Mel puede ejecutar esto** — requiere acceso a Railway.
+> **Only Mel can execute this** — requires Railway access.
 
 ```
-1. Mel accede a Railway → PostgreSQL service → Backups
-2. Identifica el backup más reciente ANTES de la migración
-3. Restaura ese backup
-4. Verifica que la app funciona
-5. Comunica al equipo que se perdieron datos desde el backup hasta ahora
+1. Mel accesses Railway → PostgreSQL service → Backups
+2. Identifies the most recent backup BEFORE the migration
+3. Restores that backup
+4. Verifies the app works
+5. Communicates to the team that data was lost from the backup until now
 ```
 
-**Riesgo:** Se pierden TODOS los datos insertados después del backup. Usar solo como último recurso.
+**Risk:** ALL data inserted after the backup is lost. Use only as a last resort.
 
-### Estrategia 3 — Migración compensatoria (preferida para producción)
+### Strategy 3 — Compensatory migration (preferred for production)
 
-En lugar de revertir, creas una **nueva migración** que corrige el problema. Es la opción más segura porque:
-- No pierdes datos
-- Queda registro en el historial de migraciones
-- Se puede revisar en PR como cualquier otro cambio
+Instead of reverting, you create a **new migration** that fixes the problem. This is the safest option because:
+- No data loss
+- It's recorded in the migration history
+- It can be reviewed in a PR like any other change
 
 ```bash
-# 1. Corrige el schema TypeScript
-# 2. Genera nueva migración
+# 1. Fix the TypeScript schema
+# 2. Generate new migration
 cd apps/api
 pnpm db:generate
 
-# 3. Revisa el SQL generado — debe ser el "inverso" del problema
-# 4. Aplica
+# 3. Review the generated SQL — it should be the "inverse" of the problem
+# 4. Apply
 pnpm db:push
 
-# 5. Incluye en un PR de hotfix
+# 5. Include in a hotfix PR
 ```
 
-## Ejemplos reales con nuestras migraciones
+## Real examples with our migrations
 
-Basados en las migraciones que tenemos en `apps/api/drizzle/`:
+Based on the migrations we have in `apps/api/drizzle/`:
 
-### Ejemplo: Rollback de `0004_mute_la_nuit.sql`
+### Example: Rollback of `0004_mute_la_nuit.sql`
 
-Esta migración agregó `conversation_id` a `files` con FK e índice.
+This migration added `conversation_id` to `files` with FK and index.
 
 ```sql
--- Migración original (0004):
+-- Original migration (0004):
 -- ALTER TABLE "files" ADD COLUMN "conversation_id" integer;
 -- ALTER TABLE "files" ADD CONSTRAINT "files_conversation_id_conversations_id_fk" ...
 -- CREATE INDEX "files_conversation_id_idx" ...
 
--- SQL de rollback:
+-- Rollback SQL:
 DROP INDEX IF EXISTS "files_conversation_id_idx";
 ALTER TABLE "files" DROP CONSTRAINT IF EXISTS "files_conversation_id_conversations_id_fk";
 ALTER TABLE "files" DROP COLUMN IF EXISTS "conversation_id";
 ```
 
-### Ejemplo: Rollback de `0003_ordinary_maria_hill.sql`
+### Example: Rollback of `0003_ordinary_maria_hill.sql`
 
-Esta migración creó tablas `errors` y `feedback`, y cambió un default.
+This migration created `errors` and `feedback` tables, and changed a default.
 
 ```sql
--- SQL de rollback:
+-- Rollback SQL:
 DROP TABLE IF EXISTS "feedback";
 DROP TABLE IF EXISTS "errors";
 ALTER TABLE "gateway_instances" ALTER COLUMN "max_slots" SET DEFAULT 15;
 ```
 
-### Ejemplo: Rollback de `0001_premium_dark_phoenix.sql`
+### Example: Rollback of `0001_premium_dark_phoenix.sql`
 
-Esta migración agregó columnas a tablas existentes.
+This migration added columns to existing tables.
 
 ```sql
--- SQL de rollback:
+-- Rollback SQL:
 ALTER TABLE "conversations" DROP COLUMN IF EXISTS "is_hackathon";
 ALTER TABLE "gateway_instances" DROP COLUMN IF EXISTS "workspace_base";
 ```
 
-### Ejemplo: Rollback de `0002_sharp_blue_blade.sql` (compleja)
+### Example: Rollback of `0002_sharp_blue_blade.sql` (complex)
 
-Esta migración creó tabla `hackathon_progress`, agregó columnas, FKs, y muchos índices. El rollback es largo:
+This migration created the `hackathon_progress` table, added columns, FKs, and many indexes. The rollback is lengthy:
 
 ```sql
--- SQL de rollback (en orden inverso):
+-- Rollback SQL (in reverse order):
 DROP INDEX IF EXISTS "workspace_members_user_id_idx";
 DROP INDEX IF EXISTS "tasks_project_id_idx";
 DROP INDEX IF EXISTS "tasks_workspace_status_idx";
@@ -162,54 +162,54 @@ ALTER TABLE "conversations" DROP COLUMN IF EXISTS "hackathon_id";
 DROP TABLE IF EXISTS "hackathon_progress";
 ```
 
-> **Nota:** El orden importa — primero dropeas lo que depende (índices, FKs) y después las columnas/tablas.
+> **Note:** Order matters — first drop what depends on other things (indexes, FKs) and then the columns/tables.
 
-## Checklist pre-migración (prevención)
+## Pre-migration checklist (prevention)
 
-Antes de aplicar cualquier migración en dev o prod:
+Before applying any migration in dev or prod:
 
-- [ ] ¿Revisaste el SQL completo de la migración?
-- [ ] ¿Tienes el SQL de rollback escrito y listo? (guárdalo en algún lado antes de aplicar)
-- [ ] ¿Confirmaste con Mel que hay un backup reciente de la DB?
-- [ ] ¿La migración fue probada en local primero?
-- [ ] ¿El PR fue aprobado por el Tech Lead?
+- [ ] Did you review the complete migration SQL?
+- [ ] Do you have the rollback SQL written and ready? (save it somewhere before applying)
+- [ ] Did you confirm with Mel that there's a recent DB backup?
+- [ ] Was the migration tested locally first?
+- [ ] Was the PR approved by the Tech Lead?
 
-## Checklist post-migración
+## Post-migration checklist
 
-Después de aplicar:
+After applying:
 
-- [ ] ¿La app levanta sin errores?
-- [ ] ¿Las features principales funcionan? (login, chat, crear proyecto)
-- [ ] ¿Drizzle Studio muestra la estructura esperada?
-- [ ] ¿No hay errores nuevos en los logs?
+- [ ] Does the app start without errors?
+- [ ] Do the main features work? (login, chat, create project)
+- [ ] Does Drizzle Studio show the expected structure?
+- [ ] Are there any new errors in the logs?
 
-## Comunicación durante un rollback
+## Communication during a rollback
 
-### Canal: Discord #godinez-studio o DM según severidad
+### Channel: Discord #godinez-studio or DM depending on severity
 
-**Template para reportar:**
+**Reporting template:**
 
 ```
-🚨 ROLLBACK EN PROGRESO
-Entorno: [dev/prod]
-Migración: [nombre del archivo SQL]
-Problema: [qué se rompió]
-Estrategia: [manual/backup/compensatoria]
-Estado: [en progreso/completado/bloqueado]
+🚨 ROLLBACK IN PROGRESS
+Environment: [dev/prod]
+Migration: [SQL file name]
+Problem: [what broke]
+Strategy: [manual/backup/compensatory]
+Status: [in progress/completed/blocked]
 ```
 
-**Quién notificar:**
+**Who to notify:**
 
-| Severidad | Notificar a |
-|-----------|-------------|
-| 🟢 Bajo | Canal del equipo |
-| 🟡 Medio | Scarf + Mel por DM |
-| 🔴 Crítico | Scarf + Mel + Bryan por DM inmediato |
+| Severity | Notify |
+|----------|--------|
+| 🟢 Low | Team channel |
+| 🟡 Medium | Scarf + Mel via DM |
+| 🔴 Critical | Scarf + Mel + Bryan via DM immediately |
 
-## Contactos clave
+## Key contacts
 
-| Persona | Rol | Cuándo contactar |
-|---------|-----|-----------------|
-| **Mel (@melAO)** | Acceso a Railway + DB credentials | Necesitas `DATABASE_URL`, backups, o acceso a producción |
-| **Scarf** | Tech Lead — aprobación de migraciones | Review de SQL, decisión de estrategia de rollback |
-| **Bryan** | Product Lead | Impacto a usuarios, comunicación externa |
+| Person | Role | When to contact |
+|--------|------|----------------|
+| **Mel (@melAO)** | Railway access + DB credentials | You need `DATABASE_URL`, backups, or production access |
+| **Scarf** | Tech Lead — migration approval | SQL review, rollback strategy decisions |
+| **Bryan** | Product Lead | User impact, external communication |
