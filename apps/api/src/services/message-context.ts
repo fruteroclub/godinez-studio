@@ -35,6 +35,9 @@ export async function buildMessageContext(
   try {
     const conversation = await getConversationById(conversationId);
 
+    // Hackathon conversations get their own context via buildHackathonContext — skip workspace context
+    if (conversation?.isHackathon) return "";
+
     if (conversation?.projectId) {
       return buildProjectContext(conversation.projectId);
     }
