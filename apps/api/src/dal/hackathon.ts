@@ -185,6 +185,12 @@ export async function addHackathonNote(
     throw Errors.hackathonNoteLimitReached(phaseNumber, MAX_NOTES_PER_PHASE);
   }
   
+  // Deduplicate: skip if the exact note already exists in this phase
+  if (currentPhase && currentPhase.notes.includes(note)) {
+    logger.info({ hackathonId, phaseNumber }, "Duplicate note skipped");
+    return hackathon;
+  }
+
   const updatedPhases = hackathon.phases.map((phase) => {
     if (phase.number === phaseNumber) {
       return {
@@ -194,7 +200,7 @@ export async function addHackathonNote(
     }
     return phase;
   });
-  
+
   try {
     const [updated] = await db
       .update(hackathonProgress)
