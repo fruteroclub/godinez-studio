@@ -35,6 +35,7 @@ import {
   prependContext,
 } from "../services/message-context";
 import { buildHackathonContext, type HackathonContext } from "../services/hackathon-context";
+import { buildHistoryContext } from "../services/conversation-history-context";
 import { syncWorkspaceFile } from "../services/workspace-sync";
 import { requireQuota } from "../middleware/require-quota";
 
@@ -113,7 +114,8 @@ app.post(
     // Build context-enriched content for the agent
     const contextHeader = await buildMessageContext(conversationId, workspaceId);
     const hackathonHeader = buildHackathonContext(hackathonContext);
-    const combinedHeader = [hackathonHeader, contextHeader].filter(Boolean).join("\n\n");
+    const historyContext = await buildHistoryContext(conversationId);
+    const combinedHeader = [hackathonHeader, historyContext, contextHeader].filter(Boolean).join("\n\n");
     const enrichedContent = prependContext(combinedHeader, content);
 
     // Send to Gateway or use stub
