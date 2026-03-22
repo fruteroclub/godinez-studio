@@ -103,6 +103,17 @@ export function connectSSE(runId: string, handlers: SSEHandlers, token?: string 
   }
 
   function connect() {
+    // Reset animation state on retry to avoid duplicates
+    if (retryCount > 0) {
+      latestText = "";
+      displayedLength = 0;
+      charDebt = 0;
+      currentSpeed = CHARS_PER_SECOND;
+      started = false;
+      doneReceived = false;
+      doneData = null;
+    }
+
     if (closed) return;
 
     es = new EventSource(url);
