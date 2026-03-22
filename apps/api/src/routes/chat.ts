@@ -18,7 +18,7 @@ import {
 } from "../dal/conversations";
 import { createProject } from "../dal/projects";
 import { createTask } from "../dal/tasks";
-import { updateFileMessageLink, getFileById } from "../dal/files";
+import { updateFileMessageLink, getFileById, createFile as createFileRecord } from "../dal/files";
 import { getWorkspaceById, activateWorkspace } from "../dal/workspaces";
 import { pool } from "../services/gateway-pool";
 import { resolveAgentSession } from "../services/agent-mapping";
@@ -37,6 +37,10 @@ import {
 import { buildHackathonContext, type HackathonContext } from "../services/hackathon-context";
 import { buildHistoryContext } from "../services/conversation-history-context";
 import { syncWorkspaceFile } from "../services/workspace-sync";
+import { storage } from "../services/storage";
+import { db } from "../db";
+import { files as filesTable } from "@godinez/db";
+import { eq, and } from "drizzle-orm";
 import { requireQuota } from "../middleware/require-quota";
 
 const app = new Hono<AuthEnv>();
@@ -193,7 +197,7 @@ app.get("/stream/:runId", async (c) => {
       } catch {
         cleanup();
       }
-    }, 30_000);
+    }, 15_000);
 
     // Check if this is a stub run
     const stubEntry = stubRuns.get(runId);
@@ -494,8 +498,56 @@ app.post(
           break;
         }
         case "create_file": {
-          // Phase 1: file creation is a stub — just mark completed
-          resultId = undefined;
+          const filename = typeof p.filename === "string" ? p.filename : "";
+          const content = typeof p.content === "string" ? p.content : "";
+          
+          if (!filename) {
+            throw new Error("Action payload missing filename");
+          }
+          
+          const buffer = Buffer.from(content, "utf-8");
+          
+          const ext = filename.split(".").pop()?.toLowerCase() || "";
+          const mimeTypes: Record<string, string> = {
+            md: "text/markdown",
+            txt: "text/plain",
+            json: "application/json",
+            js: "application/javascript",
+            ts: "application/typescript",
+            html: "text/html",
+            css: "text/css",
+          };
+          const mimeType = mimeTypes[ext] || "text/plain";
+          
+          const existingFile = await db.query.files.findFirst({
+            where: and(
+              eq(filesTable.workspaceId, workspaceId),
+              eq(filesTable.filename, filename)
+            ),
+          });
+          
+          if (existingFile) {
+            await storage.delete(existingFile.storageKey);
+            const { url, key } = await storage.upload(buffer, filename, mimeType, workspaceId);
+            await db.update(filesTable)
+              .set({ storageKey: key, url, sizeBytes: buffer.length })
+              .where(eq(filesTable.id, existingFile.id));
+            resultId = existingFile.id;
+          } else {
+            const { url, key } = await storage.upload(buffer, filename, mimeType, workspaceId);
+            const file = await createFileRecord({
+              workspaceId,
+              projectId: conversation?.projectId ?? undefined,
+              storageKey: key,
+              url,
+              filename,
+              mimeType,
+              sizeBytes: buffer.length,
+            });
+            resultId = file.id;
+          }
+          
+          syncWorkspaceFile(workspaceId);
           break;
         }
       }
