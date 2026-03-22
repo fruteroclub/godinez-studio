@@ -118,8 +118,8 @@ export default function ChatConversation() {
     () => qc.invalidateQueries({ queryKey: ["hackathon", hackathonId] }),
   );
   
-  // Track which message we already processed to avoid re-execution
-  const processedMessageIdRef = useRef<number | string | null>(null);
+  // Track which messages we already processed to avoid re-execution (Set survives re-renders, not remounts — but prevents duplicates within a mount cycle)
+  const processedMessagesRef = useRef(new Set<number | string>());
 
   // Process hackathon actions when messages change (auto-execute)
   useEffect(() => {
@@ -128,13 +128,13 @@ export default function ChatConversation() {
     const lastMessage = messages[messages.length - 1];
 
     // Skip if we already processed this message
-    if (lastMessage.id === processedMessageIdRef.current) return;
+    if (processedMessagesRef.current.has(lastMessage.id)) return;
 
     // Skip if not agent or no actions
     if (lastMessage.role !== "agent" || !lastMessage.actions?.length) return;
 
     // Mark as processed BEFORE executing
-    processedMessageIdRef.current = lastMessage.id;
+    processedMessagesRef.current.add(lastMessage.id);
 
     console.log("[Hackathon] Processing actions for message:", lastMessage.id, lastMessage.actions);
 
