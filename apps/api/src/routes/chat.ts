@@ -193,7 +193,7 @@ app.get("/stream/:runId", async (c) => {
       } catch {
         cleanup();
       }
-    }, 30_000);
+    }, 15_000);
 
     // Check if this is a stub run
     const stubEntry = stubRuns.get(runId);

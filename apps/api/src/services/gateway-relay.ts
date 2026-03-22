@@ -772,6 +772,16 @@ export class GatewayRelay {
 
 
   private scheduleReconnect(): void {
+    // Fix 7: Notify all active runs that gateway is reconnecting
+    for (const [runId, handler] of this.pendingRuns) {
+      try {
+        handler.onError?.("GATEWAY_RECONNECTING");
+      } catch {
+        // handler already closed
+      }
+    }
+    this.pendingRuns.clear();
+
     const delay = Math.min(
       1000 * Math.pow(2, this.reconnectAttempt),
       30_000,
