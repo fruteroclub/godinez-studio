@@ -143,7 +143,7 @@ export default function ChatConversation() {
       for (const action of lastMessage.actions ?? []) {
         if (action.type === "hackathon_advance" || action.type === "hackathon_note") {
           try {
-            const success = await executeHackathonAction(action);
+            const success = await executeHackathonAction(action, typeof lastMessage.id === "number" ? lastMessage.id : undefined);
             if (success) {
               updateAction(lastMessage.id, action.id, { ...action, status: "completed" });
             }
