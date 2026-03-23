@@ -184,3 +184,22 @@ export async function deleteHackathonConversation(hackathonId: number) {
   
   return { deleted: !!existing };
 }
+
+export async function updateMessageActionStatus(
+  messageId: number,
+  actionId: string,
+  status: "completed" | "error",
+): Promise<void> {
+  const msg = await getMessageById(messageId);
+  if (!msg?.metadata) return;
+  try {
+    const meta = JSON.parse(msg.metadata as string);
+    if (!Array.isArray(meta.actions)) return;
+    meta.actions = meta.actions.map((a: Record<string, unknown>) =>
+      a.id === actionId ? { ...a, status } : a,
+    );
+    await updateMessageMetadata(messageId, meta);
+  } catch {
+    // If metadata is malformed, skip silently
+  }
+}
