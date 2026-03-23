@@ -16,6 +16,7 @@ import {
   addHackathonNote,
   deleteHackathon,
 } from "../dal/hackathon";
+import { updateMessageActionStatus } from "../dal/conversations";
 
 const app = new Hono<AuthEnv>();
 
@@ -84,12 +85,17 @@ app.post(
       phaseNumber: z.number(),
       status: z.enum(["done", "current", "pending"]),
       notes: z.array(z.string()).optional(),
+      messageId: z.number().optional(),
+      actionId: z.string().optional(),
     }),
   ),
   async (c) => {
     const hackathonId = parseInt(c.req.param("hackathonId"));
-    const { phaseNumber, status, notes } = c.req.valid("json");
-    const hackathon = await updateHackathonPhase(hackathonId, phaseNumber, status, notes);
+    const data = c.req.valid("json");
+    const hackathon = await updateHackathonPhase(hackathonId, data.phaseNumber, data.status, data.notes);
+    if (data.messageId && data.actionId) {
+      await updateMessageActionStatus(data.messageId, data.actionId, "completed");
+    }
     return c.json(hackathon);
   },
 );
@@ -102,12 +108,17 @@ app.post(
     z.object({
       phaseNumber: z.number(),
       note: z.string().min(1),
+      messageId: z.number().optional(),
+      actionId: z.string().optional(),
     }),
   ),
   async (c) => {
     const hackathonId = parseInt(c.req.param("hackathonId"));
-    const { phaseNumber, note } = c.req.valid("json");
-    const hackathon = await addHackathonNote(hackathonId, phaseNumber, note);
+    const data = c.req.valid("json");
+    const hackathon = await addHackathonNote(hackathonId, data.phaseNumber, data.note);
+    if (data.messageId && data.actionId) {
+      await updateMessageActionStatus(data.messageId, data.actionId, "completed");
+    }
     return c.json(hackathon);
   },
 );
