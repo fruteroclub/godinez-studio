@@ -19,7 +19,7 @@ export function useHackathonActions(
   const executedRef = useRef<Set<string>>(new Set());
 
   const executeHackathonAction = useCallback(
-    async (action: ActionCard): Promise<boolean> => {
+    async (action: ActionCard, messageId?: number): Promise<boolean> => {
       console.log("[HackathonActions] executeHackathonAction called:", { 
         hackathonId, 
         actionType: action.type, 
@@ -49,7 +49,7 @@ export function useHackathonActions(
           
           console.log("[HackathonActions] Advancing to phase:", phaseNumber, "status:", status);
           
-          const advanceBody = { phaseNumber: Number(phaseNumber), status };
+          const advanceBody = { phaseNumber: Number(phaseNumber), status, messageId, actionId: action.id };
           console.log("[HackathonActions] Sending phase update:", advanceBody);
           await apiFetch(`/api/hackathons/${hackathonId}/phase`, {
             method: "POST",
@@ -78,7 +78,7 @@ export function useHackathonActions(
           console.log("[HackathonActions] Adding note to phase:", phaseNumber, "note:", note);
           
           if (note && note.trim()) {
-            const noteBody = { phaseNumber: Number(phaseNumber), note: String(note).trim() };
+            const noteBody = { phaseNumber: Number(phaseNumber), note: String(note).trim(), messageId, actionId: action.id };
             console.log("[HackathonActions] Sending note:", noteBody);
             await apiFetch(`/api/hackathons/${hackathonId}/note`, {
               method: "POST",
