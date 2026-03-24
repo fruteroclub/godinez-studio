@@ -170,49 +170,68 @@ app.post(
       log.warn({ slot: slotName, err: msg }, "auth-profiles.json copy failed (non-fatal)");
     }
 
-    // 9. Insert DB agent
-    log.debug("inserting DB agent");
-    const slug = `${workspace.slug}-agent`;
-    const agentConfig: Record<string, unknown> = {};
-    if (userName) agentConfig.userName = userName;
-    if (userRole) agentConfig.userRole = userRole;
-    if (businessDescription) agentConfig.businessDescription = businessDescription;
-    if (personality) agentConfig.personality = personality;
-    if (needs?.length) agentConfig.needs = needs;
+    // 9–12. DB writes — wrapped in rollback guard.
+    // If any step fails after the gateway agent is created, we delete it to prevent ghost agents.
+    let dbAgent: Awaited<ReturnType<typeof createAgent>>;
+    let conversation: Awaited<ReturnType<typeof createConversation>>;
+    try {
+      // 9. Insert DB agent
+      log.debug("inserting DB agent");
+      const slug = `${workspace.slug}-agent`;
+      const agentConfig: Record<string, unknown> = {};
+      if (userName) agentConfig.userName = userName;
+      if (userRole) agentConfig.userRole = userRole;
+      if (businessDescription) agentConfig.businessDescription = businessDescription;
+      if (personality) agentConfig.personality = personality;
+      if (needs?.length) agentConfig.needs = needs;
 
-    // Persist role + business on user record (source of truth for analytics)
-    if (userRole || businessDescription) {
-      await updateUser(userId, {
-        ...(userRole && { jobRole: userRole }),
-        ...(businessDescription && { businessDescription }),
+      // Persist role + business on user record (source of truth for analytics)
+      if (userRole || businessDescription) {
+        await updateUser(userId, {
+          ...(userRole && { jobRole: userRole }),
+          ...(businessDescription && { businessDescription }),
+        });
+      }
+
+      dbAgent = await createAgent({
+        name: resolvedAgentName,
+        slug,
+        template: "custom",
+        status: "active",
+        openclawId: agentResult.agentId,
+        ...(Object.keys(agentConfig).length > 0 && { config: agentConfig }),
       });
+
+      // 10. Link agent to workspace with instance binding
+      await linkAgentToWorkspace(workspaceId, {
+        agentId: dbAgent.id,
+        agentSlot: agentResult.agentId,
+        instanceId: instance.id,
+      });
+
+      // 11. Increment used_slots on the instance
+      await incrementUsedSlots(instance.id);
+
+      // 12. Create onboarding conversation
+      conversation = await createConversation({
+        workspaceId,
+        agentId: dbAgent.id,
+        title: "Onboarding",
+      });
+    } catch (err) {
+      // DB step failed — roll back the gateway agent to prevent ghost slots
+      const msg = err instanceof Error ? err.message : "DB write failed";
+      log.error({ slot: slotName, err: msg }, "DB write failed — rolling back gateway agent");
+      try {
+        await relay.agentsDelete(agentResult.agentId);
+        log.info({ slot: slotName }, "gateway agent rolled back successfully");
+      } catch (rollbackErr) {
+        // Rollback also failed — log for manual cleanup
+        const rbMsg = rollbackErr instanceof Error ? rollbackErr.message : "rollback failed";
+        log.error({ slot: slotName, err: rbMsg }, "gateway agent rollback FAILED — manual cleanup required");
+      }
+      return c.json({ error: "PROVISION_FAILED", message: "Error al configurar el agente. Por favor intenta de nuevo." }, 502);
     }
-
-    const dbAgent = await createAgent({
-      name: resolvedAgentName,
-      slug,
-      template: "custom",
-      status: "active",
-      openclawId: agentResult.agentId,
-      ...(Object.keys(agentConfig).length > 0 && { config: agentConfig }),
-    });
-
-    // 10. Link agent to workspace with instance binding
-    await linkAgentToWorkspace(workspaceId, {
-      agentId: dbAgent.id,
-      agentSlot: agentResult.agentId,
-      instanceId: instance.id,
-    });
-
-    // 11. Increment used_slots on the instance
-    await incrementUsedSlots(instance.id);
-
-    // 12. Create onboarding conversation
-    const conversation = await createConversation({
-      workspaceId,
-      agentId: dbAgent.id,
-      title: "Onboarding",
-    });
 
     return c.json({
       agent: {
