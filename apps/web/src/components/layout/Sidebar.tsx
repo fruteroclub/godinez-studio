@@ -254,14 +254,6 @@ export default function Sidebar({
     <aside className="flex h-full w-60 flex-col border-r border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-background))]">
       {/* Header */}
       <div className="flex h-14 items-center justify-between border-b border-[hsl(var(--sidebar-border))] px-3">
-        <button
-          onClick={() => setCollapsed(true)}
-          className="flex h-9 w-9 items-center justify-center rounded-md text-[hsl(var(--sidebar-foreground))]/70 hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))] transition-colors"
-          title="Cerrar barra lateral Ctrl+."
-        >
-          <PanelLeftClose className="h-5 w-5" />
-        </button>
-        
         <Link to="/studio" onClick={onNavigate} className="flex items-center gap-2">
           <img src="/logo.svg" alt="" width={24} height={24} />
           <span className="text-lg">
@@ -277,6 +269,14 @@ export default function Sidebar({
             </span>
           </span>
         </Link>
+        
+        <button
+          onClick={() => setCollapsed(true)}
+          className="flex h-9 w-9 items-center justify-center rounded-md text-[hsl(var(--sidebar-foreground))]/70 hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))] transition-colors"
+          title="Cerrar barra lateral Ctrl+."
+        >
+          <PanelLeftClose className="h-5 w-5" />
+        </button>
       </div>
 
       {/* Quick actions */}
