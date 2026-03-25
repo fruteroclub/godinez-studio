@@ -27,6 +27,12 @@ app.use("*", requireAuth, resolveUser);
 
 // Onboarding V3: Project type and subtype enums
 const PROJECT_TYPES = ["educacion", "profesional", "personal"] as const;
+const PROJECT_SUBTYPES_BY_TYPE = {
+  educacion: ["bootcamp", "aprender"],
+  personal: ["hackathon", "emprendimiento", "proyecto"],
+  profesional: ["crear_contenido", "automatizar", "construir", "investigar", "vender", "organizar"],
+} as const;
+
 const PROJECT_SUBTYPES = [
   // educacion
   "bootcamp", "aprender",
@@ -55,7 +61,15 @@ app.post(
       // Onboarding V3: New fields
       projectType: z.enum(PROJECT_TYPES).optional(),
       projectSubtype: z.enum(PROJECT_SUBTYPES).optional(),
-    }),
+    }).refine(
+      (data) => {
+        if (!data.projectType && !data.projectSubtype) return true;
+        if (!data.projectType || !data.projectSubtype) return false;
+        const validSubtypes = PROJECT_SUBTYPES_BY_TYPE[data.projectType] as readonly string[];
+        return validSubtypes.includes(data.projectSubtype);
+      },
+      { message: "Invalid projectSubtype for the given projectType" }
+    ),
   ),
   async (c) => {
     const userId = c.get("userId");

@@ -25,6 +25,12 @@ app.use("*", requireAuth, resolveUser);
 
 // Project type and subtype enums (same as provision.ts)
 const PROJECT_TYPES = ["educacion", "profesional", "personal"] as const;
+const PROJECT_SUBTYPES_BY_TYPE = {
+  educacion: ["bootcamp", "aprender"],
+  personal: ["hackathon", "emprendimiento", "proyecto"],
+  profesional: ["crear_contenido", "automatizar", "construir", "investigar", "vender", "organizar"],
+} as const;
+
 const PROJECT_SUBTYPES = [
   "bootcamp", "aprender",
   "hackathon", "emprendimiento", "proyecto",
@@ -55,7 +61,13 @@ app.patch(
     z.object({
       projectType: z.enum(PROJECT_TYPES),
       projectSubtype: z.enum(PROJECT_SUBTYPES),
-    }),
+    }).refine(
+      (data) => {
+        const validSubtypes = PROJECT_SUBTYPES_BY_TYPE[data.projectType] as readonly string[];
+        return validSubtypes.includes(data.projectSubtype);
+      },
+      { message: "Invalid projectSubtype for the given projectType" }
+    ),
   ),
   async (c) => {
     const userId = c.get("userId");
