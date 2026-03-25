@@ -159,14 +159,16 @@ export default function Sidebar({
 
         {/* Quick actions */}
         <div className="flex flex-col items-center gap-1 py-1">
-          <button
+          <Link
+            to={`/studio/${slug}/chat/new`}
+            onClick={onNavigate}
             className="flex h-9 w-9 items-center justify-center rounded-md text-[hsl(var(--sidebar-foreground))]/70 hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))] transition-colors"
             title="Nuevo chat"
           >
             <Plus className="h-5 w-5" />
-          </button>
-        </div>
+          </Link>
         {/* Divider */}
+        </div>
         <div className="mx-3 border-t border-[hsl(var(--sidebar-border))]" />
 
         {/* Navigation icons */}
@@ -259,10 +261,10 @@ export default function Sidebar({
 
       {/* Quick actions */}
       <div className="flex flex-col gap-0.5 px-2 py-1">
-        <button className="flex items-center gap-3 rounded-md px-3 py-1 text-sm text-[hsl(var(--sidebar-foreground))]/70 hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))] transition-colors">
+        <Link to={`/studio/${slug}/chat/new`} onClick={onNavigate} className="flex items-center gap-3 rounded-md px-3 py-1 text-sm text-[hsl(var(--sidebar-foreground))]/70 hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))] transition-colors">
           <Plus className="h-4 w-4" />
           <span>Nuevo chat</span>
-        </button>
+        </Link>
       </div>
       {/* Main Navigation */}
       <nav className="overflow-visible px-2 py-1">

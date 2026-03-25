@@ -12,6 +12,7 @@ const OnboardingWizard = lazy(() => import("./pages/OnboardingWizard"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Chat = lazy(() => import("./pages/Chat"));
 const ChatConversation = lazy(() => import("./pages/ChatConversation"));
+const ChatNew = lazy(() => import("./pages/ChatNew"));
 const Projects = lazy(() => import("./pages/Projects"));
 const ProjectDetail = lazy(() => import("./pages/ProjectDetail"));
 const Tasks = lazy(() => import("./pages/Tasks"));
@@ -77,6 +78,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <LazyPage><Dashboard /></LazyPage> },
       { path: "chat", element: <LazyPage><Chat /></LazyPage> },
+      { path: "chat/new", element: <LazyPage><ChatNew /></LazyPage> },
       { path: "chat/:conversationId", element: <LazyPage><ChatConversation /></LazyPage> },
       { path: "projects", element: <LazyPage><Projects /></LazyPage> },
       { path: "projects/:projectId", element: <LazyPage><ProjectDetail /></LazyPage> },
