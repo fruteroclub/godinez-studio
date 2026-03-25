@@ -6,6 +6,7 @@ import {
   getInstanceByName,
   getOfflineInstances,
   pickSharedInstance,
+  pickSharedInstanceExcluding,
   pickDedicatedInstance,
   markInstanceOffline,
   markInstanceActive,
@@ -79,9 +80,13 @@ class GatewayPool {
   async pickInstance(
     tier: "shared" | "dedicated",
     customerId?: number,
+    excludeIds: number[] = [],
   ) {
     if (tier === "dedicated" && customerId) {
       return pickDedicatedInstance(customerId);
+    }
+    if (excludeIds.length > 0) {
+      return pickSharedInstanceExcluding(excludeIds);
     }
     return pickSharedInstance();
   }
