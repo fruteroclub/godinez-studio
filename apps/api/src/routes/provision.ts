@@ -14,6 +14,7 @@ import { createConversation } from "../dal/conversations";
 import { updateUser } from "../dal/users";
 import { incrementUsedSlots } from "../dal/instances";
 import { pool } from "../services/gateway-pool";
+import type { GatewayRelay } from "../services/gateway-relay";
 import { buildSoulMd } from "../services/agent-soul-template";
 import { getInstanceTier } from "@godinez/types";
 import { AGENT_MAX_SLOTS } from "../lib/config";
@@ -64,56 +65,60 @@ app.post(
       return c.json({ error: "Workspace already has an agent" }, 409);
     }
 
-    // 4. Pick an instance from the pool
+    // 4-6. Pick instance, connect, find slot — with fallback across instances
     const instanceTier = getInstanceTier(workspace.tier);
-    const instance = await pool.pickInstance(instanceTier, workspace.id);
-    if (!instance) {
+    const excludeIds: number[] = [];
+    let instance;
+    let relay;
+    let slotNumber: number | null = null;
+    let agents: Awaited<ReturnType<GatewayRelay["agentsList"]>> | undefined;
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      instance = await pool.pickInstance(instanceTier, workspace.id, excludeIds);
+      if (!instance) break;
+
+      try {
+        relay = await pool.getRelay(instance.id);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Gateway connection failed";
+        log.warn({ instance: instance.name, err: msg, attempt }, "gateway connection failed, trying next");
+        excludeIds.push(instance.id);
+        continue;
+      }
+
+      try {
+        log.info({ instance: instance.name }, "listing agents");
+        agents = await relay.agentsList();
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "agents.list failed";
+        log.warn({ instance: instance.name, err: msg, attempt }, "agents.list failed, trying next");
+        excludeIds.push(instance.id);
+        continue;
+      }
+
+      const usedSlots = new Set(
+        agents!.agents.map((a) => a.name).filter(Boolean),
+      );
+
+      for (let i = 1; i <= AGENT_MAX_SLOTS; i++) {
+        if (!usedSlots.has(`godin-slot-${i}`)) {
+          slotNumber = i;
+          break;
+        }
+      }
+
+      if (slotNumber === null) {
+        log.warn({ instance: instance.name, attempt }, "instance physically full, trying next");
+        excludeIds.push(instance.id);
+        continue;
+      }
+
+      break;
+    }
+
+    if (!instance || !relay || slotNumber === null) {
       return c.json(
         { error: "CAPACITY_FULL", message: "No hay instancias disponibles. Intenta más tarde." },
-        503,
-      );
-    }
-
-    // 5. Connect to the instance
-    let relay;
-    try {
-      relay = await pool.getRelay(instance.id);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Gateway connection failed";
-      log.error({ err: msg }, "gateway connection failed");
-      return c.json(
-        { error: "GATEWAY_OFFLINE", message: "El servicio de agentes no está disponible." },
-        503,
-      );
-    }
-
-    // 6. Find available slot
-    let agents;
-    try {
-      log.info({ instance: instance.name }, "listing agents");
-      agents = await relay.agentsList();
-      log.debug({ agents: agents.agents.map((a) => a.name) }, "agent list");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "agents.list failed";
-      log.error({ err: msg }, "agents.list failed");
-      return c.json({ error: "GATEWAY_ERROR", message: msg }, 502);
-    }
-
-    const usedSlots = new Set(
-      agents.agents.map((a) => a.name).filter(Boolean),
-    );
-
-    let slotNumber: number | null = null;
-    for (let i = 1; i <= AGENT_MAX_SLOTS; i++) {
-      if (!usedSlots.has(`godin-slot-${i}`)) {
-        slotNumber = i;
-        break;
-      }
-    }
-
-    if (slotNumber === null) {
-      return c.json(
-        { error: "CAPACITY_FULL", message: "Todos los slots están ocupados. Intenta más tarde." },
         503,
       );
     }
@@ -159,7 +164,7 @@ app.post(
     // Required for external channel integrations (Telegram, Discord per-agent).
     // Studio WebSocket chat works without it, but we copy proactively for future-proofing.
     try {
-      const authFile = await relay.agentsFilesGet(agents.mainKey, "agent/auth-profiles.json");
+      const authFile = await relay.agentsFilesGet(agents!.mainKey, "agent/auth-profiles.json");
       if (authFile.content) {
         await relay.agentsFilesSet(agentResult.agentId, "agent/auth-profiles.json", authFile.content);
         log.info({ slot: slotName }, "auth-profiles.json copied from main");
@@ -170,8 +175,7 @@ app.post(
       log.warn({ slot: slotName, err: msg }, "auth-profiles.json copy failed (non-fatal)");
     }
 
-    // 9. Insert DB agent
-    log.debug("inserting DB agent");
+    // 9-12. DB operations wrapped with ghost agent rollback
     const slug = `${workspace.slug}-agent`;
     const agentConfig: Record<string, unknown> = {};
     if (userName) agentConfig.userName = userName;
@@ -180,48 +184,63 @@ app.post(
     if (personality) agentConfig.personality = personality;
     if (needs?.length) agentConfig.needs = needs;
 
-    // Persist role + business on user record (source of truth for analytics)
-    if (userRole || businessDescription) {
-      await updateUser(userId, {
-        ...(userRole && { jobRole: userRole }),
-        ...(businessDescription && { businessDescription }),
+    try {
+      // Persist role + business on user record (source of truth for analytics)
+      if (userRole || businessDescription) {
+        await updateUser(userId, {
+          ...(userRole && { jobRole: userRole }),
+          ...(businessDescription && { businessDescription }),
+        });
+      }
+
+      const dbAgent = await createAgent({
+        name: resolvedAgentName,
+        slug,
+        template: "custom",
+        status: "active",
+        openclawId: agentResult.agentId,
+        ...(Object.keys(agentConfig).length > 0 && { config: agentConfig }),
       });
+
+      // 10. Link agent to workspace with instance binding
+      await linkAgentToWorkspace(workspaceId, {
+        agentId: dbAgent.id,
+        agentSlot: agentResult.agentId,
+        instanceId: instance.id,
+      });
+
+      // 11. Increment used_slots on the instance
+      await incrementUsedSlots(instance.id);
+
+      // 12. Create onboarding conversation
+      const conversation = await createConversation({
+        workspaceId,
+        agentId: dbAgent.id,
+        title: "Onboarding",
+      });
+
+      return c.json({
+        agent: {
+          id: dbAgent.id,
+          openclawId: dbAgent.openclawId,
+          name: dbAgent.name,
+        },
+        conversationId: conversation.id,
+      });
+    } catch (err) {
+      // Rollback: delete agent from gateway to prevent ghost agent
+      log.error({ err, slot: slotName, agentId: agentResult.agentId }, "DB failed after gateway agent created, rolling back");
+      try {
+        await relay.agentsDelete(agentResult.agentId);
+        log.info({ agentId: agentResult.agentId }, "ghost agent rolled back");
+      } catch (rollbackErr) {
+        log.error({ rollbackErr, agentId: agentResult.agentId }, "ghost agent rollback failed — manual cleanup needed");
+      }
+      return c.json(
+        { error: "PROVISION_FAILED", message: "Error al registrar el agente. Intenta de nuevo." },
+        502,
+      );
     }
-
-    const dbAgent = await createAgent({
-      name: resolvedAgentName,
-      slug,
-      template: "custom",
-      status: "active",
-      openclawId: agentResult.agentId,
-      ...(Object.keys(agentConfig).length > 0 && { config: agentConfig }),
-    });
-
-    // 10. Link agent to workspace with instance binding
-    await linkAgentToWorkspace(workspaceId, {
-      agentId: dbAgent.id,
-      agentSlot: agentResult.agentId,
-      instanceId: instance.id,
-    });
-
-    // 11. Increment used_slots on the instance
-    await incrementUsedSlots(instance.id);
-
-    // 12. Create onboarding conversation
-    const conversation = await createConversation({
-      workspaceId,
-      agentId: dbAgent.id,
-      title: "Onboarding",
-    });
-
-    return c.json({
-      agent: {
-        id: dbAgent.id,
-        openclawId: dbAgent.openclawId,
-        name: dbAgent.name,
-      },
-      conversationId: conversation.id,
-    });
   },
 );
 
