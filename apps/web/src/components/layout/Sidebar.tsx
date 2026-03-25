@@ -147,7 +147,7 @@ export default function Sidebar({
     return (
       <aside className="flex h-full w-14 flex-col border-r border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-background))]">
         {/* Toggle button */}
-        <div className="flex h-14 items-center justify-center border-b border-[hsl(var(--sidebar-border))]">
+        <div className="flex h-14 items-center justify-center border-b border-[hsl(var(--border))]">
           <button
             onClick={() => setCollapsed(false)}
             className="flex h-9 w-9 items-center justify-center rounded-md text-[hsl(var(--sidebar-foreground))]/70 hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))] transition-colors"
@@ -233,7 +233,7 @@ export default function Sidebar({
   return (
     <aside className="flex h-full w-60 flex-col border-r border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-background))]">
       {/* Header */}
-      <div className="flex h-14 items-center justify-between border-b border-[hsl(var(--sidebar-border))] px-3">
+      <div className="flex h-14 items-center justify-between border-b border-[hsl(var(--border))] px-3">
         <Link to="/studio" onClick={onNavigate} className="flex items-center gap-2">
           <img src="/logo.svg" alt="" width={24} height={24} />
           <span className="text-lg">
