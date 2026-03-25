@@ -310,7 +310,6 @@ export default function Sidebar({
       </nav>
 
       {/* Configuration Section */}
-      <div className="flex-1" />
       <nav className="border-t border-[hsl(var(--sidebar-border))] px-2 py-1">
         <div className="px-3 py-1 text-[10px] font-semibold tracking-wider text-[hsl(var(--sidebar-foreground))]/[0.27] uppercase">
           CONFIGURACIÓN
