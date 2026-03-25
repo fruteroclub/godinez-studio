@@ -265,7 +265,7 @@ export default function Sidebar({
         </button>
       </div>
       {/* Main Navigation */}
-      <nav className="overflow-y-auto scrollbar-hide px-2 py-1">
+      <nav className="overflow-visible px-2 py-1">
         {sections.map((section) => (
           <div key={section.title} className="mb-4">
             <div className="px-3 py-1 text-[10px] font-semibold tracking-wider text-[hsl(var(--sidebar-foreground))]/[0.27] uppercase">
