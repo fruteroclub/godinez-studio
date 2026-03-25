@@ -12,6 +12,7 @@ import { agentLogs } from "./agent-logs";
 import { referralCodes } from "./referral-codes";
 import { gatewayInstances } from "./gateway-instances";
 import { hackathonProgress } from "./hackathon-progress";
+import { runContexts } from "./run-contexts";
 
 export const usersRelations = relations(users, ({ many }) => ({
   ownedWorkspaces: many(workspaces),
@@ -184,5 +185,20 @@ export const hackathonProgressRelations = relations(hackathonProgress, ({ one })
   workspace: one(workspaces, {
     fields: [hackathonProgress.workspaceId],
     references: [workspaces.id],
+  }),
+}));
+
+export const runContextsRelations = relations(runContexts, ({ one }) => ({
+  conversation: one(conversations, {
+    fields: [runContexts.conversationId],
+    references: [conversations.id],
+  }),
+  workspace: one(workspaces, {
+    fields: [runContexts.workspaceId],
+    references: [workspaces.id],
+  }),
+  instance: one(gatewayInstances, {
+    fields: [runContexts.instanceId],
+    references: [gatewayInstances.id],
   }),
 }));
