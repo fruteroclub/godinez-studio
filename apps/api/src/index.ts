@@ -29,6 +29,7 @@ import watchdog from "./routes/watchdog";
 import { logError } from "./dal/errors";
 import "./services/gateway-pool"; // initialize pool (lazy connections)
 import { initSentry, Sentry } from "./lib/sentry";
+import context from "./routes/context";
 import { isAppError, formatErrorResponse } from "./lib/errors";
 import { rateLimits } from "./middleware/rate-limit";
 
@@ -79,6 +80,7 @@ app.route("/api/hackathons", hackathons);
 app.route("/webhooks", webhooks);
 app.route("/api/admin/errors", errors);
 app.route("/api/watchdog", watchdog);
+app.route("/api/context", context);
 
 app.onError((err, c) => {
   Sentry.captureException(err);
