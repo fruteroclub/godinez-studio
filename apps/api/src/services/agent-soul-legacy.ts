@@ -27,6 +27,26 @@ const ROLE_LABELS: Record<string, string> = {
   other: "Otro",
 };
 
+const PROJECT_TYPE_LABELS: Record<string, string> = {
+  educacion: "Estudiante/Aprendiz",
+  profesional: "Profesional de negocios",
+  personal: "Usuario con proyecto personal",
+};
+
+const PROJECT_SUBTYPE_LABELS: Record<string, string> = {
+  bootcamp: "en un bootcamp",
+  aprender: "aprendiendo de forma autodidacta",
+  hackathon: "participando en un hackathon",
+  emprendimiento: "construyendo un emprendimiento",
+  proyecto: "desarrollando un proyecto personal",
+  crear_contenido: "creando contenido",
+  automatizar: "automatizando procesos",
+  construir: "construyendo software",
+  investigar: "investigando y analizando",
+  vender: "en ventas y atención",
+  organizar: "organizando y planeando",
+};
+
 const NEED_LABELS: Record<string, string> = {
   launch: "Lanzar productos rápido (apps, sitios, MVPs)",
   automate: "Automatizar procesos repetitivos (flujos, pipelines, integraciones)",
@@ -48,6 +68,8 @@ export function buildSoulMd(ctx: {
   personality?: string;
   needs?: string[];
   customInstructions?: string;
+  projectType?: string;
+  projectSubtype?: string;
 }): string {
   const personalitySection = ctx.personality
     ? `
@@ -64,6 +86,11 @@ ${PERSONALITY_INSTRUCTIONS[ctx.personality] || PERSONALITY_INSTRUCTIONS.friendly
     const rolePart = ctx.userRole ? `, a **${ROLE_LABELS[ctx.userRole] || ctx.userRole}**` : "";
     const bizPart = ctx.businessDescription ? ` — "${ctx.businessDescription}"` : "";
     userParts.push(`Your user's name is **${ctx.userName}**${rolePart}${bizPart}. Use their name naturally in conversation — in greetings and when it makes sense, but don't overdo it.`);
+  }
+  if (ctx.projectType && ctx.projectSubtype) {
+    const typeLabel = PROJECT_TYPE_LABELS[ctx.projectType] || ctx.projectType;
+    const subtypeLabel = PROJECT_SUBTYPE_LABELS[ctx.projectSubtype] || ctx.projectSubtype;
+    userParts.push(`**Contexto actual:** ${typeLabel} ${subtypeLabel}. Adapta tu comunicación y prioridades a este contexto.`);
   }
   if (ctx.needs?.length) {
     userParts.push(`They told you they want help with:\n${ctx.needs.map((s) => `- ${NEED_LABELS[s] || s}`).join("\n")}\n\nKeep these priorities in mind when proposing projects and tasks. Reference their goals when relevant.`);
