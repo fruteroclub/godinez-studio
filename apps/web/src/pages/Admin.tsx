@@ -1053,12 +1053,12 @@ export default function Admin() {
             ← Studio
           </Link>
         </div>
-        <nav className="mt-4 flex gap-1">
+        <nav className="mt-4 flex gap-1 overflow-x-auto scrollbar-hide">
           {TABS.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
                 tab === t.key
                   ? "bg-magenta text-white"
                   : "text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] hover:text-[hsl(var(--foreground))]"
