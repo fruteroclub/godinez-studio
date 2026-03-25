@@ -50,12 +50,12 @@ const PROJECT_SUBTYPE_CONFIG: Record<string, { title: string; description: strin
   hackathon: { title: "Hackathon", description: "Participando en un hackathon" },
   emprendimiento: { title: "Emprendimiento", description: "Construyendo mi propio negocio" },
   proyecto: { title: "Proyecto en marcha", description: "Proyecto personal activo" },
-  crear_contenido: { title: "Crear contenido", description: "Posts, copy, videos, marketing" },
-  automatizar: { title: "Automatizar tareas", description: "Procesos, flujos, integraciones" },
-  construir: { title: "Construir", description: "Apps, sitios, landing pages" },
+  crear_contenido: { title: "Crear contenido", description: "Posts, copy, textos" },
+  automatizar: { title: "Automatizar tareas", description: "Procesos repetitivos, flujos" },
+  construir: { title: "Construir", description: "App, sitio web, landing page" },
   investigar: { title: "Investigar y analizar", description: "Datos, mercado, competencia" },
-  vender: { title: "Vender y atender", description: "Comercial, soporte, clientes" },
-  organizar: { title: "Organizar y planear", description: "Reportes, gestión, admin" },
+  vender: { title: "Vender y atender", description: "Estrategia comercial, soporte a clientes" },
+  organizar: { title: "Organizar y planear", description: "Reportes, gestión, coordinación" },
 };
 
 const ROLE_IDS = ["founder", "marketing", "sales", "operations", "tech", "support", "other"] as const;
