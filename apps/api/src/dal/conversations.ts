@@ -117,6 +117,16 @@ export async function getMessageById(id: number) {
   });
 }
 
+export async function getLastAgentMessage(conversationId: number) {
+  return db.query.messages.findFirst({
+    where: and(
+      eq(messages.conversationId, conversationId),
+      eq(messages.role, "agent"),
+    ),
+    orderBy: desc(messages.createdAt),
+  });
+}
+
 export async function updateMessageMetadata(
   id: number,
   metadata: Record<string, unknown>,
