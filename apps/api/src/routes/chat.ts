@@ -10,6 +10,7 @@ import {
   createMessage,
   getMessages,
   getMessageById,
+  getLastAgentMessage,
   getConversationById,
   updateMessageMetadata,
   linkConversationToProject,
@@ -24,6 +25,7 @@ import { pool } from "../services/gateway-pool";
 import { resolveAgentSession } from "../services/agent-mapping";
 import { createStubRun } from "../services/stub-agent";
 import { parseActionBlocks, stripActionBlocks } from "../lib/action-parser";
+import { logger } from "../lib/logger";
 import { verifyWorkspaceAccess } from "../middleware/require-resource-access";
 import {
   generateHeuristicTitle,
@@ -597,8 +599,18 @@ app.post(
       conversationId: z.number(),
       workspaceId: z.number(),
       content: z.string(),
-      messageId: z.number().optional(), // If already saved by SSE, we just verify
-      actions: z.array(z.any()).optional(),
+      messageId: z.number().optional(),
+      actions: z
+        .array(
+          z.object({
+            id: z.string(),
+            type: z.string(),
+            label: z.string(),
+            payload: z.record(z.unknown()).optional(),
+            status: z.string().optional(),
+          }),
+        )
+        .optional(),
     }),
   ),
   async (c) => {
@@ -610,23 +622,17 @@ app.post(
       return c.json({ error: "Not a workspace member" }, 403);
     }
 
-    // If messageId provided, verify it exists
+    // Fast path: if SSE already saved with a messageId, just verify it exists
     if (messageId) {
       const existing = await getMessageById(messageId);
-      if (existing && existing.content === content) {
-        // Already persisted correctly
+      if (existing) {
         return c.json({ persisted: true, messageId, alreadyExisted: true });
       }
     }
 
-    // Check if message already exists in conversation (avoid duplicates)
-    const existingMessages = await getMessages(conversationId);
-    const lastAgentMessage = existingMessages
-      .filter((m) => m.role === "agent")
-      .pop();
-    
+    // Check last agent message (single row query, not full history)
+    const lastAgentMessage = await getLastAgentMessage(conversationId);
     if (lastAgentMessage && lastAgentMessage.content === content) {
-      // Message already saved
       return c.json({ persisted: true, messageId: lastAgentMessage.id, alreadyExisted: true });
     }
 
@@ -640,11 +646,11 @@ app.post(
         ...(actions?.length ? { metadata: { actions, fallbackPersist: true } } : { metadata: { fallbackPersist: true } }),
       });
 
-      console.log(`[persist-response] Fallback save for conversation ${conversationId}, messageId: ${agentMessage.id}`);
+      logger.info({ conversationId, messageId: agentMessage.id }, "fallback persist saved message");
 
       return c.json({ persisted: true, messageId: agentMessage.id, alreadyExisted: false });
     } catch (err) {
-      console.error("[persist-response] Failed to save message:", err);
+      logger.error({ err, conversationId }, "fallback persist failed");
       return c.json({ error: "Failed to persist message" }, 500);
     }
   },

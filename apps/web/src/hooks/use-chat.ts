@@ -204,7 +204,7 @@ export function useChat(
             );
           },
           onDone: async (text, agentMessageId, actions) => {
-            // Ensure message is persisted before marking as complete
+            // Ensure message is persisted — only send content if SSE didn't provide a messageId
             let finalMessageId = agentMessageId;
             try {
               const persistRes = await apiFetch<{ persisted: boolean; messageId: number; alreadyExisted: boolean }>(
@@ -215,8 +215,8 @@ export function useChat(
                     conversationId,
                     workspaceId,
                     content: text,
-                    messageId: agentMessageId,
-                    actions,
+                    ...(agentMessageId ? { messageId: agentMessageId } : {}),
+                    ...(actions?.length ? { actions } : {}),
                   }),
                   token,
                 },
@@ -225,7 +225,6 @@ export function useChat(
                 finalMessageId = persistRes.messageId;
               }
             } catch (err) {
-              // Log but don't block — user still sees the message
               console.error("[use-chat] Failed to confirm persistence:", err);
             }
 
