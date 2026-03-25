@@ -418,7 +418,7 @@ function StepContextV3({
       {/* Project type */}
       <div>
         <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
-          ¿Para qué vienes?
+          ¿Cómo vas a usar Godínez?
         </label>
         <div className="grid grid-cols-3 gap-3">
           {PROJECT_TYPES.map((type) => {
