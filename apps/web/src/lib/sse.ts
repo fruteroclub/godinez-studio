@@ -2,11 +2,17 @@ import type { ActionCard } from "@godinez/types";
 
 const API_URL = import.meta.env.VITE_API_URL || "";
 
+export interface SSEStatusInfo {
+  status: "connecting" | "connected" | "reconnecting" | "error";
+  retryCount?: number;
+  maxRetries?: number;
+}
+
 export interface SSEHandlers {
   onDelta?: (text: string) => void;
   onDone?: (text: string, messageId?: number, actions?: ActionCard[]) => void;
   onError?: (error: string) => void;
-  onStatus?: (status: "connecting" | "connected" | "reconnecting" | "error") => void;
+  onStatus?: (info: SSEStatusInfo) => void;
   onTimeout?: () => void;
 }
 
@@ -55,7 +61,7 @@ export function connectSSE(runId: string, handlers: SSEHandlers, token?: string 
     const elapsed = Date.now() - lastDataTime;
     if (elapsed >= STREAM_TIMEOUT_MS) {
       handlers.onTimeout?.();
-      handlers.onStatus?.("error");
+      handlers.onStatus?.({ status: "error" });
       cleanup();
       handlers.onError?.("Stream timeout - no data received");
     } else {
@@ -117,7 +123,9 @@ export function connectSSE(runId: string, handlers: SSEHandlers, token?: string 
     if (closed) return;
 
     es = new EventSource(url);
-    handlers.onStatus?.(retryCount > 0 ? "reconnecting" : "connecting");
+    handlers.onStatus?.(retryCount > 0
+      ? { status: "reconnecting", retryCount, maxRetries: MAX_RETRIES }
+      : { status: "connecting" });
     resetTimeout();
 
     es.addEventListener("open", () => {
@@ -126,7 +134,7 @@ export function connectSSE(runId: string, handlers: SSEHandlers, token?: string 
         return;
       }
       retryCount = 0; // Reset retry count on successful connection
-      handlers.onStatus?.("connected");
+      handlers.onStatus?.({ status: "connected" });
       resetTimeout();
     });
 
@@ -184,7 +192,7 @@ export function connectSSE(runId: string, handlers: SSEHandlers, token?: string 
       // Check if we should retry
       if (retryCount < MAX_RETRIES && !doneReceived) {
         retryCount++;
-        handlers.onStatus?.("reconnecting");
+        handlers.onStatus?.({ status: "reconnecting", retryCount, maxRetries: MAX_RETRIES });
         const delay = RETRY_DELAYS[retryCount - 1] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
         
         setTimeout(() => {
@@ -198,8 +206,8 @@ export function connectSSE(runId: string, handlers: SSEHandlers, token?: string 
       if (startTimeout) clearTimeout(startTimeout);
       if (animationFrameId !== null) cancelAnimationFrame(animationFrameId);
       
-      handlers.onStatus?.("error");
-      
+      handlers.onStatus?.({ status: "error" });
+
       if (e instanceof MessageEvent) {
         try {
           const { error } = JSON.parse(e.data);

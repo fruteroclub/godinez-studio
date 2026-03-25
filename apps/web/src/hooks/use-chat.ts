@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import type { ActionCard } from "@godinez/types";
 import { apiFetch } from "@/lib/api";
-import { connectSSE } from "@/lib/sse";
+import { connectSSE, type SSEStatusInfo } from "@/lib/sse";
 import { parseActionBlocks } from "@/lib/action-parser";
 import { trackEvent } from "@/lib/posthog";
 
@@ -25,6 +25,12 @@ export interface ChatMessage {
 
 export type ConnectionStatus = "idle" | "connected" | "reconnecting" | "disconnected" | "timeout";
 
+export interface RetryInfo {
+  retryCount: number;
+  maxRetries: number;
+  startedAt: number;
+}
+
 export function useChat(
   conversationId: number,
   workspaceId: number,
@@ -35,6 +41,7 @@ export function useChat(
   const [isLoading, setIsLoading] = useState(true);
   const [agentOffline, setAgentOffline] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("idle");
+  const [retryInfo, setRetryInfo] = useState<RetryInfo | null>(null);
   const { getToken } = useAuth();
   const sseCleanupRef = useRef<(() => void) | null>(null);
 
@@ -258,8 +265,17 @@ export function useChat(
             setConnectionStatus("disconnected");
             sseCleanupRef.current = null;
           },
-          onStatus: (status) => {
-            setConnectionStatus(status as ConnectionStatus);
+          onStatus: (info: SSEStatusInfo) => {
+            setConnectionStatus(info.status as ConnectionStatus);
+            if (info.status === "reconnecting" && info.retryCount != null && info.maxRetries != null) {
+              setRetryInfo((prev) => ({
+                retryCount: info.retryCount!,
+                maxRetries: info.maxRetries!,
+                startedAt: prev?.startedAt ?? Date.now(),
+              }));
+            } else if (info.status === "connected" || info.status === "error") {
+              setRetryInfo(null);
+            }
           },
           onTimeout: () => {
             setConnectionStatus("timeout");
@@ -271,5 +287,5 @@ export function useChat(
     [conversationId, workspaceId, getToken, options],
   );
 
-  return { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction, connectionStatus };
+  return { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction, connectionStatus, retryInfo };
 }
