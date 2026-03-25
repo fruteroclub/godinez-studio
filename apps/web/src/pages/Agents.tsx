@@ -163,7 +163,7 @@ function AgentSettingsForm({
 
   // Update context mutation
   const updateContext = useMutation({
-    mutationFn: async (data: { projectType: string; projectSubtype: string }) => {
+    mutationFn: async (data: { projectType: string; projectSubtype: string }): Promise<{ workspaceName?: string }> => {
       const token = await getToken();
       return apiFetch("/api/context", {
         method: "PATCH",
@@ -171,10 +171,17 @@ function AgentSettingsForm({
         token,
       });
     },
-    onSuccess: () => {
+    onSuccess: (data: { workspaceName?: string }) => {
       queryClient.invalidateQueries({ queryKey: ["userContext"] });
       queryClient.invalidateQueries({ queryKey: ["workspace"] });
       queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      // Redirect to new slug if workspace name changed
+      if (data?.workspaceName) {
+        const newSlug = data.workspaceName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+        if (newSlug !== slug) {
+          navigate(`/studio/${newSlug}/agents`, { replace: true });
+        }
+      }
     },
   });
 
