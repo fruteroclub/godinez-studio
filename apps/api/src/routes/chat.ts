@@ -366,14 +366,20 @@ app.get("/stream/:runId", async (c) => {
                 });
               }
               runContexts.delete(runId);
-            } else if (!streamClosed) {
-              await stream.writeSSE({
-                event: "done",
-                data: JSON.stringify({ type: "done", text: cleanText }),
-              });
+            } else {
+              // No context found - message NOT saved to DB!
+              // Frontend will use /persist-response as fallback
+              console.warn(`[chat/stream] No runContext for runId ${runId} - message not persisted via SSE`);
+              if (!streamClosed) {
+                await stream.writeSSE({
+                  event: "done",
+                  data: JSON.stringify({ type: "done", text: cleanText }),
+                });
+              }
             }
-          } catch {
-            // DB or stream error
+          } catch (err) {
+            // DB or stream error - log for debugging
+            console.error(`[chat/stream] Error in onFinal for runId ${runId}:`, err);
           } finally {
             cleanup();
             resolve();
@@ -581,5 +587,67 @@ app.get("/history/:conversationId", async (c) => {
   const messages = await getMessages(conversationId);
   return c.json({ messages });
 });
+
+// POST /api/chat/persist-response — Ensure agent response is persisted (fallback for SSE race condition)
+app.post(
+  "/persist-response",
+  zValidator(
+    "json",
+    z.object({
+      conversationId: z.number(),
+      workspaceId: z.number(),
+      content: z.string(),
+      messageId: z.number().optional(), // If already saved by SSE, we just verify
+      actions: z.array(z.any()).optional(),
+    }),
+  ),
+  async (c) => {
+    const userId = c.get("userId");
+    const { conversationId, workspaceId, content, messageId, actions } = c.req.valid("json");
+
+    // Verify workspace access
+    if (!(await verifyWorkspaceAccess(userId, workspaceId))) {
+      return c.json({ error: "Not a workspace member" }, 403);
+    }
+
+    // If messageId provided, verify it exists
+    if (messageId) {
+      const existing = await getMessageById(messageId);
+      if (existing && existing.content === content) {
+        // Already persisted correctly
+        return c.json({ persisted: true, messageId, alreadyExisted: true });
+      }
+    }
+
+    // Check if message already exists in conversation (avoid duplicates)
+    const existingMessages = await getMessages(conversationId);
+    const lastAgentMessage = existingMessages
+      .filter((m) => m.role === "agent")
+      .pop();
+    
+    if (lastAgentMessage && lastAgentMessage.content === content) {
+      // Message already saved
+      return c.json({ persisted: true, messageId: lastAgentMessage.id, alreadyExisted: true });
+    }
+
+    // Save the message (fallback persistence)
+    try {
+      const agentMessage = await createMessage({
+        conversationId,
+        workspaceId,
+        role: "agent",
+        content,
+        ...(actions?.length ? { metadata: { actions, fallbackPersist: true } } : { metadata: { fallbackPersist: true } }),
+      });
+
+      console.log(`[persist-response] Fallback save for conversation ${conversationId}, messageId: ${agentMessage.id}`);
+
+      return c.json({ persisted: true, messageId: agentMessage.id, alreadyExisted: false });
+    } catch (err) {
+      console.error("[persist-response] Failed to save message:", err);
+      return c.json({ error: "Failed to persist message" }, 500);
+    }
+  },
+);
 
 export default app;

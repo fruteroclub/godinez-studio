@@ -203,13 +203,38 @@ export function useChat(
               ),
             );
           },
-          onDone: (text, agentMessageId, actions) => {
+          onDone: async (text, agentMessageId, actions) => {
+            // Ensure message is persisted before marking as complete
+            let finalMessageId = agentMessageId;
+            try {
+              const persistRes = await apiFetch<{ persisted: boolean; messageId: number; alreadyExisted: boolean }>(
+                "/api/chat/persist-response",
+                {
+                  method: "POST",
+                  body: JSON.stringify({
+                    conversationId,
+                    workspaceId,
+                    content: text,
+                    messageId: agentMessageId,
+                    actions,
+                  }),
+                  token,
+                },
+              );
+              if (persistRes.persisted) {
+                finalMessageId = persistRes.messageId;
+              }
+            } catch (err) {
+              // Log but don't block — user still sees the message
+              console.error("[use-chat] Failed to confirm persistence:", err);
+            }
+
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === tempAgentId
                   ? {
                       ...m,
-                      id: agentMessageId ?? tempAgentId,
+                      id: finalMessageId ?? tempAgentId,
                       content: text,
                       streaming: false,
                       actions,
