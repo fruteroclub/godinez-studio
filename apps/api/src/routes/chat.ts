@@ -26,6 +26,12 @@ import { resolveAgentSession } from "../services/agent-mapping";
 import { createStubRun } from "../services/stub-agent";
 import { parseActionBlocks, stripActionBlocks } from "../lib/action-parser";
 import { logger } from "../lib/logger";
+import {
+  saveRunContext,
+  getRunContext,
+  deleteRunContext,
+  cleanExpiredRunContexts,
+} from "../dal/run-contexts";
 import { verifyWorkspaceAccess } from "../middleware/require-resource-access";
 import {
   generateHeuristicTitle,
@@ -142,7 +148,7 @@ app.post(
         const sessionKey = await resolveAgentSession(workspaceId, conversationId);
         // Send with attachments if present
         runId = await relay.chatSend(sessionKey, enrichedContent, attachments);
-        runContexts.set(runId, { conversationId, workspaceId, instanceId: workspace!.instanceId });
+        await saveRunContext({ runId, conversationId, workspaceId, instanceId: workspace!.instanceId });
       } catch (err) {
         const error = err instanceof Error ? err.message : "Gateway error";
         return c.json({ error }, 502);
@@ -177,7 +183,7 @@ app.get("/stream/:runId", async (c) => {
     let keepaliveTimer: ReturnType<typeof setInterval> | null = null;
 
     // Resolve the relay for this run (needed for onRun/offRun)
-    const ctx = runContexts.get(runId);
+    const ctx = await getRunContext(runId);
     let relay;
     try {
       relay = ctx?.instanceId != null
@@ -323,7 +329,7 @@ app.get("/stream/:runId", async (c) => {
             const suggestedTitle = parseTitleBlock(text);
             const cleanText = stripTitleBlocks(text);
 
-            const ctx = runContexts.get(runId);
+            const ctx = await getRunContext(runId);
             if (ctx) {
               // Parse action blocks from agent text
               const actionBlocks = parseActionBlocks(cleanText);
@@ -367,7 +373,7 @@ app.get("/stream/:runId", async (c) => {
                   }),
                 });
               }
-              runContexts.delete(runId);
+              await deleteRunContext(runId);
             } else {
               // No context found - message NOT saved to DB!
               // Frontend will use /persist-response as fallback
@@ -400,7 +406,7 @@ app.get("/stream/:runId", async (c) => {
             // stream closed
           } finally {
             cleanup();
-            runContexts.delete(runId);
+            await deleteRunContext(runId);
             resolve();
             try { await stream.close(); } catch { /* already closed */ }
           }
@@ -408,20 +414,21 @@ app.get("/stream/:runId", async (c) => {
       });
 
       // Timeout after 5 minutes
-      setTimeout(() => {
+      setTimeout(async () => {
         cleanup();
-        runContexts.delete(runId);
+        await deleteRunContext(runId);
         resolve();
       }, 5 * 60 * 1000);
     });
   });
 });
 
-// Context map for Gateway runs (conversationId + workspaceId needed when saving final message)
-export const runContexts = new Map<
-  string,
-  { conversationId: number; workspaceId: number; instanceId?: number | null }
->();
+// Clean up expired run contexts every 5 minutes (TTL: 10 min)
+setInterval(() => {
+  cleanExpiredRunContexts().catch((err) =>
+    logger.error({ err }, "failed to clean expired run contexts"),
+  );
+}, 5 * 60 * 1000);
 
 // POST /api/chat/actions/:messageId/execute — Execute a pending action
 app.post(
