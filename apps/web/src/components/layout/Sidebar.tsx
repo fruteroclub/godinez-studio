@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { content } from "@/lib/content";
 import { useCurrentUser } from "@/hooks/use-current-user";
-import { useUser } from "@clerk/clerk-react";
 import { 
   LayoutDashboard, 
   MessageCircle, 
@@ -126,7 +125,6 @@ export default function Sidebar({
   
   const { pathname } = useLocation();
   const { data: currentUser } = useCurrentUser();
-  const { user } = useUser();
   const sections = getNavSections(slug);
   const configItems = getConfigItems(slug);
 
@@ -143,7 +141,6 @@ export default function Sidebar({
     return pathname.startsWith(href);
   }
 
-  const userInitials = user?.firstName?.[0] || user?.username?.[0] || "U";
 
   // Collapsed view - minimal icons only
   if (collapsed) {
@@ -225,10 +222,6 @@ export default function Sidebar({
             );
           })}
           
-          {/* User avatar */}
-          <div className="mt-2 flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-magenta to-magenta/70 text-sm font-medium text-white">
-            {userInitials}
-          </div>
         </div>
       </aside>
     );
@@ -349,20 +342,6 @@ export default function Sidebar({
           );
         })}
         
-        {/* User profile */}
-        <div className="mt-3 flex items-center gap-3 rounded-md px-3 py-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-magenta to-magenta/70 text-sm font-medium text-white">
-            {userInitials}
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-medium text-[hsl(var(--sidebar-foreground))]">
-              {user?.firstName || user?.username || "Usuario"}
-            </span>
-            <span className="text-[10px] text-[hsl(var(--sidebar-foreground))]/50">
-              Plan Pro
-            </span>
-          </div>
-        </div>
       </nav>
     </aside>
   );
