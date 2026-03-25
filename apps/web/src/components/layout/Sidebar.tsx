@@ -18,8 +18,6 @@ import {
   PanelLeftClose,
   PanelLeft,
   Plus,
-  Search,
-  Sparkles,
   type LucideIcon
 } from "lucide-react";
 
@@ -170,22 +168,7 @@ export default function Sidebar({
           >
             <Plus className="h-5 w-5" />
           </button>
-          <button
-            disabled
-            className="flex h-9 w-9 items-center justify-center rounded-md opacity-50 cursor-not-allowed text-[hsl(var(--sidebar-foreground))]/50"
-            title="Buscar - Próximamente"
-          >
-            <Search className="h-5 w-5" />
-          </button>
-          <button
-            disabled
-            className="flex h-9 w-9 items-center justify-center rounded-md opacity-50 cursor-not-allowed text-[hsl(var(--sidebar-foreground))]/50"
-            title="Personalizar - Próximamente"
-          >
-            <Sparkles className="h-5 w-5" />
-          </button>
         </div>
-
         {/* Divider */}
         <div className="mx-3 border-t border-[hsl(var(--sidebar-border))]" />
 
@@ -287,23 +270,7 @@ export default function Sidebar({
           <Plus className="h-4 w-4" />
           <span>Nuevo chat</span>
         </button>
-        <button disabled className="flex items-center gap-3 rounded-md px-3 py-2 text-sm opacity-50 cursor-not-allowed text-[hsl(var(--sidebar-foreground))]/50">
-          <Search className="h-4 w-4" />
-          <div className="flex flex-col">
-            <span>Buscar</span>
-            <span className="text-[10px] text-[hsl(var(--sidebar-foreground))]/[0.27]">Próximamente</span>
-          </div>
-        </button>
-        <button disabled className="flex items-center gap-3 rounded-md px-3 py-2 text-sm opacity-50 cursor-not-allowed text-[hsl(var(--sidebar-foreground))]/50">
-          <Sparkles className="h-4 w-4" />
-          <div className="flex flex-col">
-            <span>Personalizar</span>
-            <span className="text-[10px] text-[hsl(var(--sidebar-foreground))]/[0.27]">Próximamente</span>
-          </div>
-        </button>
       </div>
-      <div className="mx-3 border-t border-[hsl(var(--sidebar-border))]" />
-
       {/* Main Navigation */}
       <nav className="flex-1 overflow-y-auto scrollbar-hide px-2 py-2">
         {sections.map((section) => (
