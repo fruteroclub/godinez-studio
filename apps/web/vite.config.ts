@@ -11,6 +11,7 @@ export default defineConfig({
     },
   },
   server: {
+    allowedHosts: ["improve-conventions-dylan-interim.trycloudflare.com"],
     proxy: {
       "/api": {
         target: "http://localhost:3001",
