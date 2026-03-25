@@ -43,21 +43,25 @@ function getNavSections(slug: string): NavSection[] {
       items: [
         { 
           label: sidebar.dashboard, 
+          subtitle: "Vista general",
           href: `/studio/${slug}`, 
           icon: LayoutDashboard 
         },
         { 
           label: sidebar.chat, 
+          subtitle: "Conversaciones",
           href: `/studio/${slug}/chat`, 
           icon: MessageCircle 
         },
         { 
           label: sidebar.projects, 
+          subtitle: "Proyectos",
           href: `/studio/${slug}/projects`, 
           icon: FolderOpen 
         },
         { 
           label: sidebar.tasks, 
+          subtitle: "Tareas",
           href: `/studio/${slug}/tasks`, 
           icon: CheckSquare 
         },
@@ -68,6 +72,7 @@ function getNavSections(slug: string): NavSection[] {
       items: [
         { 
           label: sidebar.files, 
+          subtitle: "Archivos",
           href: `/studio/${slug}/files`, 
           icon: FileText 
         },
@@ -85,6 +90,7 @@ function getNavSections(slug: string): NavSection[] {
       items: [
         { 
           label: "Hackathon", 
+          subtitle: "Flujo guiado",
           href: `/studio/${slug}/hackathon`, 
           icon: Trophy,
           highlight: "amber",
@@ -261,7 +267,7 @@ export default function Sidebar({
       {/* Main Navigation */}
       <nav className="overflow-y-auto scrollbar-hide px-2 py-1">
         {sections.map((section) => (
-          <div key={section.title} className="mb-2">
+          <div key={section.title} className="mb-4">
             <div className="px-3 py-1 text-[10px] font-semibold tracking-wider text-[hsl(var(--sidebar-foreground))]/[0.27] uppercase">
               {section.title}
             </div>
