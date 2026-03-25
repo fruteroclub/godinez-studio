@@ -145,7 +145,7 @@ export default function Sidebar({
   // Collapsed view - minimal icons only
   if (collapsed) {
     return (
-      <aside className="flex h-full w-14 flex-col border-r border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-background))]">
+      <aside className="flex h-full w-14 flex-col overflow-hidden border-r border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-background))]">
         {/* Toggle button */}
         <div className="flex h-14 min-h-14 shrink-0 items-center justify-center border-b border-[hsl(var(--border))]">
           <button
@@ -231,7 +231,7 @@ export default function Sidebar({
 
   // Expanded view
   return (
-    <aside className="flex h-full w-60 flex-col border-r border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-background))]">
+    <aside className="flex h-full w-60 flex-col overflow-hidden border-r border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-background))]">
       {/* Header */}
       <div className="flex h-14 min-h-14 shrink-0 items-center justify-between border-b border-[hsl(var(--border))] px-3">
         <Link to="/studio" onClick={onNavigate} className="flex items-center gap-2">
@@ -267,7 +267,7 @@ export default function Sidebar({
         </Link>
       </div>
       {/* Main Navigation */}
-      <nav className="overflow-visible px-2 py-1">
+      <nav className="overflow-hidden px-2 py-1">
         {sections.map((section) => (
           <div key={section.title} className="mb-4">
             <div className="px-3 py-1 text-[10px] font-semibold tracking-wider text-[hsl(var(--sidebar-foreground))]/[0.27] uppercase">
