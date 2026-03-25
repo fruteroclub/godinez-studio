@@ -21,6 +21,13 @@ import { logger } from "../lib/logger";
 
 const log = logger.child({ service: "provision" });
 
+/**
+ * NOTE: projectType/projectSubtype are stored in TWO places:
+ * - users table (SOURCE OF TRUTH for analytics)
+ * - agents.config (cached copy for agent access)
+ * Always update users first, then sync to agents.config.
+ */
+
 const app = new Hono<AuthEnv>();
 
 app.use("*", requireAuth, resolveUser);
