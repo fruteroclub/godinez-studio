@@ -1,4 +1,4 @@
-import { sql, eq, and } from "drizzle-orm";
+import { sql, eq, and, notInArray } from "drizzle-orm";
 import {
   gatewayInstances,
   workspaces,
@@ -129,6 +129,24 @@ export async function pickSharedInstance() {
         sql`${gatewayInstances.usedSlots} < ${gatewayInstances.maxSlots}`,
       ),
     )
+    .orderBy(sql`${gatewayInstances.usedSlots} DESC`)
+    .limit(1);
+  return row ?? null;
+}
+
+export async function pickSharedInstanceExcluding(excludeIds: number[]) {
+  const conditions = [
+    eq(gatewayInstances.tier, "shared"),
+    eq(gatewayInstances.status, "active"),
+    sql`${gatewayInstances.usedSlots} < ${gatewayInstances.maxSlots}`,
+  ];
+  if (excludeIds.length > 0) {
+    conditions.push(notInArray(gatewayInstances.id, excludeIds));
+  }
+  const [row] = await db
+    .select()
+    .from(gatewayInstances)
+    .where(and(...conditions))
     .orderBy(sql`${gatewayInstances.usedSlots} DESC`)
     .limit(1);
   return row ?? null;
