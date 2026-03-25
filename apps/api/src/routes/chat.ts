@@ -10,6 +10,7 @@ import {
   createMessage,
   getMessages,
   getMessageById,
+  getLastAgentMessage,
   getConversationById,
   updateMessageMetadata,
   linkConversationToProject,
@@ -24,6 +25,7 @@ import { pool } from "../services/gateway-pool";
 import { resolveAgentSession } from "../services/agent-mapping";
 import { createStubRun } from "../services/stub-agent";
 import { parseActionBlocks, stripActionBlocks } from "../lib/action-parser";
+import { logger } from "../lib/logger";
 import { verifyWorkspaceAccess } from "../middleware/require-resource-access";
 import {
   generateHeuristicTitle,
@@ -366,14 +368,20 @@ app.get("/stream/:runId", async (c) => {
                 });
               }
               runContexts.delete(runId);
-            } else if (!streamClosed) {
-              await stream.writeSSE({
-                event: "done",
-                data: JSON.stringify({ type: "done", text: cleanText }),
-              });
+            } else {
+              // No context found - message NOT saved to DB!
+              // Frontend will use /persist-response as fallback
+              console.warn(`[chat/stream] No runContext for runId ${runId} - message not persisted via SSE`);
+              if (!streamClosed) {
+                await stream.writeSSE({
+                  event: "done",
+                  data: JSON.stringify({ type: "done", text: cleanText }),
+                });
+              }
             }
-          } catch {
-            // DB or stream error
+          } catch (err) {
+            // DB or stream error - log for debugging
+            console.error(`[chat/stream] Error in onFinal for runId ${runId}:`, err);
           } finally {
             cleanup();
             resolve();
@@ -581,5 +589,71 @@ app.get("/history/:conversationId", async (c) => {
   const messages = await getMessages(conversationId);
   return c.json({ messages });
 });
+
+// POST /api/chat/persist-response — Ensure agent response is persisted (fallback for SSE race condition)
+app.post(
+  "/persist-response",
+  zValidator(
+    "json",
+    z.object({
+      conversationId: z.number(),
+      workspaceId: z.number(),
+      content: z.string(),
+      messageId: z.number().optional(),
+      actions: z
+        .array(
+          z.object({
+            id: z.string(),
+            type: z.string(),
+            label: z.string(),
+            payload: z.record(z.unknown()).optional(),
+            status: z.string().optional(),
+          }),
+        )
+        .optional(),
+    }),
+  ),
+  async (c) => {
+    const userId = c.get("userId");
+    const { conversationId, workspaceId, content, messageId, actions } = c.req.valid("json");
+
+    // Verify workspace access
+    if (!(await verifyWorkspaceAccess(userId, workspaceId))) {
+      return c.json({ error: "Not a workspace member" }, 403);
+    }
+
+    // Fast path: if SSE already saved with a messageId, just verify it exists
+    if (messageId) {
+      const existing = await getMessageById(messageId);
+      if (existing) {
+        return c.json({ persisted: true, messageId, alreadyExisted: true });
+      }
+    }
+
+    // Check last agent message (single row query, not full history)
+    const lastAgentMessage = await getLastAgentMessage(conversationId);
+    if (lastAgentMessage && lastAgentMessage.content === content) {
+      return c.json({ persisted: true, messageId: lastAgentMessage.id, alreadyExisted: true });
+    }
+
+    // Save the message (fallback persistence)
+    try {
+      const agentMessage = await createMessage({
+        conversationId,
+        workspaceId,
+        role: "agent",
+        content,
+        ...(actions?.length ? { metadata: { actions, fallbackPersist: true } } : { metadata: { fallbackPersist: true } }),
+      });
+
+      logger.info({ conversationId, messageId: agentMessage.id }, "fallback persist saved message");
+
+      return c.json({ persisted: true, messageId: agentMessage.id, alreadyExisted: false });
+    } catch (err) {
+      logger.error({ err, conversationId }, "fallback persist failed");
+      return c.json({ error: "Failed to persist message" }, 500);
+    }
+  },
+);
 
 export default app;

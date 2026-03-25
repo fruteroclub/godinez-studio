@@ -335,7 +335,12 @@ export class GatewayRelay {
     this.token = token;
 
     return new Promise((resolve, reject) => {
-      this.ws = new WebSocket(url);
+      this.ws = new WebSocket(url, {
+        headers: {
+          // Required for ngrok free tier to skip browser warning page
+          "ngrok-skip-browser-warning": "true",
+        },
+      });
 
       this.ws.on("error", (err) => {
         if (!this._connected) {
