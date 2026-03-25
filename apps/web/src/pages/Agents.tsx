@@ -173,6 +173,8 @@ function AgentSettingsForm({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["userContext"] });
+      queryClient.invalidateQueries({ queryKey: ["workspace"] });
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
     },
   });
 
@@ -210,16 +212,19 @@ function AgentSettingsForm({
     );
   }
 
-  function handleSave() {
+  async function handleSave() {
     // Save context if changed
     if (projectType && projectSubtype) {
       const currentType = userContext?.projectType;
       const currentSubtype = userContext?.projectSubtype;
       if (projectType !== currentType || projectSubtype !== currentSubtype) {
-        updateContext.mutate({ projectType, projectSubtype });
+        try {
+          await updateContext.mutateAsync({ projectType, projectSubtype });
+        } catch (err) {
+          console.error("Failed to update context:", err);
+        }
       }
     }
-
     // Save agent config
     updateConfig.mutate(
       {

@@ -2,7 +2,7 @@
  * Onboarding V3: Context update endpoint
  * 
  * Allows users to change their project type/subtype after onboarding.
- * Regenerates SOUL.md with new context.
+ * Regenerates SOUL.md with new context and updates workspace name.
  */
 
 import { Hono } from "hono";
@@ -12,7 +12,7 @@ import type { AuthEnv } from "../types";
 import { requireAuth } from "../middleware/auth";
 import { resolveUser } from "../middleware/resolve-user";
 import { updateUser, getUserById } from "../dal/users";
-import { getWorkspacesByUserId } from "../dal/workspaces";
+import { getWorkspacesByUserId, updateWorkspace } from "../dal/workspaces";
 import { pool } from "../services/gateway-pool";
 import { buildSoulMd } from "../services/agent-soul-template";
 import { logger } from "../lib/logger";
@@ -37,6 +37,12 @@ const PROJECT_SUBTYPES = [
   "crear_contenido", "automatizar", "construir",
   "investigar", "vender", "organizar",
 ] as const;
+
+const TYPE_LABELS: Record<string, string> = {
+  educacion: "Educación",
+  profesional: "Profesional",
+  personal: "Personal",
+};
 
 // GET /api/context — Get current user context
 app.get("/", async (c) => {
@@ -77,28 +83,33 @@ app.patch(
     await updateUser(userId, { projectType, projectSubtype });
     log.info({ userId, projectType, projectSubtype }, "user context updated");
 
-    // 2. Get user's workspace and agent to regenerate SOUL.md
+    // 2. Get user and workspace
+    const user = await getUserById(userId);
     const workspaces = await getWorkspacesByUserId(userId);
     const workspace = workspaces[0];
-    
-    if (!workspace?.agentSlot || !workspace.instanceId) {
-      // User doesn't have an agent yet, just save the context
+
+    if (!user || !workspace) {
       return c.json({ ok: true, regenerated: false });
     }
 
-    // 3. Get full user data for SOUL.md generation
-    const user = await getUserById(userId);
-    if (!user) {
-      return c.json({ ok: true, regenerated: false });
+    // 3. Update workspace name to reflect new type
+    const firstName = user.name?.split(" ")[0] || "Usuario";
+    const newName = `${firstName} - ${TYPE_LABELS[projectType] || projectType}`;
+    const newSlug = newName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    await updateWorkspace(workspace.id, { name: newName, slug: newSlug });
+    log.info({ workspaceId: workspace.id, newName }, "workspace name updated");
+
+    // 4. Regenerate SOUL.md if agent exists
+    if (!workspace.agentSlot || !workspace.instanceId) {
+      return c.json({ ok: true, regenerated: false, workspaceName: newName });
     }
 
-    // 4. Regenerate SOUL.md with new context
     try {
       const relay = await pool.getRelayForWorkspace(workspace.instanceId);
       
       const newSoul = buildSoulMd({
-        workspaceName: workspace.name,
-        agentName: workspace.name + " Agent",
+        workspaceName: newName,
+        agentName: newName + " Agent",
         agentSlot: workspace.agentSlot,
         userName: user.name || undefined,
         userRole: user.jobRole || undefined,
@@ -110,12 +121,12 @@ app.patch(
       await relay.agentsFilesSet(workspace.agentSlot, "SOUL.md", newSoul);
       
       log.info({ userId, projectType, projectSubtype }, "SOUL.md regenerated");
-      return c.json({ ok: true, regenerated: true });
+      return c.json({ ok: true, regenerated: true, workspaceName: newName });
     } catch (err) {
       // Non-fatal: context was saved, but SOUL.md couldn't be updated
       const msg = err instanceof Error ? err.message : "SOUL.md regeneration failed";
       log.warn({ userId, err: msg }, "context updated but SOUL.md regeneration failed");
-      return c.json({ ok: true, regenerated: false, warning: msg });
+      return c.json({ ok: true, regenerated: false, workspaceName: newName, warning: msg });
     }
   },
 );
