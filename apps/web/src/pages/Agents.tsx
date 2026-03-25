@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Bot } from "lucide-react";
-import { RoleIcon, NeedIcon } from "@/lib/icons";
+import { RoleIcon, NeedIcon, ProjectTypeIcon, ProjectSubtypeIcon } from "@/lib/icons";
 import { useAuth } from "@clerk/clerk-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate, useNavigate } from "react-router-dom";
@@ -39,23 +39,23 @@ const PROJECT_SUBTYPES = {
 };
 
 const PROJECT_TYPE_CONFIG = {
-  educacion: { emoji: "📚", title: "Educación", description: "Bootcamp, curso o aprendizaje autodidacta" },
-  profesional: { emoji: "💼", title: "Profesional", description: "Trabajo, negocio o empresa" },
-  personal: { emoji: "🚀", title: "Personal", description: "Hackathon, emprendimiento o proyecto propio" },
+  educacion: { title: "Educación", description: "Bootcamp, curso o aprendizaje autodidacta" },
+  profesional: { title: "Profesional", description: "Trabajo, negocio o empresa" },
+  personal: { title: "Personal", description: "Hackathon, emprendimiento o proyecto propio" },
 };
 
-const PROJECT_SUBTYPE_CONFIG: Record<string, { emoji: string; title: string; description: string }> = {
-  bootcamp: { emoji: "🎓", title: "Bootcamp o curso", description: "Programa de aprendizaje estructurado" },
-  aprender: { emoji: "📖", title: "Aprender por mi cuenta", description: "Aprendizaje autodidacta" },
-  hackathon: { emoji: "🏆", title: "Hackathon", description: "Participando en un hackathon" },
-  emprendimiento: { emoji: "💡", title: "Emprendimiento", description: "Construyendo mi propio negocio" },
-  proyecto: { emoji: "🛠️", title: "Proyecto en marcha", description: "Proyecto personal activo" },
-  crear_contenido: { emoji: "✍️", title: "Crear contenido", description: "Posts, copy, videos, marketing" },
-  automatizar: { emoji: "⚙️", title: "Automatizar tareas", description: "Procesos, flujos, integraciones" },
-  construir: { emoji: "💻", title: "Construir", description: "Apps, sitios, landing pages" },
-  investigar: { emoji: "🔍", title: "Investigar y analizar", description: "Datos, mercado, competencia" },
-  vender: { emoji: "💰", title: "Vender y atender", description: "Comercial, soporte, clientes" },
-  organizar: { emoji: "📋", title: "Organizar y planear", description: "Reportes, gestión, admin" },
+const PROJECT_SUBTYPE_CONFIG: Record<string, { title: string; description: string }> = {
+  bootcamp: { title: "Bootcamp o curso", description: "Programa de aprendizaje estructurado" },
+  aprender: { title: "Aprender por mi cuenta", description: "Aprendizaje autodidacta" },
+  hackathon: { title: "Hackathon", description: "Participando en un hackathon" },
+  emprendimiento: { title: "Emprendimiento", description: "Construyendo mi propio negocio" },
+  proyecto: { title: "Proyecto en marcha", description: "Proyecto personal activo" },
+  crear_contenido: { title: "Crear contenido", description: "Posts, copy, videos, marketing" },
+  automatizar: { title: "Automatizar tareas", description: "Procesos, flujos, integraciones" },
+  construir: { title: "Construir", description: "Apps, sitios, landing pages" },
+  investigar: { title: "Investigar y analizar", description: "Datos, mercado, competencia" },
+  vender: { title: "Vender y atender", description: "Comercial, soporte, clientes" },
+  organizar: { title: "Organizar y planear", description: "Reportes, gestión, admin" },
 };
 
 const ROLE_IDS = ["founder", "marketing", "sales", "operations", "tech", "support", "other"] as const;
@@ -287,11 +287,13 @@ function AgentSettingsForm({
                 {agent.status}
               </span>
             </div>
-            <p className="text-sm text-[hsl(var(--muted-foreground))]">
+            <p className="text-sm text-[hsl(var(--muted-foreground))] flex items-center gap-1">
               {projectType && projectSubtype ? (
                 <>
-                  {PROJECT_TYPE_CONFIG[projectType]?.emoji} {PROJECT_TYPE_CONFIG[projectType]?.title}
+                  <ProjectTypeIcon typeId={projectType} className="w-4 h-4 inline" />
+                  {PROJECT_TYPE_CONFIG[projectType]?.title}
                   {" → "}
+                  <ProjectSubtypeIcon subtypeId={projectSubtype} className="w-4 h-4 inline" />
                   {PROJECT_SUBTYPE_CONFIG[projectSubtype]?.title}
                 </>
               ) : (
@@ -328,7 +330,7 @@ function AgentSettingsForm({
           </label>
           <div className="grid grid-cols-3 gap-3">
             {PROJECT_TYPES.map((type) => {
-              const config = PROJECT_TYPE_CONFIG[type];
+              const typeConfig = PROJECT_TYPE_CONFIG[type];
               const isSelected = projectType === type;
               return (
                 <button
@@ -341,9 +343,9 @@ function AgentSettingsForm({
                       : "border-white/10 bg-[hsl(var(--card))] hover:border-white/20"
                   }`}
                 >
-                  <span className="text-2xl">{config.emoji}</span>
+                  <ProjectTypeIcon typeId={type} className="w-8 h-8 text-white" />
                   <span className="mt-2 text-sm font-medium text-[hsl(var(--foreground))]">
-                    {config.title}
+                    {typeConfig.title}
                   </span>
                 </button>
               );
@@ -359,8 +361,8 @@ function AgentSettingsForm({
             </label>
             <div className={`grid gap-3 ${subtypes.length > 3 ? 'grid-cols-2 lg:grid-cols-3' : 'grid-cols-' + subtypes.length}`}>
               {subtypes.map((subtype) => {
-                const config = PROJECT_SUBTYPE_CONFIG[subtype];
-                if (!config) return null;
+                const subtypeConfig = PROJECT_SUBTYPE_CONFIG[subtype];
+                if (!subtypeConfig) return null;
                 const isSelected = projectSubtype === subtype;
                 return (
                   <button
@@ -374,9 +376,9 @@ function AgentSettingsForm({
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <span className="text-lg">{config.emoji}</span>
+                      <ProjectSubtypeIcon subtypeId={subtype} className="w-5 h-5 text-white" />
                       <span className="text-sm font-medium text-[hsl(var(--foreground))]">
-                        {config.title}
+                        {subtypeConfig.title}
                       </span>
                     </div>
                   </button>

@@ -1,3 +1,4 @@
+import { ProjectTypeIcon, ProjectSubtypeIcon } from "@/lib/icons";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
@@ -26,26 +27,26 @@ type ProjectSubtype = typeof PROJECT_SUBTYPES[keyof typeof PROJECT_SUBTYPES][num
 
 // V3 Labels
 const PROJECT_TYPE_CONFIG = {
-  educacion: { emoji: "📚", title: "Educación", description: "Bootcamp, curso o aprendizaje autodidacta" },
-  profesional: { emoji: "💼", title: "Profesional", description: "Trabajo, negocio o empresa" },
-  personal: { emoji: "🚀", title: "Personal", description: "Hackathon, emprendimiento o proyecto propio" },
+  educacion: { title: "Educación", description: "Bootcamp, curso o aprendizaje autodidacta" },
+  profesional: { title: "Profesional", description: "Trabajo, negocio o empresa" },
+  personal: { title: "Personal", description: "Hackathon, emprendimiento o proyecto propio" },
 };
 
-const PROJECT_SUBTYPE_CONFIG: Record<string, { emoji: string; title: string; description: string }> = {
+const PROJECT_SUBTYPE_CONFIG: Record<string, { title: string; description: string }> = {
   // educacion
-  bootcamp: { emoji: "🎓", title: "Bootcamp o curso", description: "Estoy en un programa de aprendizaje estructurado" },
-  aprender: { emoji: "📖", title: "Aprender por mi cuenta", description: "Quiero aprender algo nuevo de forma autodidacta" },
+  bootcamp: { title: "Bootcamp o curso", description: "Estoy en un programa de aprendizaje estructurado" },
+  aprender: { title: "Aprender por mi cuenta", description: "Quiero aprender algo nuevo de forma autodidacta" },
   // personal
-  hackathon: { emoji: "🏆", title: "Hackathon", description: "Estoy participando en un hackathon" },
-  emprendimiento: { emoji: "💡", title: "Emprendimiento", description: "Estoy construyendo mi propio negocio" },
-  proyecto: { emoji: "🛠️", title: "Proyecto en marcha", description: "Tengo un proyecto personal que quiero avanzar" },
+  hackathon: { title: "Hackathon", description: "Estoy participando en un hackathon" },
+  emprendimiento: { title: "Emprendimiento", description: "Estoy construyendo mi propio negocio" },
+  proyecto: { title: "Proyecto en marcha", description: "Tengo un proyecto personal que quiero avanzar" },
   // profesional
-  crear_contenido: { emoji: "✍️", title: "Crear contenido", description: "Posts, copy, videos, marketing" },
-  automatizar: { emoji: "⚙️", title: "Automatizar tareas", description: "Procesos, flujos, integraciones" },
-  construir: { emoji: "💻", title: "Construir", description: "Apps, sitios, landing pages" },
-  investigar: { emoji: "🔍", title: "Investigar y analizar", description: "Datos, mercado, competencia" },
-  vender: { emoji: "💰", title: "Vender y atender", description: "Comercial, soporte, clientes" },
-  organizar: { emoji: "📋", title: "Organizar y planear", description: "Reportes, gestión, admin" },
+  crear_contenido: { title: "Crear contenido", description: "Posts, copy, videos, marketing" },
+  automatizar: { title: "Automatizar tareas", description: "Procesos, flujos, integraciones" },
+  construir: { title: "Construir", description: "Apps, sitios, landing pages" },
+  investigar: { title: "Investigar y analizar", description: "Datos, mercado, competencia" },
+  vender: { title: "Vender y atender", description: "Comercial, soporte, clientes" },
+  organizar: { title: "Organizar y planear", description: "Reportes, gestión, admin" },
 };
 
 // Legacy constants (for backward compatibility)
@@ -434,7 +435,7 @@ function StepContextV3({
                     : "border-white/10 bg-[hsl(var(--card))] hover:border-white/20"
                 }`}
               >
-                <span className="text-2xl">{config.emoji}</span>
+                <ProjectTypeIcon typeId={type} className="w-8 h-8 text-white" />
                 <span className="mt-2 text-sm font-medium text-[hsl(var(--foreground))]">
                   {config.title}
                 </span>
@@ -470,7 +471,7 @@ function StepContextV3({
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">{config.emoji}</span>
+                    <ProjectSubtypeIcon subtypeId={subtype} className="w-5 h-5 text-white" />
                     <span className="text-sm font-medium text-[hsl(var(--foreground))]">
                       {config.title}
                     </span>
