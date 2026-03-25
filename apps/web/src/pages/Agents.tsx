@@ -393,6 +393,11 @@ function AgentSettingsForm({
                         {subtypeConfig.title}
                       </span>
                     </div>
+                    {subtypeConfig.description && (
+                      <span className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+                        {subtypeConfig.description}
+                      </span>
+                    )}
                   </button>
                 );
               })}
