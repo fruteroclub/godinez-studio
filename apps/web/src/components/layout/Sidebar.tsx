@@ -158,7 +158,7 @@ export default function Sidebar({
         </div>
 
         {/* Quick actions */}
-        <div className="flex flex-col items-center gap-1 py-3">
+        <div className="flex flex-col items-center gap-1 py-1">
           <button
             className="flex h-9 w-9 items-center justify-center rounded-md text-[hsl(var(--sidebar-foreground))]/70 hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))] transition-colors"
             title="Nuevo chat"
@@ -170,7 +170,7 @@ export default function Sidebar({
         <div className="mx-3 border-t border-[hsl(var(--sidebar-border))]" />
 
         {/* Navigation icons */}
-        <nav className="flex flex-1 flex-col items-center gap-1 py-3">
+        <nav className="flex flex-1 flex-col items-center gap-1 py-1">
           {sections.flatMap((section) =>
             section.items.map((item) => {
               const Icon = item.icon;
@@ -200,7 +200,7 @@ export default function Sidebar({
         </nav>
 
         {/* Bottom section */}
-        <div className="flex flex-col items-center gap-1 border-t border-[hsl(var(--sidebar-border))] py-3">
+        <div className="flex flex-col items-center gap-1 border-t border-[hsl(var(--sidebar-border))] py-1">
           {configItems.slice(0, 2).map((item) => {
             const Icon = item.icon;
             return (
@@ -258,21 +258,21 @@ export default function Sidebar({
       </div>
 
       {/* Quick actions */}
-      <div className="flex flex-col gap-1 px-2 py-3">
-        <button className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-[hsl(var(--sidebar-foreground))]/70 hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))] transition-colors">
+      <div className="flex flex-col gap-0.5 px-2 py-1">
+        <button className="flex items-center gap-3 rounded-md px-3 py-1 text-sm text-[hsl(var(--sidebar-foreground))]/70 hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))] transition-colors">
           <Plus className="h-4 w-4" />
           <span>Nuevo chat</span>
         </button>
       </div>
       {/* Main Navigation */}
-      <nav className="flex-1 overflow-y-auto scrollbar-hide px-2 py-2">
+      <nav className="flex-1 overflow-y-auto scrollbar-hide px-2 py-1">
         {sections.map((section) => (
-          <div key={section.title} className="mb-2">
+          <div key={section.title} className="mb-1">
             <div className="px-3 py-1 text-[10px] font-semibold tracking-wider text-[hsl(var(--sidebar-foreground))]/[0.27] uppercase">
               {section.title}
             </div>
             
-            <div className="space-y-1">
+            <div className="space-y-0.5">
               {section.items.map((item) => {
                 const Icon = item.icon;
                 return (
@@ -310,7 +310,7 @@ export default function Sidebar({
       </nav>
 
       {/* Configuration Section */}
-      <nav className="border-t border-[hsl(var(--sidebar-border))] px-2 py-2">
+      <nav className="border-t border-[hsl(var(--sidebar-border))] px-2 py-1">
         <div className="px-3 py-1 text-[10px] font-semibold tracking-wider text-[hsl(var(--sidebar-foreground))]/[0.27] uppercase">
           CONFIGURACIÓN
         </div>
