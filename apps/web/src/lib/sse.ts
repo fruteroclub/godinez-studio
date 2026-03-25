@@ -146,10 +146,12 @@ export function connectSSE(runId: string, handlers: SSEHandlers, token?: string 
       if (closed) return;
       resetTimeout();
       try {
-        const { text } = JSON.parse(e.data);
-        if (text) {
-          latestText = text;
-          
+        const data = JSON.parse(e.data);
+        // Support incremental fragments (new) and full snapshots (legacy fallback)
+        const chunk = data.fragment ?? data.text;
+        if (chunk) {
+          latestText = data.fragment ? latestText + chunk : chunk;
+
           // Start animation if not started
           if (!started) {
             if (startTimeout) clearTimeout(startTimeout);
