@@ -171,14 +171,16 @@ export default function Sidebar({
             <Plus className="h-5 w-5" />
           </button>
           <button
-            className="flex h-9 w-9 items-center justify-center rounded-md text-[hsl(var(--sidebar-foreground))]/70 hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))] transition-colors"
-            title="Buscar"
+            disabled
+            className="flex h-9 w-9 items-center justify-center rounded-md opacity-50 cursor-not-allowed text-[hsl(var(--sidebar-foreground))]/50"
+            title="Buscar - Próximamente"
           >
             <Search className="h-5 w-5" />
           </button>
           <button
-            className="flex h-9 w-9 items-center justify-center rounded-md text-[hsl(var(--sidebar-foreground))]/70 hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))] transition-colors"
-            title="Personalizar"
+            disabled
+            className="flex h-9 w-9 items-center justify-center rounded-md opacity-50 cursor-not-allowed text-[hsl(var(--sidebar-foreground))]/50"
+            title="Personalizar - Próximamente"
           >
             <Sparkles className="h-5 w-5" />
           </button>
@@ -285,17 +287,21 @@ export default function Sidebar({
           <Plus className="h-4 w-4" />
           <span>Nuevo chat</span>
         </button>
-        <button className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-[hsl(var(--sidebar-foreground))]/70 hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))] transition-colors">
+        <button disabled className="flex items-center gap-3 rounded-md px-3 py-2 text-sm opacity-50 cursor-not-allowed text-[hsl(var(--sidebar-foreground))]/50">
           <Search className="h-4 w-4" />
-          <span>Buscar</span>
+          <div className="flex flex-col">
+            <span>Buscar</span>
+            <span className="text-[10px] text-[hsl(var(--sidebar-foreground))]/[0.27]">Próximamente</span>
+          </div>
         </button>
-        <button className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-[hsl(var(--sidebar-foreground))]/70 hover:bg-[hsl(var(--sidebar-accent))] hover:text-[hsl(var(--sidebar-foreground))] transition-colors">
+        <button disabled className="flex items-center gap-3 rounded-md px-3 py-2 text-sm opacity-50 cursor-not-allowed text-[hsl(var(--sidebar-foreground))]/50">
           <Sparkles className="h-4 w-4" />
-          <span>Personalizar</span>
+          <div className="flex flex-col">
+            <span>Personalizar</span>
+            <span className="text-[10px] text-[hsl(var(--sidebar-foreground))]/[0.27]">Próximamente</span>
+          </div>
         </button>
       </div>
-
-      {/* Divider */}
       <div className="mx-3 border-t border-[hsl(var(--sidebar-border))]" />
 
       {/* Main Navigation */}
