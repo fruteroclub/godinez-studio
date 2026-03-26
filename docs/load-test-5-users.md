@@ -133,6 +133,72 @@ Solo si ronda 1 y 2 fueron exitosas:
 
 ---
 
+### Ronda 4 — GitHub + Vercel deploy simultáneo (T+15 min)
+
+> ⚠️ Esta es la ronda más exigente. Solo ejecutar si rondas 1-3 pasaron sin errores.
+
+**Objetivo:** 5 usuarios crean un proyecto web con el agente, lo suben a GitHub y despliegan a Vercel al mismo tiempo.
+
+#### Setup previo (cada usuario antes de la señal):
+
+Cada usuario debe tener listo:
+- Cuenta de GitHub conectada al agente
+- Cuenta de Vercel (puede ser la misma que GitHub OAuth)
+- Workspace provisionado y agente activo
+
+#### Mensaje para los 5 usuarios:
+
+> **Ronda 4 — Deploy simultáneo:**
+>
+> Cuando diga "¡DEPLOY!" todos mandan este mensaje a su agente:
+>
+> *"Crea un proyecto web simple — una landing page con mi nombre y una descripción de lo que hago. Súbelo a GitHub y despliégalo en Vercel."*
+>
+> Después solo sigan las instrucciones del agente. Reportan cuando tengan la URL de Vercel o si ven algún error.
+
+#### Qué monitorea cada rol:
+
+**Scarf:**
+- PostHog: buscar eventos de `create_project`, `chat_message_sent` con payload de deploy
+- Clarity: ver si algún usuario se queda atascado esperando
+
+**Mel:**
+- Railway Metrics: CPU y Memory — esta ronda genera más carga (agente ejecuta comandos)
+- Logs: buscar `cloudflared`, `git push`, errores de Vercel CLI
+
+**Kukulcán:**
+```bash
+# Logs clave para esta ronda:
+# ✅ tunnel URL generada     → cloudflared funcionando
+# ✅ git push exitoso        → repo en GitHub
+# ✅ vercel deploy           → deploy completado
+# ❌ "spawn ENOENT"          → CLI no encontrada en el agente
+# ❌ "vercel: command not found" → Vercel CLI no instalada en el slot
+# ❌ "authentication required"   → token de Vercel no configurado
+```
+
+#### Métricas de esta ronda:
+
+```
+RONDA 4:
+  Hora inicio: ___:___
+  Usuarios que recibieron URL de Vercel: ___ / 5
+  Tiempo hasta primer deploy exitoso: ___ minutos
+  Tiempo hasta último deploy: ___ minutos
+  Repos creados en GitHub: ___ / 5
+  Errores de deploy: [ ] Ninguno [ ] Vercel auth [ ] GitHub push [ ] CLI [ ] otro: ___
+  CPU pico durante deploys: ___%
+  Memory pico: ___ MB
+```
+
+#### Criterio de éxito:
+
+- ≥ 4/5 usuarios tienen URL de Vercel funcionando
+- Ningún agente se cuelga sin responder > 3 minutos
+- No hay `CAPACITY_FULL` ni pérdida de sesión SSE
+
+---
+
 ## Métricas a capturar (llenar durante la prueba)
 
 ### Formulario del monitor
@@ -154,7 +220,17 @@ RONDA 2:
 RONDA 3:
   Rate limiter activado: [ ] Sí [ ] No
   Mensajes procesados en orden: [ ] Sí [ ] No
-  
+
+RONDA 4 — GitHub + Vercel deploy:
+  Hora inicio: ___:___
+  URLs de Vercel recibidas: ___ / 5
+  Tiempo primer deploy: ___ min
+  Tiempo último deploy: ___ min
+  Repos en GitHub: ___ / 5
+  Errores: [ ] Ninguno [ ] Vercel auth [ ] GitHub push [ ] CLI missing [ ] otro: ___
+  CPU pico: ___%
+  Memory pico: ___ MB
+
 RAILWAY METRICS (capturar al final):
   CPU pico: ___%
   CPU promedio: ___%
