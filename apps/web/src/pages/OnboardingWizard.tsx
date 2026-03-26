@@ -1,4 +1,4 @@
-import { ProjectTypeIcon, ProjectSubtypeIcon, RoleIcon } from "@/lib/icons";
+import { ProjectTypeIcon, ProjectSubtypeIcon } from "@/lib/icons";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
@@ -434,7 +434,7 @@ function StepContextV3({
                     : "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] hover:border-white/20"
                 }`}
               >
-                <RoleIcon roleId={id} className="w-4 h-4 stroke-[1.5] inline mr-1.5" />{label}
+                {label}
               </button>
             );
           })}
