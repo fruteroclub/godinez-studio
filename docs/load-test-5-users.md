@@ -8,40 +8,67 @@
 Medir latencia end-to-end con 5 usuarios enviando mensajes simultáneos al agente, y generar un reporte de comportamiento de la plataforma bajo carga real.
 
 **Duración estimada:** 30-45 minutos  
-**Participantes:** 5 usuarios + 1 monitor (Scarf/Kukulcán)
+**Participantes:** 5 usuarios + 3 roles de monitoreo
+
+### Roles el día de la prueba
+
+| Rol | Persona | Herramientas |
+|-----|---------|-------------|
+| **Coordinador + Monitor UX** | Scarf | Clarity, PostHog, señales de inicio/fin |
+| **Monitor Infra** | Mel | Railway Dashboard (Metrics tab), Railway logs |
+| **Monitor Logs/DB** | Kukulcán | `railway logs --tail` en tiempo real, psql DB connections, reporte final |
+| **Usuarios de prueba** | 5 personas | dev-studio.godinez.ai — solo enviar mensajes |
+
+> Kukulcán monitorea desde aquí durante la sesión. Avisar en este canal cuando empiece y él reporta lo que ve en logs en tiempo real.
 
 ---
 
 ## Preparación (30 min antes)
 
-### Monitor (Scarf)
+### Scarf — Coordinador + Monitor UX
 
-Abrir 4 terminales/tabs simultáneos:
-
-**Terminal 1 — Railway logs:**
-```bash
-railway logs --service api --tail
-```
-
-**Terminal 2 — DB connections:**
-```bash
-railway connect postgres
-# En psql, correr cada 2 min:
-SELECT count(*), state FROM pg_stat_activity GROUP BY state;
-```
-
-**Terminal 3 — Railway Dashboard:**
-- Abrir https://railway.app → godinez → api → tab **Metrics**
-- Dejar abierto en pantalla secundaria
-
-**Tab 4 — PostHog:**
+**Tab 1 — PostHog:**
 - Abrir https://us.posthog.com → proyecto Godínez Studio
 - Ir a **Live Events** (tiempo real)
 - Filtrar por evento: `chat_message_sent`
 
-**Tab 5 — Clarity:**
+**Tab 2 — Clarity:**
 - Abrir https://clarity.microsoft.com → proyecto Godínez Studio
-- Ir a **Dashboard** — sesiones activas se ven en tiempo real
+- Ir a **Dashboard** — sesiones activas en tiempo real
+
+**Responsabilidad:** dar las señales "¡YA!" y "¡SEGUNDA!" al canal. Anotar tiempos de respuesta que reportan los usuarios.
+
+---
+
+### Mel — Monitor Infra (Railway)
+
+**Tab 1 — Railway Dashboard:**
+- Abrir https://railway.app → godinez → api → tab **Metrics**
+- Mantener visible durante toda la sesión
+- Capturar screenshot de Metrics al final de cada ronda
+
+**Tab 2 — Railway Logs (web):**
+- Misma pantalla de Railway → tab **Logs**
+- Buscar: `CAPACITY_FULL`, `gateway connection failed`, `agents.create failed`
+
+**Responsabilidad:** reportar en el canal si CPU > 80% o errores en logs.
+
+---
+
+### Kukulcán — Monitor Logs/DB + Reporte Final
+
+Monitorea desde el servidor. Avisar en **#scarf-kukulcan-cto** al inicio de la prueba para activar monitoreo en tiempo real.
+
+```bash
+# Terminal 1 — logs en tiempo real
+railway logs --service api --tail
+
+# Terminal 2 — DB connections (cada 2 min)
+railway connect postgres
+SELECT count(*), state FROM pg_stat_activity GROUP BY state;
+```
+
+**Responsabilidad:** reportar hallazgos en el canal durante la sesión. Compilar reporte final.
 
 ---
 
