@@ -154,6 +154,7 @@ export interface Conversation {
   createdAt: string;
   isHackathon: boolean;
   hackathonId: number | null;
+  isStarred: boolean;
 }
 
 export interface Message {

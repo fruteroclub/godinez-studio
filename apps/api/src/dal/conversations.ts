@@ -213,3 +213,15 @@ export async function updateMessageActionStatus(
     // If metadata is malformed, skip silently
   }
 }
+
+export async function updateConversation(
+  conversationId: number,
+  data: { title?: string; isStarred?: boolean },
+) {
+  const [conversation] = await db
+    .update(conversations)
+    .set(data)
+    .where(eq(conversations.id, conversationId))
+    .returning();
+  return conversation;
+}
