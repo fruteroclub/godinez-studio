@@ -72,7 +72,11 @@ app.post(
     }),
   ),
   async (c) => {
+    const userId = c.get("userId");
     const { workspaceId, hackathonId, hackathonName } = c.req.valid("json");
+    if (!(await verifyWorkspaceAccess(userId, workspaceId))) {
+      return c.json({ error: "Not a workspace member" }, 403);
+    }
     const workspace = await getWorkspaceById(workspaceId);
     if (!workspace?.agentId) {
       return c.json({ error: "No agent assigned to this workspace" }, 400);

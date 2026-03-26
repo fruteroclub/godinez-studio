@@ -7,11 +7,14 @@ import { getUnprocessedErrors, updateErrorClassification, getSystemHealth } from
 
 const app = new Hono();
 
-// API Key simple para Watchdog
-const WATCHDOG_API_KEY = process.env.WATCHDOG_API_KEY || "watchdog-dev-key-2026";
+// API Key for Watchdog — fail-closed if not configured
+const WATCHDOG_API_KEY = process.env.WATCHDOG_API_KEY;
 
 // Middleware de autenticación
 app.use("*", async (c, next) => {
+  if (!WATCHDOG_API_KEY) {
+    return c.json({ error: "Watchdog not configured", code: "SERVICE_UNAVAILABLE" }, 503);
+  }
   const apiKey = c.req.header("X-Watchdog-Key");
   if (apiKey !== WATCHDOG_API_KEY) {
     return c.json({ error: "Unauthorized", code: "INVALID_API_KEY" }, 401);
