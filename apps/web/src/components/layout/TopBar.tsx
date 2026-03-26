@@ -22,7 +22,7 @@ export default function TopBar({
   const breadcrumbs = getBreadcrumbs(pathname);
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 sm:px-6">
+    <header className="flex h-14 min-h-14 shrink-0 items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--background))] px-4 sm:px-6">
       <div className="flex items-center min-w-0">
         <button
           onClick={onMenuToggle}

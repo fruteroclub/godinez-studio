@@ -129,7 +129,7 @@ export default function Files() {
         <div className="space-y-1">
           <div className="flex items-center justify-between text-xs text-[hsl(var(--muted-foreground))]">
             <span>
-              {formatSize(quota.usedBytes)} de {formatSize(quota.quotaBytes)}
+              {formatSize(quota.quotaBytes - quota.usedBytes)} disponibles de {formatSize(quota.quotaBytes)}
             </span>
             <span>{quota.usedPercent}%</span>
           </div>

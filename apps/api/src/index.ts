@@ -29,6 +29,7 @@ import watchdog from "./routes/watchdog";
 import { logError } from "./dal/errors";
 import "./services/gateway-pool"; // initialize pool (lazy connections)
 import { initSentry, Sentry } from "./lib/sentry";
+import context from "./routes/context";
 import { isAppError, formatErrorResponse } from "./lib/errors";
 import { rateLimits } from "./middleware/rate-limit";
 
@@ -41,7 +42,7 @@ app.use(
   "*",
   cors({
     origin: process.env.CORS_ORIGIN?.split(",") ?? [],
-    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization", "X-Service-Key"],
     exposeHeaders: ["Content-Type"],
     credentials: true,
@@ -79,6 +80,7 @@ app.route("/api/users", users);
 app.route("/api/hackathons", hackathons);
 app.route("/webhooks", webhooks);
 app.route("/api/watchdog", watchdog);
+app.route("/api/context", context);
 
 app.onError((err, c) => {
   Sentry.captureException(err);

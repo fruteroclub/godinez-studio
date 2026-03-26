@@ -1,0 +1,1 @@
+# Soul Templates\n\nThis directory contains modular SOUL.md templates for Onboarding V3.\n\nStructure:\n- base.md — Common instructions for all users\n- personal/ — Templates for personal projects\n- educacion/ — Templates for education contexts\n- profesional/ — Templates for business users\n\nSee ONBOARDING-V3-SPEC.md for details.

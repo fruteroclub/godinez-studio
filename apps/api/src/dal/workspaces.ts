@@ -65,7 +65,7 @@ export async function createWorkspace(data: {
 
 export async function updateWorkspace(
   id: number,
-  data: Partial<{ name: string; tier: string; status: string }>,
+  data: Partial<{ name: string; slug: string; tier: string; status: string }>,
 ) {
   const [workspace] = await db
     .update(workspaces)

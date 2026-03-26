@@ -22,9 +22,34 @@ import { logger } from "../lib/logger";
 
 const log = logger.child({ service: "provision" });
 
+/**
+ * NOTE: projectType/projectSubtype are stored in TWO places:
+ * - users table (SOURCE OF TRUTH for analytics)
+ * - agents.config (cached copy for agent access)
+ * Always update users first, then sync to agents.config.
+ */
+
 const app = new Hono<AuthEnv>();
 
 app.use("*", requireAuth, resolveUser);
+
+// Onboarding V3: Project type and subtype enums
+const PROJECT_TYPES = ["educacion", "profesional", "personal"] as const;
+const PROJECT_SUBTYPES_BY_TYPE = {
+  educacion: ["bootcamp", "aprender"],
+  personal: ["hackathon", "emprendimiento", "proyecto"],
+  profesional: ["crear_contenido", "automatizar", "construir", "investigar", "vender", "organizar"],
+} as const;
+
+const PROJECT_SUBTYPES = [
+  // educacion
+  "bootcamp", "aprender",
+  // personal
+  "hackathon", "emprendimiento", "proyecto",
+  // profesional
+  "crear_contenido", "automatizar", "construir",
+  "investigar", "vender", "organizar",
+] as const;
 
 // POST /api/agents/provision — Provision an OpenClaw agent for a workspace
 app.post(
@@ -41,12 +66,25 @@ app.post(
       needs: z.array(z.string()).optional(),
       userRole: z.string().max(50).optional(),
       businessDescription: z.string().max(255).optional(),
-    }),
+      // Onboarding V3: New fields
+      projectType: z.enum(PROJECT_TYPES).optional(),
+      projectSubtype: z.enum(PROJECT_SUBTYPES).optional(),
+    }).refine(
+      (data) => {
+        if (!data.projectType && !data.projectSubtype) return true;
+        if (!data.projectType || !data.projectSubtype) return false;
+        const validSubtypes = PROJECT_SUBTYPES_BY_TYPE[data.projectType] as readonly string[];
+        return validSubtypes.includes(data.projectSubtype);
+      },
+      { message: "Invalid projectSubtype for the given projectType" }
+    ),
   ),
   async (c) => {
     const userId = c.get("userId");
-    const { workspaceId, userName, agentName, personality, needs, userRole, businessDescription } =
-      c.req.valid("json");
+    const { 
+      workspaceId, userName, agentName, personality, needs, userRole, businessDescription,
+      projectType, projectSubtype  // Onboarding V3
+    } = c.req.valid("json");
 
     // 1. Verify workspace exists
     const workspace = await getWorkspaceById(workspaceId);
@@ -151,6 +189,8 @@ app.post(
         businessDescription,
         personality,
         needs,
+        projectType,      // Onboarding V3
+        projectSubtype,   // Onboarding V3
       });
       await relay.agentsFilesSet(agentResult.agentId, "SOUL.md", soulMd);
       log.info({ slot: slotName }, "SOUL.md injected");
@@ -183,13 +223,17 @@ app.post(
     if (businessDescription) agentConfig.businessDescription = businessDescription;
     if (personality) agentConfig.personality = personality;
     if (needs?.length) agentConfig.needs = needs;
+    if (projectType) agentConfig.projectType = projectType;           // Onboarding V3
+    if (projectSubtype) agentConfig.projectSubtype = projectSubtype;  // Onboarding V3
 
     try {
-      // Persist role + business on user record (source of truth for analytics)
-      if (userRole || businessDescription) {
+      // Persist user data on user record (source of truth for analytics)
+      if (userRole || businessDescription || projectType || projectSubtype) {
         await updateUser(userId, {
           ...(userRole && { jobRole: userRole }),
           ...(businessDescription && { businessDescription }),
+          ...(projectType && { projectType }),           // Onboarding V3
+          ...(projectSubtype && { projectSubtype }),     // Onboarding V3
         });
       }
 

@@ -16,7 +16,14 @@ export async function getUserById(id: number) {
 
 export async function updateUser(
   id: number,
-  data: { name?: string; jobRole?: string; businessDescription?: string },
+  data: {
+    name?: string;
+    jobRole?: string;
+    businessDescription?: string;
+    projectType?: string;       // Onboarding V3
+    projectSubtype?: string;    // Onboarding V3
+    deadline?: Date | null;     // Onboarding V3
+  },
 ) {
   const [updated] = await db
     .update(users)
