@@ -10,6 +10,7 @@ import WorkspaceProvider, {
 
 function ShellContent() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { workspace, isLoading, slug } = useWorkspace();
   const location = useLocation();
 
@@ -40,12 +41,18 @@ function ShellContent() {
         />
       )}
 
+      {/* Sidebar container - width adjusts based on collapsed state */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-60 transform transition-transform duration-200 lg:static lg:translate-x-0 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 transform transition-all duration-200 lg:static lg:translate-x-0 ${
+          sidebarCollapsed ? "w-14" : "w-60"
+        } ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
-        <Sidebar slug={slug} onNavigate={() => setSidebarOpen(false)} />
+        <Sidebar 
+          slug={slug} 
+          onNavigate={() => setSidebarOpen(false)}
+          collapsed={sidebarCollapsed}
+          onCollapsedChange={setSidebarCollapsed}
+        />
       </div>
 
       <div className="flex flex-1 flex-col overflow-hidden">

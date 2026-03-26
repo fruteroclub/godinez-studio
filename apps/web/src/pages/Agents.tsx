@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { Bot } from "lucide-react";
-import { RoleIcon, NeedIcon } from "@/lib/icons";
+import { RoleIcon, NeedIcon, ProjectTypeIcon, ProjectSubtypeIcon } from "@/lib/icons";
 import { useAuth } from "@clerk/clerk-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Navigate, useNavigate } from "react-router-dom";
 import { apiFetch } from "@/lib/api";
 import { content } from "@/lib/content";
@@ -23,33 +23,44 @@ interface Agent {
   config: Record<string, unknown> | null;
 }
 
-const ROLE_IDS = [
-  "founder",
-  "marketing",
-  "sales",
-  "operations",
-  "tech",
-  "support",
-  "other",
-] as const;
+interface UserContext {
+  projectType: string | null;
+  projectSubtype: string | null;
+}
 
-const PERSONALITY_IDS = [
-  "professional",
-  "friendly",
-  "creative",
-  "technical",
-] as const;
+// V3 Types
+const PROJECT_TYPES = ["educacion", "profesional", "personal"] as const;
+type ProjectType = typeof PROJECT_TYPES[number];
 
-const NEED_IDS = [
-  "launch",
-  "automate",
-  "social",
-  "sales",
-  "time",
-  "research",
-  "support",
-  "build",
-] as const;
+const PROJECT_SUBTYPES = {
+  educacion: ["bootcamp", "aprender"] as const,
+  personal: ["hackathon", "emprendimiento", "proyecto"] as const,
+  profesional: ["crear_contenido", "automatizar", "construir", "investigar", "vender", "organizar"] as const,
+};
+
+const PROJECT_TYPE_CONFIG = {
+  educacion: { title: "Educación", description: "Bootcamp, curso o aprendizaje autodidacta" },
+  profesional: { title: "Profesional", description: "Trabajo, negocio o empresa" },
+  personal: { title: "Personal", description: "Hackathon, emprendimiento o proyecto propio" },
+};
+
+const PROJECT_SUBTYPE_CONFIG: Record<string, { title: string; description: string }> = {
+  bootcamp: { title: "Bootcamp o curso", description: "Programa de aprendizaje estructurado" },
+  aprender: { title: "Aprender por mi cuenta", description: "Aprendizaje autodidacta" },
+  hackathon: { title: "Hackathon", description: "Participando en un hackathon" },
+  emprendimiento: { title: "Emprendimiento", description: "Construyendo mi propio negocio" },
+  proyecto: { title: "Proyecto en marcha", description: "Proyecto personal activo" },
+  crear_contenido: { title: "Crear contenido", description: "Posts, copy, textos" },
+  automatizar: { title: "Automatizar tareas", description: "Procesos repetitivos, flujos" },
+  construir: { title: "Construir", description: "App, sitio web, landing page" },
+  investigar: { title: "Investigar y analizar", description: "Datos, mercado, competencia" },
+  vender: { title: "Vender y atender", description: "Estrategia comercial, soporte a clientes" },
+  organizar: { title: "Organizar y planear", description: "Reportes, gestión, coordinación" },
+};
+
+const ROLE_IDS = ["negocio", "marketing", "ventas", "admin", "tech", "educacion", "creatividad", "consultoria", "otra"] as const;
+const PERSONALITY_IDS = ["professional", "friendly", "creative", "technical"] as const;
+const NEED_IDS = ["launch", "automate", "social", "sales", "time", "research", "support", "build"] as const;
 
 const statusColors: Record<string, string> = {
   active: "bg-green-500/20 text-green-400",
@@ -74,6 +85,15 @@ export default function Agents() {
     enabled: !!workspace?.agentId,
   });
 
+  // Fetch user context (V3)
+  const { data: userContext } = useQuery({
+    queryKey: ["userContext"],
+    queryFn: async () => {
+      const token = await getToken();
+      return apiFetch<UserContext>("/api/context", { token });
+    },
+  });
+
   if (wsLoading || (workspace?.agentId && agentLoading)) {
     return <PageSkeleton />;
   }
@@ -87,6 +107,7 @@ export default function Agents() {
       agent={agent}
       workspaceId={workspace.id}
       slug={slug}
+      userContext={userContext}
     />
   );
 }
@@ -95,40 +116,76 @@ function AgentSettingsForm({
   agent,
   workspaceId,
   slug,
+  userContext,
 }: {
   agent: Agent;
   workspaceId: number;
   slug: string;
+  userContext?: UserContext;
 }) {
   const navigate = useNavigate();
+  const { getToken } = useAuth();
+  const queryClient = useQueryClient();
   const updateConfig = useUpdateAgentConfig(agent.id);
   const createConversation = useCreateConversation(workspaceId);
 
   const config = agent.config ?? {};
 
+  // V3 State
+  const [projectType, setProjectType] = useState<ProjectType | null>(
+    (userContext?.projectType as ProjectType) || (config.projectType as ProjectType) || null
+  );
+  const [projectSubtype, setProjectSubtype] = useState<string | null>(
+    userContext?.projectSubtype || (config.projectSubtype as string) || null
+  );
+
   // Form state — init from agent config
   const [agentName, setAgentName] = useState(agent.name);
   const [personality, setPersonality] = useState<string>(
-    (config.personality as string) || "friendly",
+    (config.personality as string) || "friendly"
   );
   const [selectedNeeds, setSelectedNeeds] = useState<string[]>(
-    (config.needs as string[]) || [],
+    (config.needs as string[]) || []
   );
   const [userRole, setUserRole] = useState(
-    (config.userRole as string) || "",
+    (config.userRole as string) || ""
   );
   const [businessDescription, setBusinessDescription] = useState(
-    (config.businessDescription as string) || "",
+    (config.businessDescription as string) || ""
   );
   const [customInstructions, setCustomInstructions] = useState(
-    (config.customInstructions as string) || "",
+    (config.customInstructions as string) || ""
   );
 
   const [saveFlash, setSaveFlash] = useState(false);
   const [needsRestart, setNeedsRestart] = useState(false);
   const [offlineError, setOfflineError] = useState(false);
 
-  // Reset form when agent data changes (e.g. after save invalidation)
+  // Update context mutation
+  const updateContext = useMutation({
+    mutationFn: async (data: { projectType: string; projectSubtype: string }): Promise<{ workspaceName?: string }> => {
+      const token = await getToken();
+      return apiFetch("/api/context", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+        token,
+      });
+    },
+    onSuccess: (data: { workspaceName?: string }) => {
+      queryClient.invalidateQueries({ queryKey: ["userContext"] });
+      queryClient.invalidateQueries({ queryKey: ["workspace"] });
+      queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      // Redirect to new slug if workspace name changed
+      if (data?.workspaceName) {
+        const newSlug = data.workspaceName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+        if (newSlug !== slug) {
+          navigate(`/studio/${newSlug}/agents`, { replace: true });
+        }
+      }
+    },
+  });
+
+  // Reset form when agent data changes
   useEffect(() => {
     setAgentName(agent.name);
     setPersonality((agent.config?.personality as string) || "friendly");
@@ -138,18 +195,49 @@ function AgentSettingsForm({
     setCustomInstructions((agent.config?.customInstructions as string) || "");
   }, [agent]);
 
+  // Update from userContext when it loads
+  useEffect(() => {
+    if (userContext) {
+      if (userContext.projectType) setProjectType(userContext.projectType as ProjectType);
+      if (userContext.projectSubtype) setProjectSubtype(userContext.projectSubtype);
+    }
+  }, [userContext]);
+
+  // Reset subtype when type changes
+  useEffect(() => {
+    if (projectType) {
+      const validSubtypes = PROJECT_SUBTYPES[projectType] as readonly string[];
+      if (projectSubtype && !validSubtypes.includes(projectSubtype)) {
+        setProjectSubtype(null);
+      }
+    }
+  }, [projectType, projectSubtype]);
+
   function toggleNeed(id: string) {
     setSelectedNeeds((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
     );
   }
 
-  function handleSave() {
+  async function handleSave() {
+    // Save context if changed
+    if (projectType && projectSubtype) {
+      const currentType = userContext?.projectType;
+      const currentSubtype = userContext?.projectSubtype;
+      if (projectType !== currentType || projectSubtype !== currentSubtype) {
+        try {
+          await updateContext.mutateAsync({ projectType, projectSubtype });
+        } catch (err) {
+          console.error("Failed to update context:", err);
+        }
+      }
+    }
+    // Save agent config
     updateConfig.mutate(
       {
         agentName: agentName.trim(),
-        userRole,
-        businessDescription: businessDescription.trim(),
+        userRole: projectType === "profesional" ? userRole : "",
+        businessDescription: projectType === "profesional" ? businessDescription.trim() : "",
         personality,
         needs: selectedNeeds,
         customInstructions: customInstructions.trim(),
@@ -167,7 +255,7 @@ function AgentSettingsForm({
             setOfflineError(true);
           }
         },
-      },
+      }
     );
   }
 
@@ -178,11 +266,12 @@ function AgentSettingsForm({
         onSuccess: (conv) => {
           navigate(`/studio/${slug}/chat/${conv.id}`);
         },
-      },
+      }
     );
   }
 
   const canSave = agentName.trim().length > 0;
+  const subtypes = projectType ? PROJECT_SUBTYPES[projectType] : [];
 
   return (
     <div className="space-y-6">
@@ -210,8 +299,18 @@ function AgentSettingsForm({
                 {agent.status}
               </span>
             </div>
-            <p className="text-sm text-[hsl(var(--muted-foreground))]">
-              {agent.template} · {agent.slug}
+            <p className="text-sm text-[hsl(var(--muted-foreground))] flex items-center gap-1">
+              {projectType && projectSubtype ? (
+                <>
+                  <ProjectTypeIcon typeId={projectType} className="w-4 h-4 inline" />
+                  {PROJECT_TYPE_CONFIG[projectType]?.title}
+                  {" → "}
+                  <ProjectSubtypeIcon subtypeId={projectSubtype} className="w-4 h-4 inline" />
+                  {PROJECT_SUBTYPE_CONFIG[projectSubtype]?.title}
+                </>
+              ) : (
+                <>{agent.template} · {agent.slug}</>
+              )}
             </p>
           </div>
         </div>
@@ -235,8 +334,79 @@ function AgentSettingsForm({
 
       {/* Settings form */}
       <div className="space-y-8 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-6">
-        {/* Agent name */}
+        
+        {/* V3: Project Type */}
         <div>
+          <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
+            Tu contexto
+          </label>
+          <div className="grid grid-cols-3 gap-3">
+            {PROJECT_TYPES.map((type) => {
+              const typeConfig = PROJECT_TYPE_CONFIG[type];
+              const isSelected = projectType === type;
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setProjectType(type)}
+                  className={`relative flex flex-col items-center rounded-lg border p-4 text-center transition-all ${
+                    isSelected
+                      ? "border-magenta bg-magenta/10"
+                      : "border-white/10 bg-[hsl(var(--card))] hover:border-white/20"
+                  }`}
+                >
+                  <ProjectTypeIcon typeId={type} className="w-8 h-8 text-white" />
+                  <span className="mt-2 text-sm font-medium text-[hsl(var(--foreground))]">
+                    {typeConfig.title}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* V3: Project Subtype */}
+        {projectType && subtypes.length > 0 && (
+          <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+            <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
+              ¿Por dónde empezamos?
+            </label>
+            <div className={`grid gap-3 ${subtypes.length > 3 ? 'grid-cols-2 lg:grid-cols-3' : 'grid-cols-' + subtypes.length}`}>
+              {subtypes.map((subtype) => {
+                const subtypeConfig = PROJECT_SUBTYPE_CONFIG[subtype];
+                if (!subtypeConfig) return null;
+                const isSelected = projectSubtype === subtype;
+                return (
+                  <button
+                    key={subtype}
+                    type="button"
+                    onClick={() => setProjectSubtype(subtype)}
+                    className={`flex flex-col items-start rounded-lg border p-3 text-left transition-all ${
+                      isSelected
+                        ? "border-magenta bg-magenta/10"
+                        : "border-white/10 bg-[hsl(var(--card))] hover:border-white/20"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <ProjectSubtypeIcon subtypeId={subtype} className="w-5 h-5 text-white" />
+                      <span className="text-sm font-medium text-[hsl(var(--foreground))]">
+                        {subtypeConfig.title}
+                      </span>
+                    </div>
+                    {subtypeConfig.description && (
+                      <span className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+                        {subtypeConfig.description}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Agent name */}
+        <div className="hidden">
           <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
             {ac.agentNameLabel}
           </label>
@@ -249,50 +419,54 @@ function AgentSettingsForm({
           />
         </div>
 
-        {/* User role picker */}
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
-            {ac.userRoleLabel}
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {ROLE_IDS.map((id) => {
-              const label = onboarding.roles[id];
-              if (!label) return null;
-              const isSelected = userRole === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => setUserRole(id)}
-                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
-                    isSelected
-                      ? "border-magenta bg-magenta/10 text-[hsl(var(--foreground))]"
-                      : "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] hover:border-white/20"
-                  }`}
-                >
-                  <RoleIcon roleId={id} className="w-4 h-4 stroke-[1.5] inline mr-1.5" />{label}
-                </button>
-              );
-            })}
+        {/* User role picker - HIDDEN (moved to Settings) */}
+        {false && projectType === "profesional" && (
+          <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+            <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
+              {ac.userRoleLabel}
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {ROLE_IDS.map((id) => {
+                const label = onboarding.roles[id];
+                if (!label) return null;
+                const isSelected = userRole === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setUserRole(id)}
+                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                      isSelected
+                        ? "border-magenta bg-magenta/10 text-[hsl(var(--foreground))]"
+                        : "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] hover:border-white/20"
+                    }`}
+                  >
+                    <RoleIcon roleId={id} className="w-4 h-4 stroke-[1.5] inline mr-1.5" />{label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Business description */}
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
-            {ac.businessDescriptionLabel}
-          </label>
-          <input
-            type="text"
-            value={businessDescription}
-            onChange={(e) => setBusinessDescription(e.target.value)}
-            placeholder={ac.businessDescriptionPlaceholder}
-            maxLength={120}
-            className="w-full max-w-sm rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
-          />
-        </div>
+        {/* Business description — ONLY for profesional */}
+        {false && projectType === "profesional" && (
+          <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+            <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
+              {ac.businessDescriptionLabel}
+            </label>
+            <input
+              type="text"
+              value={businessDescription}
+              onChange={(e) => setBusinessDescription(e.target.value)}
+              placeholder={ac.businessDescriptionPlaceholder}
+              maxLength={150}
+              className="w-full max-w-sm rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
+            />
+          </div>
+        )}
 
-        {/* Personality picker */}
+        {/* Personality picker - HIDDEN */}
         <div>
           <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
             {ac.personalityLabel}
@@ -325,46 +499,48 @@ function AgentSettingsForm({
           </div>
         </div>
 
-        {/* Needs picker */}
-        <div>
-          <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
-            {ac.needsLabel}
-          </label>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            {NEED_IDS.map((id) => {
-              const need = onboarding.needs[id];
-              if (!need) return null;
-              const isSelected = selectedNeeds.includes(id);
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => toggleNeed(id)}
-                  className={`relative flex flex-col items-start rounded-lg border p-4 text-left transition-all ${
-                    isSelected
-                      ? "border-magenta bg-magenta/10"
-                      : "border-white/10 bg-[hsl(var(--card))] hover:border-white/20 hover:shadow-[0_0_12px_rgba(233,30,140,0.08)]"
-                  }`}
-                >
-                  {isSelected && (
-                    <div className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-magenta text-[10px] text-white">
-                      ✓
-                    </div>
-                  )}
-                  <NeedIcon needId={id} className="w-6 h-6 stroke-[1.5] text-white" />
-                  <span className="mt-2 text-sm font-medium text-[hsl(var(--foreground))]">
-                    {need.title}
-                  </span>
-                  <span className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
-                    {need.description}
-                  </span>
-                </button>
-              );
-            })}
+        {/* Needs picker - HIDDEN */}
+        {false && projectType === "profesional" && (
+          <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+            <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
+              {ac.needsLabel}
+            </label>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {NEED_IDS.map((id) => {
+                const need = onboarding.needs[id];
+                if (!need) return null;
+                const isSelected = selectedNeeds.includes(id);
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => toggleNeed(id)}
+                    className={`relative flex flex-col items-start rounded-lg border p-4 text-left transition-all ${
+                      isSelected
+                        ? "border-magenta bg-magenta/10"
+                        : "border-white/10 bg-[hsl(var(--card))] hover:border-white/20 hover:shadow-[0_0_12px_rgba(233,30,140,0.08)]"
+                    }`}
+                  >
+                    {isSelected && (
+                      <div className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-magenta text-[10px] text-white">
+                        ✓
+                      </div>
+                    )}
+                    <NeedIcon needId={id} className="w-6 h-6 stroke-[1.5] text-white" />
+                    <span className="mt-2 text-sm font-medium text-[hsl(var(--foreground))]">
+                      {need.title}
+                    </span>
+                    <span className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
+                      {need.description}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Custom instructions */}
+        {/* Custom instructions - HIDDEN */}
         <div>
           <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
             {ac.customInstructionsLabel}
@@ -394,10 +570,10 @@ function AgentSettingsForm({
         <div>
           <button
             onClick={handleSave}
-            disabled={updateConfig.isPending || !canSave}
+            disabled={updateConfig.isPending || updateContext.isPending || !canSave}
             className="rounded-md bg-magenta px-6 py-2 text-sm font-medium text-white hover:bg-magenta/90 transition-colors disabled:opacity-50"
           >
-            {updateConfig.isPending
+            {(updateConfig.isPending || updateContext.isPending)
               ? ac.saving
               : saveFlash
                 ? ac.saved
