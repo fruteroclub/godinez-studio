@@ -369,7 +369,7 @@ function AgentSettingsForm({
         {projectType && subtypes.length > 0 && (
           <div className="animate-in fade-in slide-in-from-top-2 duration-300">
             <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
-              ¿Qué te describe mejor?
+              ¿Por dónde empezamos?
             </label>
             <div className={`grid gap-3 ${subtypes.length > 3 ? 'grid-cols-2 lg:grid-cols-3' : 'grid-cols-' + subtypes.length}`}>
               {subtypes.map((subtype) => {
