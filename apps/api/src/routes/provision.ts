@@ -16,7 +16,7 @@ import { incrementUsedSlots } from "../dal/instances";
 import { pool } from "../services/gateway-pool";
 import type { GatewayRelay } from "../services/gateway-relay";
 import { buildSoulMd } from "../services/agent-soul-template";
-import { getInstanceTier } from "@godinez/types";
+import { getInstanceTier, PROJECT_TYPES, PROJECT_SUBTYPES, PROJECT_SUBTYPES_BY_TYPE } from "@godinez/types";
 import { AGENT_MAX_SLOTS } from "../lib/config";
 import { logger } from "../lib/logger";
 
@@ -32,24 +32,6 @@ const log = logger.child({ service: "provision" });
 const app = new Hono<AuthEnv>();
 
 app.use("*", requireAuth, resolveUser);
-
-// Onboarding V3: Project type and subtype enums
-const PROJECT_TYPES = ["educacion", "profesional", "personal"] as const;
-const PROJECT_SUBTYPES_BY_TYPE = {
-  educacion: ["bootcamp", "aprender"],
-  personal: ["hackathon", "emprendimiento", "proyecto"],
-  profesional: ["crear_contenido", "automatizar", "construir", "investigar", "vender", "organizar"],
-} as const;
-
-const PROJECT_SUBTYPES = [
-  // educacion
-  "bootcamp", "aprender",
-  // personal
-  "hackathon", "emprendimiento", "proyecto",
-  // profesional
-  "crear_contenido", "automatizar", "construir",
-  "investigar", "vender", "organizar",
-] as const;
 
 // POST /api/agents/provision — Provision an OpenClaw agent for a workspace
 app.post(

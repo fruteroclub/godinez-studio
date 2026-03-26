@@ -11,6 +11,7 @@ import { useUpdateAgentConfig } from "@/hooks/use-agent";
 import { useCreateConversation } from "@/hooks/use-conversations";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import AgentOfflineBanner from "@/components/AgentOfflineBanner";
+import { PROJECT_TYPES, PROJECT_SUBTYPES_BY_TYPE, type ProjectType } from "@godinez/types";
 
 const { agents: ac, onboarding } = content.studio;
 
@@ -27,16 +28,6 @@ interface UserContext {
   projectType: string | null;
   projectSubtype: string | null;
 }
-
-// V3 Types
-const PROJECT_TYPES = ["educacion", "profesional", "personal"] as const;
-type ProjectType = typeof PROJECT_TYPES[number];
-
-const PROJECT_SUBTYPES = {
-  educacion: ["bootcamp", "aprender"] as const,
-  personal: ["hackathon", "emprendimiento", "proyecto"] as const,
-  profesional: ["crear_contenido", "automatizar", "construir", "investigar", "vender", "organizar"] as const,
-};
 
 const PROJECT_TYPE_CONFIG = {
   educacion: { title: "Educación", description: "Bootcamp, curso o aprendizaje autodidacta" },
@@ -206,7 +197,7 @@ function AgentSettingsForm({
   // Reset subtype when type changes
   useEffect(() => {
     if (projectType) {
-      const validSubtypes = PROJECT_SUBTYPES[projectType] as readonly string[];
+      const validSubtypes = PROJECT_SUBTYPES_BY_TYPE[projectType] as readonly string[];
       if (projectSubtype && !validSubtypes.includes(projectSubtype)) {
         setProjectSubtype(null);
       }
@@ -271,7 +262,7 @@ function AgentSettingsForm({
   }
 
   const canSave = agentName.trim().length > 0;
-  const subtypes = projectType ? PROJECT_SUBTYPES[projectType] : [];
+  const subtypes = projectType ? PROJECT_SUBTYPES_BY_TYPE[projectType] : [];
 
   return (
     <div className="space-y-6">
