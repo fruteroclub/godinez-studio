@@ -32,6 +32,7 @@ import { initSentry, Sentry } from "./lib/sentry";
 import context from "./routes/context";
 import { isAppError, formatErrorResponse } from "./lib/errors";
 import { rateLimits } from "./middleware/rate-limit";
+import { deployRateLimit } from "./middleware/deploy-rate-limit";
 
 initSentry();
 
@@ -70,6 +71,7 @@ app.route("/api/agents", provision);
 // Rate-limited routes
 app.use("/api/chat/*", rateLimits.chat);
 app.use("/api/hackathons/*", rateLimits.hackathon);
+app.use("/api/deploy/*", deployRateLimit());
 
 app.route("/api/chat", chat);
 app.route("/api/conversations", conversations);
