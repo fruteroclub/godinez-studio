@@ -50,6 +50,7 @@ const PROJECT_SUBTYPE_CONFIG: Record<string, { title: string; description: strin
 };
 
 const ROLE_IDS = ["negocio", "marketing", "ventas", "admin", "tech", "educacion", "creatividad", "consultoria", "otra"] as const;
+const MAX_ROLES = 5;
 const PERSONALITY_IDS = ["professional", "friendly", "creative", "technical"] as const;
 const NEED_IDS = ["launch", "automate", "social", "sales", "time", "research", "support", "build"] as const;
 
@@ -421,14 +422,24 @@ function AgentSettingsForm({
                 const label = onboarding.roles[id];
                 if (!label) return null;
                 const isSelected = userRoles.includes(id);
+                const isDisabled = !isSelected && userRoles.length >= MAX_ROLES;
                 return (
                   <button
                     key={id}
                     type="button"
-                    onClick={() => setUserRoles(isSelected ? userRoles.filter(r => r !== id) : [...userRoles, id])}
+                    disabled={isDisabled}
+                    onClick={() => {
+                      if (isSelected) {
+                        setUserRoles(userRoles.filter(r => r !== id));
+                      } else if (userRoles.length < MAX_ROLES) {
+                        setUserRoles([...userRoles, id]);
+                      }
+                    }}
                     className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
                       isSelected
                         ? "border-magenta bg-magenta/10 text-[hsl(var(--foreground))]"
+                        : isDisabled
+                        ? "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] opacity-40 cursor-not-allowed"
                         : "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] hover:border-white/20"
                     }`}
                   >
@@ -437,6 +448,9 @@ function AgentSettingsForm({
                 );
               })}
             </div>
+            {userRoles.length >= MAX_ROLES && (
+              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Máximo {MAX_ROLES} roles</p>
+            )}
           </div>
         )}
 
