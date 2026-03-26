@@ -100,24 +100,21 @@ export default function OnboardingWizard() {
     );
   }
 
+  // V3 uses 3 steps, legacy uses 4
+  const totalSteps = USE_ONBOARDING_V3 ? 3 : 4;
+
   function canAdvance(): boolean {
     if (USE_ONBOARDING_V3) {
       switch (step) {
         case 1:
           // Name + Type + Subtype required
-          // Role required for all types
           const hasBasics = userName.trim().length > 0 && projectType && projectSubtype;
           return Boolean(hasBasics);
         case 2:
-          // For profesional, require business description
-          if (projectType === "profesional") {
-            return businessDescription.trim().length > 0;
-          }
-          // For others, step 2 is optional/skip
-          return true;
-        case 3:
+          // Agent name required
           return agentName.trim().length > 0;
-        case 4:
+        case 3:
+          // Review step - always can proceed
           return true;
         default:
           return false;
@@ -149,7 +146,7 @@ export default function OnboardingWizard() {
       setNeedsError(true);
       return;
     }
-    if (step < 4) setStep((step + 1) as Step);
+    if (step < totalSteps) setStep((step + 1) as Step);
   }
 
   function handleBack() {
@@ -223,7 +220,7 @@ export default function OnboardingWizard() {
     <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-2xl flex-col px-4 py-12">
       {/* Progress indicator */}
       <div className="mb-8 flex items-center justify-center gap-2">
-        {[1, 2, 3, 4].map((s) => (
+        {Array.from({ length: totalSteps }, (_, i) => i + 1).map((s) => (
           <div
             key={s}
             className={`h-2 w-12 rounded-full transition-colors ${
@@ -232,7 +229,7 @@ export default function OnboardingWizard() {
           />
         ))}
         <span className="ml-3 text-xs text-[hsl(var(--muted-foreground))]">
-          {onboarding.step} {step} {onboarding.of} 4
+          {onboarding.step} {step} {onboarding.of} {totalSteps}
         </span>
       </div>
 
@@ -253,13 +250,6 @@ export default function OnboardingWizard() {
               />
             )}
             {step === 2 && (
-              <StepDetailsV3
-                projectType={projectType}
-                businessDescription={businessDescription}
-                setBusinessDescription={setBusinessDescription}
-              />
-            )}
-            {step === 3 && (
               <StepAgent
                 agentName={agentName}
                 setAgentName={setAgentName}
@@ -267,7 +257,7 @@ export default function OnboardingWizard() {
                 setPersonality={setPersonality}
               />
             )}
-            {step === 4 && (
+            {step === 3 && (
               <StepReviewV3
                 userName={userName}
                 projectType={projectType}
@@ -533,68 +523,7 @@ function StepContextV3({
   );
 }
 
-/* ── V3 Step 2: Context Details ────────────────────────────── */
-
-function StepDetailsV3({
-  projectType,
-  businessDescription,
-  setBusinessDescription,
-}: {
-  projectType: ProjectType | null;
-  businessDescription: string;
-  setBusinessDescription: (v: string) => void;
-}) {
-  // For profesional, ask about business
-  if (projectType === "profesional") {
-    return (
-      <div className="space-y-6">
-        <h2 className="text-2xl font-semibold text-[hsl(var(--foreground))]">
-          Cuéntanos de tu negocio
-        </h2>
-
-        <div>
-          <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
-            ¿A qué se dedica tu negocio?
-          </label>
-          <input
-            type="text"
-            value={businessDescription}
-            onChange={(e) => setBusinessDescription(e.target.value)}
-            placeholder="Ej: Agencia de marketing digital, Tienda de ropa online..."
-            maxLength={150}
-            className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
-            autoFocus
-          />
-          <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
-            {businessDescription.length}/150 caracteres
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  // For educacion and personal, this step is mostly informational
-  return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-semibold text-[hsl(var(--foreground))]">
-        ¡Perfecto!
-      </h2>
-      <p className="text-[hsl(var(--muted-foreground))]">
-        {projectType === "educacion" 
-          ? "Tu agente estará listo para ayudarte a aprender. Podrás activar un bootcamp o curso específico desde el dashboard cuando lo necesites."
-          : "Tu agente estará listo para ayudarte con tus proyectos. Podrás activar el modo hackathon desde el dashboard cuando lo necesites."
-        }
-      </p>
-      <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
-        <p className="text-sm text-[hsl(var(--muted-foreground))]">
-          💡 <strong>Tip:</strong> Cuando actives un modo específico (hackathon, bootcamp), tu agente se adaptará automáticamente con deadline y prioridades.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-/* ── V3 Step 4: Review + Launch ────────────────────────────── */
+/* ── V3 Step 3: Review + Launch ────────────────────────────── */
 
 function StepReviewV3({
   userName,
@@ -633,6 +562,18 @@ function StepReviewV3({
       <h2 className="text-2xl font-semibold text-[hsl(var(--foreground))]">
         Todo listo
       </h2>
+
+      {/* Tip informativo */}
+      <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
+        <p className="text-sm text-[hsl(var(--muted-foreground))]">
+          <span className="mr-2">💡</span>
+          <span className="font-medium text-[hsl(var(--foreground))]">Tip:</span>{" "}
+          {projectType === "educacion" 
+            ? "Cuando actives un modo específico (bootcamp, curso), tu agente se adaptará automáticamente con deadline y prioridades."
+            : "Cuando actives un modo específico (hackathon, proyecto), tu agente se adaptará automáticamente con deadline y prioridades."
+          }
+        </p>
+      </div>
 
       <div className="space-y-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5">
         <ReviewRow label="Tu nombre" value={userName} />
