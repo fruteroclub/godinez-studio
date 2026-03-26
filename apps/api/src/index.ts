@@ -102,11 +102,10 @@ app.onError((err, c) => {
     return c.json(response, err.statusCode as 400 | 401 | 403 | 404 | 429 | 500);
   }
   
-  logger.error({ err: err.message }, "unhandled error");
-  return c.json({ 
+  logger.error({ err: err.message, path: c.req.path }, "unhandled error");
+  return c.json({
     error: "Algo salió mal. Por favor, intenta de nuevo.",
     code: "INTERNAL_ERROR",
-    message: err.message 
   }, 500);
 });
 
