@@ -1,4 +1,4 @@
-import { ProjectTypeIcon, ProjectSubtypeIcon } from "@/lib/icons";
+import { ProjectTypeIcon, ProjectSubtypeIcon, RoleIcon } from "@/lib/icons";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
@@ -116,11 +116,8 @@ export default function OnboardingWizard() {
       switch (step) {
         case 1:
           // Name + Type + Subtype required
-          // Role only required if profesional
-          const hasBasics = userName.trim().length > 0 && projectType && projectSubtype;
-          if (projectType === "profesional") {
-            return Boolean(hasBasics) && userRole.length > 0;
-          }
+          // Role required for all types
+          const hasBasics = userName.trim().length > 0 && userRole.length > 0 && projectType && projectSubtype;
           return Boolean(hasBasics);
         case 2:
           // For profesional, require business description
@@ -415,6 +412,34 @@ function StepContextV3({
         />
       </div>
 
+
+      {/* User role */}
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
+          Rol del usuario
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {ROLE_IDS.map((id) => {
+            const label = onboarding.roles[id];
+            if (!label) return null;
+            const isSelected = userRole === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setUserRole(isSelected ? "" : id)}
+                className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                  isSelected
+                    ? "border-magenta bg-magenta/10 text-[hsl(var(--foreground))]"
+                    : "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] hover:border-white/20"
+                }`}
+              >
+                <RoleIcon roleId={id} className="w-4 h-4 stroke-[1.5] inline mr-1.5" />{label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
       {/* Project type */}
       <div>
         <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
