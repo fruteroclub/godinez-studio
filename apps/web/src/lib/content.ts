@@ -120,7 +120,7 @@ export const content = {
       businessDescriptionPlaceholder: "Ej: Vendo ropa por Instagram, Agencia de diseño web...",
       personalityLabel: "Personalidad",
       needsLabel: "¿En qué necesitas ayuda?",
-      customInstructionsLabel: "Instrucciones adicionales",
+      customInstructionsLabel: "Instrucciones adicionales para tu Agente",
       customInstructionsPlaceholder: "Ej: Siempre responde con bullet points, prioriza tareas de marketing...",
       customInstructionsHint: "Estas instrucciones se agregan a la personalidad de tu agente.",
     },
