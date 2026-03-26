@@ -7,23 +7,12 @@ import { useProvision } from "@/hooks/use-provision";
 import { apiFetch } from "@/lib/api";
 import { content } from "@/lib/content";
 import type { Workspace } from "@godinez/types";
+import { PROJECT_TYPES, PROJECT_SUBTYPES_BY_TYPE, type ProjectType, type ProjectSubtype } from "@godinez/types";
 
 const { onboarding } = content.studio;
 
 // Feature flag for V3 onboarding
 const USE_ONBOARDING_V3 = true;
-
-// === V3 Types and Constants ===
-const PROJECT_TYPES = ["educacion", "profesional", "personal"] as const;
-type ProjectType = typeof PROJECT_TYPES[number];
-
-const PROJECT_SUBTYPES = {
-  educacion: ["bootcamp", "aprender"] as const,
-  personal: ["hackathon", "emprendimiento", "proyecto"] as const,
-  profesional: ["crear_contenido", "automatizar", "construir", "investigar", "vender", "organizar"] as const,
-};
-
-type ProjectSubtype = typeof PROJECT_SUBTYPES[keyof typeof PROJECT_SUBTYPES][number];
 
 // V3 Labels
 const PROJECT_TYPE_CONFIG = {
@@ -389,7 +378,7 @@ function StepContextV3({
   userRole: string;
   setUserRole: (v: string) => void;
 }) {
-  const subtypes = projectType ? PROJECT_SUBTYPES[projectType] : [];
+  const subtypes = projectType ? PROJECT_SUBTYPES_BY_TYPE[projectType] : [];
 
   return (
     <div className="space-y-6">

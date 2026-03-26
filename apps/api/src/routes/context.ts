@@ -13,6 +13,7 @@ import { requireAuth } from "../middleware/auth";
 import { resolveUser } from "../middleware/resolve-user";
 import { updateUser, getUserById } from "../dal/users";
 import { getWorkspacesByUserId, getWorkspaceBySlug, getMemberRole, updateWorkspace } from "../dal/workspaces";
+import { PROJECT_TYPES, PROJECT_SUBTYPES, PROJECT_SUBTYPES_BY_TYPE } from "@godinez/types";
 import { pool } from "../services/gateway-pool";
 import { buildSoulMd } from "../services/agent-soul-template";
 import { logger } from "../lib/logger";
@@ -22,21 +23,6 @@ const log = logger.child({ service: "context" });
 const app = new Hono<AuthEnv>();
 
 app.use("*", requireAuth, resolveUser);
-
-// Project type and subtype enums (same as provision.ts)
-const PROJECT_TYPES = ["educacion", "profesional", "personal"] as const;
-const PROJECT_SUBTYPES_BY_TYPE = {
-  educacion: ["bootcamp", "aprender"],
-  personal: ["hackathon", "emprendimiento", "proyecto"],
-  profesional: ["crear_contenido", "automatizar", "construir", "investigar", "vender", "organizar"],
-} as const;
-
-const PROJECT_SUBTYPES = [
-  "bootcamp", "aprender",
-  "hackathon", "emprendimiento", "proyecto",
-  "crear_contenido", "automatizar", "construir",
-  "investigar", "vender", "organizar",
-] as const;
 
 const TYPE_LABELS: Record<string, string> = {
   educacion: "Educación",

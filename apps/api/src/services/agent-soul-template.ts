@@ -6,7 +6,7 @@
  */
 
 import { existsSync, readFileSync } from "fs";
-import { join } from "path";
+import { join, resolve } from "path";
 
 // Re-export buildSoulMd from legacy for fallback
 import { buildSoulMd as buildLegacySoulMd } from "./agent-soul-legacy";
@@ -52,27 +52,40 @@ const PROJECT_SUBTYPE_LABELS: Record<string, string> = {
   organizar: "gestor/organizador",
 };
 
+function safePath(path: string): string {
+  const resolved = resolve(TEMPLATES_DIR, path);
+  if (!resolved.startsWith(TEMPLATES_DIR)) {
+    throw new Error("Invalid template path");
+  }
+  return resolved;
+}
+
 function templateExists(path: string): boolean {
   try {
-    return existsSync(join(TEMPLATES_DIR, path));
+    return existsSync(safePath(path));
   } catch {
     return false;
   }
 }
 
 function loadTemplate(path: string): string {
-  return readFileSync(join(TEMPLATES_DIR, path), "utf-8");
+  return readFileSync(safePath(path), "utf-8");
+}
+
+/** Strip control characters and limit length to prevent template injection */
+function sanitize(value: string, maxLen = 255): string {
+  return value.replace(/[\x00-\x1F\x7F]/g, " ").slice(0, maxLen).trim();
 }
 
 function replaceVariables(template: string, ctx: SoulContext): string {
   return template
-    .replace(/\{\{agentName\}\}/g, ctx.agentName)
-    .replace(/\{\{userName\}\}/g, ctx.userName || "usuario")
-    .replace(/\{\{workspaceName\}\}/g, ctx.workspaceName)
-    .replace(/\{\{userRole\}\}/g, ctx.userRole || "")
-    .replace(/\{\{businessDescription\}\}/g, ctx.businessDescription || "")
-    .replace(/\{\{projectType\}\}/g, ctx.projectType || "")
-    .replace(/\{\{projectSubtype\}\}/g, ctx.projectSubtype || "")
+    .replace(/\{\{agentName\}\}/g, sanitize(ctx.agentName, 50))
+    .replace(/\{\{userName\}\}/g, sanitize(ctx.userName || "usuario", 100))
+    .replace(/\{\{workspaceName\}\}/g, sanitize(ctx.workspaceName, 100))
+    .replace(/\{\{userRole\}\}/g, sanitize(ctx.userRole || "", 50))
+    .replace(/\{\{businessDescription\}\}/g, sanitize(ctx.businessDescription || ""))
+    .replace(/\{\{projectType\}\}/g, sanitize(ctx.projectType || "", 20))
+    .replace(/\{\{projectSubtype\}\}/g, sanitize(ctx.projectSubtype || "", 30))
     .replace(/\{\{projectTypeLabel\}\}/g, PROJECT_TYPE_LABELS[ctx.projectType || ""] || "")
     .replace(/\{\{projectSubtypeLabel\}\}/g, PROJECT_SUBTYPE_LABELS[ctx.projectSubtype || ""] || "");
 }

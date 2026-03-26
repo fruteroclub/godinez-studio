@@ -312,3 +312,21 @@ export interface CurrentUser {
 export { studioContent } from "./content";
 export { TIER_LIMITS, getTierLimits, TIER_INSTANCE_MAP, getInstanceTier } from "./quotas";
 export type { TierLimits } from "./quotas";
+
+// Onboarding V3: Project classification
+export const PROJECT_TYPES = ["educacion", "profesional", "personal"] as const;
+export type ProjectType = (typeof PROJECT_TYPES)[number];
+
+export const PROJECT_SUBTYPES_BY_TYPE = {
+  educacion: ["bootcamp", "aprender"],
+  personal: ["hackathon", "emprendimiento", "proyecto"],
+  profesional: ["crear_contenido", "automatizar", "construir", "investigar", "vender", "organizar"],
+} as const;
+
+export const PROJECT_SUBTYPES = [
+  "bootcamp", "aprender",
+  "hackathon", "emprendimiento", "proyecto",
+  "crear_contenido", "automatizar", "construir",
+  "investigar", "vender", "organizar",
+] as const;
+export type ProjectSubtype = (typeof PROJECT_SUBTYPES)[number];
