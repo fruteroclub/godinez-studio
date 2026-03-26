@@ -55,6 +55,7 @@ app.get("/", async (c) => {
   
   return c.json({
     projectType: user.projectType || null,
+    jobRole: user.jobRole || null,
     projectSubtype: user.projectSubtype || null,
   });
 });
@@ -131,4 +132,24 @@ app.patch(
   },
 );
 
+
+// PATCH /api/context/role — Update user role only
+app.patch(
+  "/role",
+  zValidator(
+    "json",
+    z.object({
+      jobRole: z.string().max(50),
+    }),
+  ),
+  async (c) => {
+    const userId = c.get("userId");
+    const { jobRole } = c.req.valid("json");
+
+    await updateUser(userId, { jobRole });
+    log.info({ userId, jobRole }, "user role updated");
+
+    return c.json({ ok: true });
+  },
+);
 export default app;

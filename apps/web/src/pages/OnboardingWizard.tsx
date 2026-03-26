@@ -117,7 +117,7 @@ export default function OnboardingWizard() {
         case 1:
           // Name + Type + Subtype required
           // Role required for all types
-          const hasBasics = userName.trim().length > 0 && userRole.length > 0 && projectType && projectSubtype;
+          const hasBasics = userName.trim().length > 0 && projectType && projectSubtype;
           return Boolean(hasBasics);
         case 2:
           // For profesional, require business description

@@ -419,8 +419,8 @@ function AgentSettingsForm({
           />
         </div>
 
-        {/* User role picker — ONLY for profesional */}
-        {projectType === "profesional" && (
+        {/* User role picker - HIDDEN (moved to Settings) */}
+        {false && projectType === "profesional" && (
           <div className="animate-in fade-in slide-in-from-top-2 duration-300">
             <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
               {ac.userRoleLabel}
