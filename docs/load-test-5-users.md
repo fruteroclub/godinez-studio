@@ -199,6 +199,96 @@ RONDA 4:
 
 ---
 
+### Ronda 5 — Smart Contract deploy a Monad Testnet (T+30 min)
+
+> ⚠️ Ronda crítica para el hackathon. Prueba el NonceManager + wallet maestra bajo carga simultánea.
+
+**Objetivo:** 5 usuarios piden al agente que deploje un smart contract simple a Monad testnet al mismo tiempo. El NonceManager debe serializar los deploys sin nonce collisions.
+
+#### Contrato de prueba (usar el mismo para todos):
+
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+contract HelloWorld {
+    string public message;
+    address public owner;
+
+    constructor(string memory _message) {
+        message = _message;
+        owner = msg.sender;
+    }
+
+    function setMessage(string memory _newMessage) public {
+        require(msg.sender == owner, "Not owner");
+        message = _newMessage;
+    }
+}
+```
+
+#### Mensaje para los 5 usuarios:
+
+> **Ronda 5 — Smart Contract:**
+>
+> Cuando diga "¡CONTRACT!" todos mandan este mensaje a su agente:
+>
+> *"Deploya este contrato en Monad testnet con el mensaje '[tu nombre] en Monad'. Quiero ser el owner con mi wallet [dirección de cada quien]."*
+>
+> Reportan: txHash + dirección del contrato o error.
+
+#### Qué monitorea cada rol:
+
+**Scarf:**
+- PostHog: eventos `chat_message_sent` con contexto de deploy
+- Clarity: tiempo que pasan los usuarios esperando la confirmación de tx
+
+**Mel:**
+- Railway Metrics: CPU/Memory durante el proceso de firma y broadcast
+- Logs: cualquier error relacionado con Monad RPC
+
+**Kukulcán:**
+```bash
+# Logs clave para esta ronda:
+# ✅ "nonce acquired"          → NonceManager funcionando
+# ✅ "tx confirmed"            → deploy exitoso en Monad
+# ✅ "ownership transferred"   → agente preguntó y transfirió
+# ❌ "nonce mismatch"          → collision detectada, NonceManager falló
+# ❌ "nonce lock timeout"      → deploy anterior no liberó el lock
+# ❌ "insufficient funds"      → wallet maestra sin MON
+# ❌ "RPC error"               → Monad testnet congestionado
+```
+
+#### Verificación en Monad Explorer:
+
+Después de cada deploy, verificar en https://testnet.monadexplorer.com:
+- Tx confirmada en < 2 segundos (Monad es rápido)
+- `from` = wallet maestra `0xe7742E5D2FeB0B97925Ecfc1F4fC9b805050EF55`
+- `owner` = dirección del usuario (si hizo transfer)
+
+#### Métricas de esta ronda:
+
+```
+RONDA 5 — Smart Contract deploy:
+  Hora inicio: ___:___
+  Contratos desplegados exitosamente: ___ / 5
+  Tiempo primer deploy confirmado: ___ segundos
+  Tiempo último deploy confirmado: ___ segundos
+  Ownership transferido: ___ / 5 (de los que pidieron)
+  Nonce collisions: [ ] Ninguna [ ] Sí — cuántas: ___
+  Balance wallet maestra al final: ___ MON (de 1 MON inicial)
+  Errores: [ ] Ninguno [ ] nonce [ ] RPC [ ] funds [ ] otro: ___
+```
+
+#### Criterio de éxito:
+
+- ≥ 4/5 contratos desplegados con txHash válido
+- **0 nonce collisions** — el NonceManager debe serializar correctamente
+- Wallet maestra con balance > 0.5 MON (BalanceMonitor no dispara alerta)
+- Ownership transfer funciona cuando el usuario provee su dirección
+
+---
+
 ## Métricas a capturar (llenar durante la prueba)
 
 ### Formulario del monitor
@@ -230,6 +320,16 @@ RONDA 4 — GitHub + Vercel deploy:
   Errores: [ ] Ninguno [ ] Vercel auth [ ] GitHub push [ ] CLI missing [ ] otro: ___
   CPU pico: ___%
   Memory pico: ___ MB
+
+RONDA 5 — Smart Contract deploy Monad:
+  Hora inicio: ___:___
+  Contratos desplegados: ___ / 5
+  Tiempo primer tx confirmada: ___ seg
+  Tiempo última tx confirmada: ___ seg
+  Nonce collisions: [ ] 0 [ ] Sí: ___
+  Ownership transfers: ___ / 5
+  Balance wallet maestra final: ___ MON
+  Errores: [ ] Ninguno [ ] nonce [ ] RPC [ ] funds [ ] otro: ___
 
 RAILWAY METRICS (capturar al final):
   CPU pico: ___%
