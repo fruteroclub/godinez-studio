@@ -12,7 +12,7 @@ import type { AuthEnv } from "../types";
 import { requireAuth } from "../middleware/auth";
 import { resolveUser } from "../middleware/resolve-user";
 import { updateUser, getUserById } from "../dal/users";
-import { getWorkspacesByUserId, updateWorkspace } from "../dal/workspaces";
+import { getWorkspacesByUserId, getWorkspaceBySlug, getMemberRole, updateWorkspace } from "../dal/workspaces";
 import { pool } from "../services/gateway-pool";
 import { buildSoulMd } from "../services/agent-soul-template";
 import { logger } from "../lib/logger";
@@ -84,7 +84,7 @@ app.patch(
     await updateUser(userId, { projectType, projectSubtype });
     log.info({ userId, projectType, projectSubtype }, "user context updated");
 
-    // 2. Get user and workspace
+    // 2. Get user and workspace (verify ownership)
     const user = await getUserById(userId);
     const workspaces = await getWorkspacesByUserId(userId);
     const workspace = workspaces[0];
@@ -93,10 +93,22 @@ app.patch(
       return c.json({ ok: true, regenerated: false });
     }
 
+    const role = await getMemberRole(workspace.id, userId);
+    if (!role || !["owner", "admin"].includes(role)) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+
     // 3. Update workspace name to reflect new type
     const firstName = user.name?.split(" ")[0] || "Usuario";
     const newName = `${firstName} - ${TYPE_LABELS[projectType] || projectType}`;
-    const newSlug = newName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    let newSlug = newName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+    // Ensure slug uniqueness
+    const existing = await getWorkspaceBySlug(newSlug);
+    if (existing && existing.id !== workspace.id) {
+      newSlug = `${newSlug}-${workspace.id}`;
+    }
+
     await updateWorkspace(workspace.id, { name: newName, slug: newSlug });
     log.info({ workspaceId: workspace.id, newName }, "workspace name updated");
 
