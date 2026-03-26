@@ -54,7 +54,7 @@ export default function OnboardingWizard() {
   const [userName, setUserName] = useState("");
   const [projectType, setProjectType] = useState<ProjectType | null>(null);
   const [projectSubtype, setProjectSubtype] = useState<ProjectSubtype | null>(null);
-  const [userRole, setUserRole] = useState("");  // Only for profesional
+  const [userRoles, setUserRoles] = useState<string[]>([]);  // Multiple roles allowed
   const [businessDescription, setBusinessDescription] = useState("");  // Only for profesional
   
   // Legacy form state (for non-V3 or profesional needs)
@@ -88,7 +88,7 @@ export default function OnboardingWizard() {
   // Reset subtype when type changes
   useEffect(() => {
     setProjectSubtype(null);
-    setUserRole("");
+    setUserRoles([]);
     setBusinessDescription("");
     setSelectedNeeds([]);
   }, [projectType]);
@@ -126,7 +126,7 @@ export default function OnboardingWizard() {
           return (
             workspaceName.trim().length > 0 &&
             userName.trim().length > 0 &&
-            userRole.length > 0 &&
+            userRoles.length > 0 &&
             businessDescription.trim().length > 0
           );
         case 2:
@@ -186,7 +186,7 @@ export default function OnboardingWizard() {
           agentName: agentName.trim(),
           personality,
           needs: selectedNeeds.length > 0 ? selectedNeeds : undefined,
-          userRole: userRole || undefined,
+          userRole: userRoles.length > 0 ? userRoles.join(",") : undefined,
           businessDescription: businessDescription.trim() || undefined,
           // V3 fields
           projectType: projectType || undefined,
@@ -245,8 +245,8 @@ export default function OnboardingWizard() {
                 setProjectType={setProjectType}
                 projectSubtype={projectSubtype}
                 setProjectSubtype={setProjectSubtype}
-                userRole={userRole}
-                setUserRole={setUserRole}
+                userRoles={userRoles}
+                setUserRoles={setUserRoles}
               />
             )}
             {step === 2 && (
@@ -262,7 +262,7 @@ export default function OnboardingWizard() {
                 userName={userName}
                 projectType={projectType}
                 projectSubtype={projectSubtype}
-                userRole={userRole}
+                userRoles={userRoles}
                 businessDescription={businessDescription}
                 workspaceName={workspaceName}
                 setWorkspaceName={setWorkspaceName}
@@ -282,8 +282,8 @@ export default function OnboardingWizard() {
                 setWorkspaceName={setWorkspaceName}
                 userName={userName}
                 setUserName={setUserName}
-                userRole={userRole}
-                setUserRole={setUserRole}
+                userRoles={userRoles}
+                setUserRoles={setUserRoles}
                 businessDescription={businessDescription}
                 setBusinessDescription={setBusinessDescription}
               />
@@ -307,7 +307,7 @@ export default function OnboardingWizard() {
               <StepReviewLegacy
                 workspaceName={workspaceName}
                 userName={userName}
-                userRole={userRole}
+                userRoles={userRoles}
                 businessDescription={businessDescription}
                 selectedNeeds={selectedNeeds}
                 agentName={agentName}
@@ -356,8 +356,8 @@ function StepContextV3({
   setProjectType,
   projectSubtype,
   setProjectSubtype,
-  userRole,
-  setUserRole,
+  userRoles,
+  setUserRoles,
 }: {
   userName: string;
   setUserName: (v: string) => void;
@@ -365,8 +365,8 @@ function StepContextV3({
   setProjectType: (v: ProjectType) => void;
   projectSubtype: ProjectSubtype | null;
   setProjectSubtype: (v: ProjectSubtype) => void;
-  userRole: string;
-  setUserRole: (v: string) => void;
+  userRoles: string[];
+  setUserRoles: (v: string[]) => void;
 }) {
   const subtypes = projectType ? PROJECT_SUBTYPES_BY_TYPE[projectType] : [];
 
@@ -401,12 +401,12 @@ function StepContextV3({
           {ROLE_IDS.map((id) => {
             const label = onboarding.roles[id];
             if (!label) return null;
-            const isSelected = userRole === id;
+            const isSelected = userRoles.includes(id);
             return (
               <button
                 key={id}
                 type="button"
-                onClick={() => setUserRole(isSelected ? "" : id)}
+                onClick={() => setUserRoles(isSelected ? userRoles.filter(r => r !== id) : [...userRoles, id])}
                 className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
                   isSelected
                     ? "border-magenta bg-magenta/10 text-[hsl(var(--foreground))]"
@@ -500,12 +500,12 @@ function StepContextV3({
             {ROLE_IDS.map((id) => {
               const label = onboarding.roles[id];
               if (!label) return null;
-              const isSelected = userRole === id;
+              const isSelected = userRoles.includes(id);
               return (
                 <button
                   key={id}
                   type="button"
-                  onClick={() => setUserRole(id)}
+                  onClick={() => setUserRoles(isSelected ? userRoles.filter(r => r !== id) : [...userRoles, id])}
                   className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
                     isSelected
                       ? "border-magenta bg-magenta/10 text-[hsl(var(--foreground))]"
@@ -529,7 +529,7 @@ function StepReviewV3({
   userName,
   projectType,
   projectSubtype,
-  userRole,
+  userRoles,
   businessDescription,
   workspaceName,
   setWorkspaceName,
@@ -542,7 +542,7 @@ function StepReviewV3({
   userName: string;
   projectType: ProjectType | null;
   projectSubtype: ProjectSubtype | null;
-  userRole: string;
+  userRoles: string[];
   businessDescription: string;
   workspaceName: string;
   setWorkspaceName: (v: string) => void;
@@ -555,7 +555,7 @@ function StepReviewV3({
   const personalityLabel = onboarding.personalities[personality]?.title || personality;
   const typeLabel = projectType ? PROJECT_TYPE_CONFIG[projectType].title : "";
   const subtypeLabel = projectSubtype ? PROJECT_SUBTYPE_CONFIG[projectSubtype]?.title : "";
-  const roleLabel = userRole ? onboarding.roles[userRole] : "";
+  const roleLabels = userRoles.map(r => onboarding.roles[r]).filter(Boolean).join(", ");
 
   return (
     <div className="space-y-6">
@@ -578,7 +578,7 @@ function StepReviewV3({
       <div className="space-y-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5">
         <ReviewRow label="Tu nombre" value={userName} />
         <ReviewRow label="Contexto" value={`${typeLabel} → ${subtypeLabel}`} />
-        {roleLabel && <ReviewRow label="Tu rol" value={roleLabel} />}
+        {roleLabels && <ReviewRow label="Tu rol" value={roleLabels} />}
         {businessDescription && <ReviewRow label="Tu negocio" value={businessDescription} />}
         <ReviewRow label="Tu agente" value={agentName} />
         <ReviewRow label="Personalidad" value={personalityLabel} />
@@ -700,8 +700,8 @@ function StepWorkspaceLegacy({
   setWorkspaceName,
   userName,
   setUserName,
-  userRole,
-  setUserRole,
+  userRoles,
+  setUserRoles,
   businessDescription,
   setBusinessDescription,
 }: {
@@ -709,8 +709,8 @@ function StepWorkspaceLegacy({
   setWorkspaceName: (v: string) => void;
   userName: string;
   setUserName: (v: string) => void;
-  userRole: string;
-  setUserRole: (v: string) => void;
+  userRoles: string[];
+  setUserRoles: (v: string[]) => void;
   businessDescription: string;
   setBusinessDescription: (v: string) => void;
 }) {
@@ -756,12 +756,12 @@ function StepWorkspaceLegacy({
             {ROLE_IDS.map((id) => {
               const label = onboarding.roles[id];
               if (!label) return null;
-              const isSelected = userRole === id;
+              const isSelected = userRoles.includes(id);
               return (
                 <button
                   key={id}
                   type="button"
-                  onClick={() => setUserRole(id)}
+                  onClick={() => setUserRoles(isSelected ? userRoles.filter(r => r !== id) : [...userRoles, id])}
                   className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
                     isSelected
                       ? "border-magenta bg-magenta/10 text-[hsl(var(--foreground))]"
@@ -858,7 +858,7 @@ function StepNeeds({
 function StepReviewLegacy({
   workspaceName,
   userName,
-  userRole,
+  userRoles,
   businessDescription,
   selectedNeeds,
   agentName,
@@ -869,7 +869,7 @@ function StepReviewLegacy({
 }: {
   workspaceName: string;
   userName: string;
-  userRole: string;
+  userRoles: string[];
   businessDescription: string;
   selectedNeeds: string[];
   agentName: string;
@@ -879,7 +879,7 @@ function StepReviewLegacy({
   onLaunch: () => void;
 }) {
   const personalityLabel = onboarding.personalities[personality]?.title || personality;
-  const roleLabel = onboarding.roles[userRole] || userRole;
+  const roleLabels = userRoles.map(r => onboarding.roles[r]).filter(Boolean).join(", ");
   const needLabels = selectedNeeds.map((id) => onboarding.needs[id]?.title).filter(Boolean);
 
   return (
@@ -891,7 +891,7 @@ function StepReviewLegacy({
       <div className="space-y-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5">
         <ReviewRow label={onboarding.reviewWorkspace} value={workspaceName} />
         <ReviewRow label={onboarding.reviewUser} value={userName} />
-        <ReviewRow label={onboarding.reviewRole} value={roleLabel} />
+        <ReviewRow label={onboarding.reviewRole} value={roleLabels} />
         <ReviewRow label={onboarding.reviewBusiness} value={businessDescription} />
         <ReviewRow label={onboarding.reviewNeeds} value={needLabels.join(", ")} />
         <ReviewRow label={onboarding.reviewAgent} value={agentName} />
