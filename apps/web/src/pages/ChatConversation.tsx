@@ -57,6 +57,15 @@ async function reportError(error: unknown, context: { path: string; action: stri
   }
 }
 
+function ElapsedTime({ startedAt }: { startedAt: number }) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, [startedAt]);
+  return <span>{elapsed}s</span>;
+}
+
 export default function ChatConversation() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const { workspace, slug } = useWorkspace();
@@ -108,7 +117,7 @@ export default function ChatConversation() {
     [qc, workspace?.id],
   );
 
-  const { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction, connectionStatus } =
+  const { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction, connectionStatus, retryInfo } =
     useChat(Number(conversationId), workspace?.id ?? 0, { onComplete });
   const { execute } = useActionExecutor(updateAction);
   
@@ -425,6 +434,13 @@ export default function ChatConversation() {
         {connectionStatus === "reconnecting" && (
           <div className="mx-4 mt-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-sm text-yellow-400">
             {content.studio.connection.reconnecting}
+            {retryInfo && (
+              <span className="ml-2 text-yellow-500/70">
+                ({retryInfo.retryCount}/{retryInfo.maxRetries})
+                {" · "}
+                <ElapsedTime startedAt={retryInfo.startedAt} />
+              </span>
+            )}
           </div>
         )}
         {connectionStatus === "timeout" && (
