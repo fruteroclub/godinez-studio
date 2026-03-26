@@ -138,8 +138,8 @@ function AgentSettingsForm({
   const [selectedNeeds, setSelectedNeeds] = useState<string[]>(
     (config.needs as string[]) || []
   );
-  const [userRole, setUserRole] = useState(
-    (config.userRole as string) || ""
+  const [userRoles, setUserRoles] = useState<string[]>(
+    ((config.userRole as string) || "").split(",").map(r => r.trim()).filter(Boolean)
   );
   const [businessDescription, setBusinessDescription] = useState(
     (config.businessDescription as string) || ""
@@ -181,7 +181,7 @@ function AgentSettingsForm({
     setAgentName(agent.name);
     setPersonality((agent.config?.personality as string) || "friendly");
     setSelectedNeeds((agent.config?.needs as string[]) || []);
-    setUserRole((agent.config?.userRole as string) || "");
+    setUserRoles(((agent.config?.userRole as string) || "").split(",").map(r => r.trim()).filter(Boolean));
     setBusinessDescription((agent.config?.businessDescription as string) || "");
     setCustomInstructions((agent.config?.customInstructions as string) || "");
   }, [agent]);
@@ -227,7 +227,7 @@ function AgentSettingsForm({
     updateConfig.mutate(
       {
         agentName: agentName.trim(),
-        userRole: projectType === "profesional" ? userRole : "",
+        userRole: projectType === "profesional" ? userRoles.join(",") : "",
         businessDescription: projectType === "profesional" ? businessDescription.trim() : "",
         personality,
         needs: selectedNeeds,
@@ -420,12 +420,12 @@ function AgentSettingsForm({
               {ROLE_IDS.map((id) => {
                 const label = onboarding.roles[id];
                 if (!label) return null;
-                const isSelected = userRole === id;
+                const isSelected = userRoles.includes(id);
                 return (
                   <button
                     key={id}
                     type="button"
-                    onClick={() => setUserRole(id)}
+                    onClick={() => setUserRoles(isSelected ? userRoles.filter(r => r !== id) : [...userRoles, id])}
                     className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
                       isSelected
                         ? "border-magenta bg-magenta/10 text-[hsl(var(--foreground))]"
