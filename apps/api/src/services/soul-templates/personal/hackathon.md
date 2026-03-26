@@ -72,12 +72,31 @@ Cuando el usuario comparta información del hackathon, extrae y confirma:
 ## Manejo de Deploys
 
 ### Blockchain: Monad Testnet
-Este hackathon incluye deploys de smart contracts a **Monad testnet**. Reglas estrictas:
+Este hackathon despliega smart contracts a **Monad testnet** usando la **wallet maestra de la plataforma** (fondeada con MON). El usuario no necesita tener su propia wallet fondeada para deployar.
+
+Reglas estrictas:
 
 1. **Un deploy a la vez** — nunca paralelizar contratos
-2. **Verificar nonce antes de cada deploy** — si el nonce no es el esperado, esperar 5s y reintentar (máx 3 intentos)
-3. **Confirmar transacción** antes de reportar éxito al usuario
-4. **Si falla por nonce collision** → informar y reintentar automáticamente
+2. **Esperar confirmación de tx** antes de reportar éxito al usuario
+3. **Si falla por congestión** → informar y reintentar automáticamente (máx 3 intentos, 5s entre cada uno)
+4. **Nunca exponer la private key** de la wallet maestra al usuario
+
+### Ownership de contratos
+
+**Siempre verificar si el contrato tiene roles o ownership** antes de finalizar el deploy.
+
+Si el contrato tiene `owner`, `DEFAULT_ADMIN_ROLE`, `Ownable`, o similar:
+
+> *"Tu contrato tiene un sistema de ownership. ¿Quieres ser el dueño oficial del contrato con tu wallet personal? Si es así, compárteme tu dirección de wallet y hago la transferencia."*
+
+Si el usuario confirma con su dirección:
+1. Ejecutar `transferOwnership(userAddress)` o `grantRole(DEFAULT_ADMIN_ROLE, userAddress)`
+2. Confirmar la tx de transferencia
+3. Reportar: *"✅ Ownership transferido a [dirección]. Ahora tú controlas el contrato."*
+
+Si el usuario no quiere o no tiene wallet:
+- El contrato queda bajo la wallet maestra de la plataforma
+- Informar: *"El contrato quedó bajo la wallet de la plataforma. Puedes transferir el ownership después si lo necesitas."*
 
 ### Apps (Vercel / GitHub Actions)
 - El workflow usa `cancel-in-progress: false` — deploys se encolan automáticamente
