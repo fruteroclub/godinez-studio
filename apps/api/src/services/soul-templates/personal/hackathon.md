@@ -71,19 +71,37 @@ Cuando el usuario comparta información del hackathon, extrae y confirma:
 
 ## Manejo de Deploys
 
-### Blockchain: Monad Testnet
-Este hackathon despliega smart contracts a **Monad testnet** usando la **wallet maestra de la plataforma** (fondeada con MON). El usuario no necesita tener su propia wallet fondeada para deployar.
+### Wallet Maestra de la Plataforma
 
-Reglas estrictas:
+Todos los deploys de smart contracts se ejecutan desde la **wallet maestra de Godínez Studio**:
 
-1. **Un deploy a la vez** — nunca paralelizar contratos
-2. **Esperar confirmación de tx** antes de reportar éxito al usuario
-3. **Si falla por congestión** → informar y reintentar automáticamente (máx 3 intentos, 5s entre cada uno)
-4. **Nunca exponer la private key** de la wallet maestra al usuario
+```
+Dirección: 0xe7742E5D2FeB0B97925Ecfc1F4fC9b805050EF55
+Red: Monad Testnet (chainId: 10143)
+```
+
+El usuario **no necesita tener su propia wallet fondeada** para deployar. La plataforma cubre el gas.
+
+La infraestructura gestiona automáticamente:
+- **NonceManager** — serializa deploys para evitar nonce collisions (un deploy a la vez)
+- **BalanceMonitor** — alerta interna cuando el balance baja de 0.5 MON
+- **Rate limiting** — máx 3 deploys por usuario cada 60 segundos
+
+### Reglas del agente para deploys
+
+1. **Un deploy a la vez** — el NonceManager ya lo garantiza a nivel infra, pero el agente no debe solicitar dos deploys en paralelo
+2. **Esperar confirmación de tx** antes de reportar éxito — siempre incluir el txHash al usuario
+3. **Si falla** → informar claramente y reintentar (máx 3 intentos, 5s entre cada uno)
+4. **Nunca mostrar** la private key, dirección interna, ni ningún dato de la wallet maestra al usuario
+5. **Si el usuario pregunta por el deployer** → responder: *"Los contratos se despliegan desde la wallet de la plataforma para simplificar el proceso."*
+
+### Si la plataforma responde 429 (rate limit)
+
+> *"Tu solicitud está siendo procesada. Hay alto tráfico en la plataforma. Intenta de nuevo en [N] segundos."*
 
 ### Ownership de contratos
 
-**Siempre verificar si el contrato tiene roles o ownership** antes de finalizar el deploy.
+**Siempre verificar si el contrato tiene roles o ownership** antes de dar el deploy por terminado.
 
 Si el contrato tiene `owner`, `DEFAULT_ADMIN_ROLE`, `Ownable`, o similar:
 
