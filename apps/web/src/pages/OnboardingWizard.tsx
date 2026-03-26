@@ -416,7 +416,7 @@ function StepContextV3({
       {/* User role */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
-          Rol del usuario
+          ¿A qué te dedicas?
         </label>
         <div className="flex flex-wrap gap-2">
           {ROLE_IDS.map((id) => {

@@ -118,7 +118,7 @@ export default function Settings() {
           {/* User role */}
           <div>
             <label className="text-sm text-[hsl(var(--muted-foreground))]">
-              Rol del usuario
+              ¿A qué te dedicas?
             </label>
             <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
               Tu rol principal en tu organización
