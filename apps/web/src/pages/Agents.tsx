@@ -406,7 +406,7 @@ function AgentSettingsForm({
         )}
 
         {/* Agent name */}
-        <div>
+        <div className="hidden">
           <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
             {ac.agentNameLabel}
           </label>
