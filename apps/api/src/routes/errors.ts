@@ -26,6 +26,8 @@ import {
   logRawError,
 } from "../dal/errors";
 
+const adminAuth = [requireAuth, resolveUser, requireAdmin] as const;
+
 const app = new Hono<AuthEnv>();
 
 // ============================================
@@ -94,21 +96,19 @@ app.post(
 // PROTECTED ENDPOINTS (require admin auth)
 // ============================================
 
-app.use("*", requireAuth, resolveUser, requireAdmin);
-
 // Health & Dashboard
-app.get("/health", async (c) => {
+app.get("/health", ...adminAuth, async (c) => {
   const health = await getSystemHealth();
   return c.json(health);
 });
 
-app.get("/dashboard", async (c) => {
+app.get("/dashboard", ...adminAuth, async (c) => {
   const summary = await getDashboardSummary();
   return c.json(summary);
 });
 
 // Errors CRUD
-app.get("/", async (c) => {
+app.get("/", ...adminAuth, async (c) => {
   const resolved = c.req.query("resolved");
   const errors = await getErrors({
     resolved: resolved !== undefined ? resolved === "true" : undefined,
@@ -116,39 +116,39 @@ app.get("/", async (c) => {
   return c.json(errors);
 });
 
-app.patch("/:id/resolve", async (c) => {
+app.patch("/:id/resolve", ...adminAuth, async (c) => {
   const id = parseInt(c.req.param("id"));
   const resolved = await resolveError(id, "admin");
   return c.json(resolved);
 });
 
-app.delete("/:id", async (c) => {
+app.delete("/:id", ...adminAuth, async (c) => {
   const id = parseInt(c.req.param("id"));
   await deleteError(id);
   return c.json({ success: true });
 });
 
 // Feedback CRUD (reads)
-app.get("/feedback", async (c) => {
+app.get("/feedback", ...adminAuth, async (c) => {
   const list = await getFeedback();
   return c.json(list);
 });
 
-app.patch("/feedback/:id", async (c) => {
+app.patch("/feedback/:id", ...adminAuth, async (c) => {
   const id = parseInt(c.req.param("id"));
   const { status } = await c.req.json();
   const updated = await updateFeedbackStatus(id, status);
   return c.json(updated);
 });
 
-app.delete("/feedback/:id", async (c) => {
+app.delete("/feedback/:id", ...adminAuth, async (c) => {
   const id = parseInt(c.req.param("id"));
   const deleted = await deleteFeedback(id);
   return c.json({ success: true, deleted });
 });
 
 // Watchdog endpoints (also admin-protected)
-app.get("/unprocessed", async (c) => {
+app.get("/unprocessed", ...adminAuth, async (c) => {
   const limit = parseInt(c.req.query("limit") || "50");
   const list = await getUnprocessedErrors(limit);
   return c.json(list);
@@ -156,6 +156,7 @@ app.get("/unprocessed", async (c) => {
 
 app.patch(
   "/:id",
+  ...adminAuth,
   zValidator(
     "json",
     z.object({

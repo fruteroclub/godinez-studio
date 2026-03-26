@@ -73,11 +73,11 @@ app.use("/api/hackathons/*", rateLimits.hackathon);
 app.route("/api/chat", chat);
 app.route("/api/conversations", conversations);
 app.route("/api/referral-codes", referralCodes);
+app.route("/api/admin/errors", errors); // before /api/admin to avoid admin middleware catch-all
 app.route("/api/admin", admin);
 app.route("/api/users", users);
 app.route("/api/hackathons", hackathons);
 app.route("/webhooks", webhooks);
-app.route("/api/admin/errors", errors);
 app.route("/api/watchdog", watchdog);
 
 app.onError((err, c) => {
