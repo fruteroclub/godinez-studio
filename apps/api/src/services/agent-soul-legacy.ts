@@ -18,11 +18,19 @@ const PERSONALITY_INSTRUCTIONS: Record<string, string> = {
 };
 
 const ROLE_LABELS: Record<string, string> = {
+  negocio: "Negocio propio",
+  marketing: "Marketing/Comunicación",
+  ventas: "Ventas",
+  admin: "Admin/Operaciones",
+  tech: "Tecnología",
+  educacion: "Educación",
+  creatividad: "Creatividad",
+  consultoria: "Consultoría/Servicios",
+  otra: "Otra",
+  // Legacy (for existing users)
   founder: "Fundador/CEO",
-  marketing: "Marketing",
   sales: "Ventas",
   operations: "Operaciones",
-  tech: "Tecnología",
   support: "Soporte",
   other: "Otro",
 };

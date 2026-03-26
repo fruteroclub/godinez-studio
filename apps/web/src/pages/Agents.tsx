@@ -58,7 +58,7 @@ const PROJECT_SUBTYPE_CONFIG: Record<string, { title: string; description: strin
   organizar: { title: "Organizar y planear", description: "Reportes, gestión, coordinación" },
 };
 
-const ROLE_IDS = ["founder", "marketing", "sales", "operations", "tech", "support", "other"] as const;
+const ROLE_IDS = ["negocio", "marketing", "ventas", "admin", "tech", "educacion", "creatividad", "consultoria", "otra"] as const;
 const PERSONALITY_IDS = ["professional", "friendly", "creative", "technical"] as const;
 const NEED_IDS = ["launch", "automate", "social", "sales", "time", "research", "support", "build"] as const;
 

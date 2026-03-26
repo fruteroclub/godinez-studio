@@ -10,7 +10,7 @@ import { RoleIcon } from "@/lib/icons";
 
 const { settings: sc, onboarding } = content.studio;
 
-const ROLE_IDS = ["founder", "marketing", "sales", "operations", "tech", "support", "other"] as const;
+const ROLE_IDS = ["negocio", "marketing", "ventas", "admin", "tech", "educacion", "creatividad", "consultoria", "otra"] as const;
 
 interface UserContext {
   projectType: string | null;
