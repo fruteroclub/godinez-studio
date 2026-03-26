@@ -466,7 +466,7 @@ function AgentSettingsForm({
           </div>
         )}
 
-        {/* Personality picker */}
+        {/* Personality picker - HIDDEN */}
         <div>
           <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
             {ac.personalityLabel}
@@ -499,8 +499,8 @@ function AgentSettingsForm({
           </div>
         </div>
 
-        {/* Needs picker — ONLY for profesional */}
-        {projectType === "profesional" && (
+        {/* Needs picker - HIDDEN */}
+        {false && projectType === "profesional" && (
           <div className="animate-in fade-in slide-in-from-top-2 duration-300">
             <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
               {ac.needsLabel}
@@ -540,7 +540,7 @@ function AgentSettingsForm({
           </div>
         )}
 
-        {/* Custom instructions */}
+        {/* Custom instructions - HIDDEN */}
         <div>
           <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
             {ac.customInstructionsLabel}
