@@ -36,5 +36,6 @@ export const messages = pgTable(
       t.conversationId,
       t.createdAt,
     ),
+    index("messages_workspace_id_idx").on(t.workspaceId),
   ],
 );
