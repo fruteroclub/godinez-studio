@@ -27,7 +27,7 @@ export default function Settings() {
   
   const [name, setName] = useState(workspace?.name ?? "");
   const [deleteSlug, setDeleteSlug] = useState("");
-  const [userRole, setUserRole] = useState<string>("");
+  const [userRoles, setUserRoles] = useState<string[]>([]);
   const [saveFlash, setSaveFlash] = useState(false);
 
   // Fetch user context (includes jobRole)
@@ -39,10 +39,10 @@ export default function Settings() {
     },
   });
 
-  // Update role when context loads
+  // Update roles when context loads
   useEffect(() => {
     if (userContext?.jobRole) {
-      setUserRole(userContext.jobRole);
+      setUserRoles(userContext.jobRole.split(",").map(r => r.trim()).filter(Boolean));
     }
   }, [userContext]);
 
@@ -68,9 +68,10 @@ export default function Settings() {
     // Save workspace name
     await updateWorkspace.mutateAsync({ name: name.trim() });
     
-    // Save role if changed
-    if (userRole && userRole !== userContext?.jobRole) {
-      await updateRole.mutateAsync(userRole);
+    // Save roles if changed
+    const rolesString = userRoles.join(",");
+    if (rolesString && rolesString !== userContext?.jobRole) {
+      await updateRole.mutateAsync(rolesString);
     }
     
     setSaveFlash(true);
@@ -126,12 +127,12 @@ export default function Settings() {
               {ROLE_IDS.map((id) => {
                 const label = onboarding.roles[id];
                 if (!label) return null;
-                const isSelected = userRole === id;
+                const isSelected = userRoles.includes(id);
                 return (
                   <button
                     key={id}
                     type="button"
-                    onClick={() => setUserRole(isSelected ? "" : id)}
+                    onClick={() => setUserRoles(isSelected ? userRoles.filter(r => r !== id) : [...userRoles, id])}
                     className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
                       isSelected
                         ? "border-magenta bg-magenta/10 text-[hsl(var(--foreground))]"
