@@ -157,22 +157,31 @@ app.post(
       // Stub mode — create a stub run and register it
       const stub = createStubRun(enrichedContent);
       runId = stub.runId;
-      stubRuns.set(runId, { stub, conversationId, workspaceId });
+      stubRuns.set(runId, { stub, conversationId, workspaceId, createdAt: Date.now() });
     }
 
     return c.json({ runId, messageId: message.id });
   },
 );
 
-// Map for stub runs waiting to be streamed
+// Map for stub runs waiting to be streamed (with TTL cleanup)
 const stubRuns = new Map<
   string,
   {
     stub: ReturnType<typeof createStubRun>;
     conversationId: number;
     workspaceId: number;
+    createdAt: number;
   }
 >();
+
+// Clean up orphaned stub runs every 2 minutes (TTL: 60s)
+setInterval(() => {
+  const cutoff = Date.now() - 60_000;
+  for (const [id, entry] of stubRuns) {
+    if (entry.createdAt < cutoff) stubRuns.delete(id);
+  }
+}, 2 * 60 * 1000);
 
 // GET /api/chat/stream/:runId — SSE stream of agent response
 app.get("/stream/:runId", async (c) => {
@@ -415,6 +424,7 @@ app.get("/stream/:runId", async (c) => {
         cleanup();
         await deleteRunContext(runId);
         resolve();
+        try { await stream.close(); } catch { /* already closed */ }
       }, 5 * 60 * 1000);
     });
   });

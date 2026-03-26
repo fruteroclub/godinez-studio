@@ -74,11 +74,11 @@ app.use("/api/hackathons/*", rateLimits.hackathon);
 app.route("/api/chat", chat);
 app.route("/api/conversations", conversations);
 app.route("/api/referral-codes", referralCodes);
+app.route("/api/admin/errors", errors); // before /api/admin to avoid admin middleware catch-all
 app.route("/api/admin", admin);
 app.route("/api/users", users);
 app.route("/api/hackathons", hackathons);
 app.route("/webhooks", webhooks);
-app.route("/api/admin/errors", errors);
 app.route("/api/watchdog", watchdog);
 app.route("/api/context", context);
 
@@ -104,11 +104,10 @@ app.onError((err, c) => {
     return c.json(response, err.statusCode as 400 | 401 | 403 | 404 | 429 | 500);
   }
   
-  logger.error({ err: err.message }, "unhandled error");
-  return c.json({ 
+  logger.error({ err: err.message, path: c.req.path }, "unhandled error");
+  return c.json({
     error: "Algo salió mal. Por favor, intenta de nuevo.",
     code: "INTERNAL_ERROR",
-    message: err.message 
   }, 500);
 });
 
