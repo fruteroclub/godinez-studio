@@ -6,7 +6,6 @@ import { useUpdateWorkspace, useDeleteWorkspace } from "@/hooks/use-workspace";
 import { useAuth } from "@clerk/clerk-react";
 import { apiFetch } from "@/lib/api";
 import { content } from "@/lib/content";
-import { RoleIcon } from "@/lib/icons";
 
 const { settings: sc, onboarding } = content.studio;
 
@@ -121,7 +120,7 @@ export default function Settings() {
               ¿A qué te dedicas?
             </label>
             <p className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
-              Tu rol principal en tu organización
+              
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {ROLE_IDS.map((id) => {
@@ -139,7 +138,7 @@ export default function Settings() {
                         : "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] hover:border-white/20"
                     }`}
                   >
-                    <RoleIcon roleId={id} className="w-4 h-4 stroke-[1.5] inline mr-1.5" />{label}
+                    {label}
                   </button>
                 );
               })}
