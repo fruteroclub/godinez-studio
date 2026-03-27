@@ -30,6 +30,7 @@ export function connectSSE(runId: string, handlers: SSEHandlers, token?: string 
     ? `${API_URL}/api/chat/stream/${runId}?token=${encodeURIComponent(token)}`
     : `${API_URL}/api/chat/stream/${runId}`;
   
+<<<<<<< Updated upstream
   let closed = false;
   let retryCount = 0;
   let es: EventSource | null = null;
@@ -64,6 +65,47 @@ export function connectSSE(runId: string, handlers: SSEHandlers, token?: string 
       handlers.onStatus?.({ status: "error" });
       cleanup();
       handlers.onError?.("Stream timeout - no data received");
+=======
+  const es = new EventSource(url);
+  let closed = false;
+  let totalReceived = 0; // Track total chars received to detect duplicates
+
+  es.addEventListener("delta", (e) => {
+    if (closed) return;
+    try {
+      const { text } = JSON.parse(e.data);
+      if (text) {
+        totalReceived += text.length;
+        handlers.onDelta?.(text);
+      }
+    } catch {
+      // Invalid JSON, ignore
+    }
+  });
+
+  es.addEventListener("done", (e) => {
+    if (closed) return;
+    closed = true;
+    try {
+      const { text, messageId, actions } = JSON.parse(e.data);
+      handlers.onDone?.(text, messageId, actions);
+    } catch {
+      // Invalid JSON
+    }
+    es.close();
+  });
+
+  es.addEventListener("error", (e) => {
+    if (closed) return;
+    closed = true;
+    if (e instanceof MessageEvent) {
+      try {
+        const { error } = JSON.parse(e.data);
+        handlers.onError?.(error);
+      } catch {
+        handlers.onError?.("Connection error");
+      }
+>>>>>>> Stashed changes
     } else {
       timeoutTimer = setTimeout(checkTimeout, 10_000);
     }
@@ -226,5 +268,19 @@ export function connectSSE(runId: string, handlers: SSEHandlers, token?: string 
   // Start initial connection
   connect();
 
+<<<<<<< Updated upstream
   return cleanup;
+=======
+  // Disable auto-reconnect by closing on open if already closed
+  es.addEventListener("open", () => {
+    if (closed) {
+      es.close();
+    }
+  });
+
+  return () => {
+    closed = true;
+    es.close();
+  };
+>>>>>>> Stashed changes
 }

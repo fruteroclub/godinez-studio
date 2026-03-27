@@ -41,7 +41,10 @@ export async function createConversation(data: {
   projectId?: number;
   title?: string;
   isHackathon?: boolean;
+<<<<<<< Updated upstream
   hackathonId?: number;
+=======
+>>>>>>> Stashed changes
 }) {
   const [conversation] = await db
     .insert(conversations)
@@ -50,6 +53,7 @@ export async function createConversation(data: {
   return conversation;
 }
 
+<<<<<<< Updated upstream
 // Get or create hackathon conversation for a SPECIFIC hackathon
 export async function getOrCreateHackathonConversation(
   workspaceId: number,
@@ -60,6 +64,19 @@ export async function getOrCreateHackathonConversation(
   // First, try to find existing conversation for this specific hackathon
   const existing = await db.query.conversations.findFirst({
     where: eq(conversations.hackathonId, hackathonId),
+=======
+// Get or create the hackathon conversation for a workspace
+export async function getOrCreateHackathonConversation(
+  workspaceId: number,
+  agentId: number,
+) {
+  // First, try to find existing hackathon conversation
+  const existing = await db.query.conversations.findFirst({
+    where: and(
+      eq(conversations.workspaceId, workspaceId),
+      eq(conversations.isHackathon, true),
+    ),
+>>>>>>> Stashed changes
   });
   
   if (existing) {
@@ -72,8 +89,12 @@ export async function getOrCreateHackathonConversation(
     .values({
       workspaceId,
       agentId,
+<<<<<<< Updated upstream
       hackathonId,
       title: `🏆 ${hackathonName}`,
+=======
+      title: "🏆 Hackathon",
+>>>>>>> Stashed changes
       isHackathon: true,
     })
     .returning();
@@ -81,10 +102,20 @@ export async function getOrCreateHackathonConversation(
   return conversation;
 }
 
+<<<<<<< Updated upstream
 // Get hackathon conversation by hackathonId
 export async function getHackathonConversation(hackathonId: number) {
   return db.query.conversations.findFirst({
     where: eq(conversations.hackathonId, hackathonId),
+=======
+// Get hackathon conversation for a workspace (null if none)
+export async function getHackathonConversation(workspaceId: number) {
+  return db.query.conversations.findFirst({
+    where: and(
+      eq(conversations.workspaceId, workspaceId),
+      eq(conversations.isHackathon, true),
+    ),
+>>>>>>> Stashed changes
   });
 }
 

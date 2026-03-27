@@ -15,6 +15,7 @@ import { ListSkeleton } from "@/components/ui/Skeleton";
 
 const { chat } = content.studio;
 
+<<<<<<< Updated upstream
 interface ConversationToDelete {
   id: number;
   title: string;
@@ -28,11 +29,23 @@ interface MenuState {
 interface RenameState {
   conversationId: number | null;
   title: string;
+=======
+interface Conversation {
+  id: number;
+  title: string | null;
+  channel: string;
+  projectId: number | null;
+  isHackathon?: boolean;
+  lastMessageAt: string | null;
+>>>>>>> Stashed changes
 }
 
 export default function Chat() {
   const { workspace, slug } = useWorkspace();
-  const { data: conversations, isLoading } = useConversations(workspace?.id);
+  const { data: conversations, isLoading } = useConversations(workspace?.id) as {
+    data: Conversation[] | undefined;
+    isLoading: boolean;
+  };
   const { data: projects } = useProjects(workspace?.id);
   const createConversation = useCreateConversation(workspace?.id ?? 0);
   const deleteConversation = useDeleteConversation(workspace?.id ?? 0);
@@ -94,6 +107,7 @@ export default function Chat() {
     }
   }
 
+<<<<<<< Updated upstream
   function handleMenuClick(conv: { id: number }, e: React.MouseEvent) {
     e.stopPropagation();
     const rect = (e.target as HTMLElement).getBoundingClientRect();
@@ -229,6 +243,18 @@ export default function Chat() {
       </div>
     );
   };
+=======
+  // Sort conversations: hackathon first, then by lastMessageAt
+  const sortedConversations = [...(conversations ?? [])].sort((a, b) => {
+    // Hackathon conversations always first
+    if (a.isHackathon && !b.isHackathon) return -1;
+    if (!a.isHackathon && b.isHackathon) return 1;
+    // Then by date
+    const dateA = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+    const dateB = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+    return dateB - dateA;
+  });
+>>>>>>> Stashed changes
 
   return (
     <div className="space-y-6">
@@ -329,9 +355,10 @@ export default function Chat() {
 
       {isLoading ? (
         <ListSkeleton rows={4} />
-      ) : !conversations?.length ? (
+      ) : !sortedConversations?.length ? (
         <EmptyState message="Inicia una conversacion con tu agente" />
       ) : (
+<<<<<<< Updated upstream
         <div className="space-y-6">
           {/* Starred Conversations */}
           {starredConversations.length > 0 && (
@@ -358,6 +385,56 @@ export default function Chat() {
               </div>
             </div>
           )}
+=======
+        <div className="space-y-2">
+          {sortedConversations.map((conv) => {
+            const projName = conv.projectId
+              ? projectMap.get(conv.projectId)
+              : undefined;
+            return (
+              <button
+                key={conv.id}
+                onClick={() => navigate(`/studio/${slug}/chat/${conv.id}`)}
+                className={`flex w-full items-center justify-between rounded-lg border p-4 text-left transition-colors ${
+                  conv.isHackathon
+                    ? "border-amber-500/40 bg-amber-500/5 hover:border-amber-500/60"
+                    : "border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:border-magenta/30"
+                }`}
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    {conv.isHackathon && (
+                      <span className="text-lg">🏆</span>
+                    )}
+                    <p className="font-medium text-[hsl(var(--foreground))] truncate">
+                      {conv.title ?? "Conversación"}
+                    </p>
+                  </div>
+                  <div className="mt-1 flex items-center gap-2">
+                    {conv.isHackathon && (
+                      <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-400">
+                        Hackathon
+                      </span>
+                    )}
+                    {projName && (
+                      <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-[10px] font-medium text-violet-400">
+                        {projName}
+                      </span>
+                    )}
+                    <span className="text-xs text-[hsl(var(--muted-foreground))]">
+                      {conv.channel}
+                    </span>
+                  </div>
+                </div>
+                {conv.lastMessageAt && (
+                  <span className="ml-4 shrink-0 text-xs text-[hsl(var(--muted-foreground))]">
+                    {new Date(conv.lastMessageAt).toLocaleDateString("es-MX")}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+>>>>>>> Stashed changes
         </div>
       )}
     </div>

@@ -23,18 +23,35 @@ export interface ChatMessage {
   createdAt?: string;
 }
 
+<<<<<<< Updated upstream
 export type ConnectionStatus = "idle" | "connected" | "reconnecting" | "disconnected" | "timeout";
 
 export interface RetryInfo {
   retryCount: number;
   maxRetries: number;
   startedAt: number;
+=======
+export interface HackathonContext {
+  active: boolean;
+  name: string;
+  deadline: string;
+  currentPhase: number;
+  phases: Array<{
+    number: number;
+    status: "done" | "current" | "pending";
+    notes: string[];
+  }>;
+>>>>>>> Stashed changes
 }
 
 export function useChat(
   conversationId: number,
   workspaceId: number,
+<<<<<<< Updated upstream
   options?: { onComplete?: () => void; hackathonContext?: { name: string; deadline: string; currentPhase: number; phases: Array<{ number: number; status: string; notes: string[] }>; hackathonUrl?: string; resourcesUrl?: string; } | null },
+=======
+  options?: { onComplete?: (text: string) => void },
+>>>>>>> Stashed changes
 ) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -43,13 +60,23 @@ export function useChat(
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("idle");
   const [retryInfo, setRetryInfo] = useState<RetryInfo | null>(null);
   const { getToken } = useAuth();
+<<<<<<< Updated upstream
   const sseCleanupRef = useRef<(() => void) | null>(null);
+=======
+  
+  // Store cleanup function and accumulated text for SSE
+  const sseCleanupRef = useRef<(() => void) | null>(null);
+  const accumulatedTextRef = useRef<string>("");
+>>>>>>> Stashed changes
 
   // Cleanup SSE on unmount
   useEffect(() => {
     return () => {
       sseCleanupRef.current?.();
+<<<<<<< Updated upstream
       sseCleanupRef.current = null;
+=======
+>>>>>>> Stashed changes
     };
   }, []);
 
@@ -126,11 +153,20 @@ export function useChat(
   );
 
   const sendMessage = useCallback(
+<<<<<<< Updated upstream
     async (
       content: string,
       hackathonContext?: { name: string; deadline: string; currentPhase: number; phases: Array<{ number: number; status: string; notes: string[] }>; hackathonUrl?: string; resourcesUrl?: string; active?: boolean; timeRemaining?: string; } | null,
       attachments?: ChatAttachment[],
     ) => {
+=======
+    async (content: string, hackathonContext?: HackathonContext | null) => {
+      // Close any existing SSE connection
+      sseCleanupRef.current?.();
+      sseCleanupRef.current = null;
+      accumulatedTextRef.current = "";
+
+>>>>>>> Stashed changes
       const token = await getToken();
       const tempUserId = `temp-${Date.now()}`;
       const tempAgentId = `temp-agent-${Date.now()}`;
@@ -142,6 +178,12 @@ export function useChat(
       ]);
       trackEvent("chat_message_sent", { conversationId, workspaceId, hasAttachment: !!attachments?.length });
 
+      // Build request body
+      const body: Record<string, unknown> = { conversationId, workspaceId, content };
+      if (hackathonContext?.active) {
+        body.hackathonContext = hackathonContext;
+      }
+
       // POST to send
       let runId: string;
       let messageId: number;
@@ -150,6 +192,7 @@ export function useChat(
           "/api/chat/send",
           {
             method: "POST",
+<<<<<<< Updated upstream
             body: JSON.stringify({
               conversationId,
               workspaceId,
@@ -157,6 +200,9 @@ export function useChat(
               attachments,
               hackathonContext: hackathonContext || undefined,
             }),
+=======
+            body: JSON.stringify(body),
+>>>>>>> Stashed changes
             token,
           },
         );
@@ -167,7 +213,6 @@ export function useChat(
         const msg = err instanceof Error ? err.message : "";
         if (msg.includes("AGENT_OFFLINE") || msg.includes("GATEWAY_OFFLINE")) {
           setAgentOffline(true);
-          // Remove the optimistic user message
           setMessages((prev) => prev.filter((m) => m.id !== tempUserId));
         }
         return;
@@ -187,29 +232,32 @@ export function useChat(
       ]);
       setIsStreaming(true);
 
+<<<<<<< Updated upstream
       // Clean up any previous SSE connection
       sseCleanupRef.current?.();
 
       // Connect SSE (pass token via query param — EventSource can't send headers)
       sseCleanupRef.current = connectSSE(
+=======
+      // Connect SSE and store cleanup function
+      const cleanup = connectSSE(
+>>>>>>> Stashed changes
         runId,
         {
           onDelta: (text) => {
-            // Parse action blocks from streaming text for live preview
-            const streamActions = parseActionBlocks(text);
-            const liveActions: ActionCard[] | undefined =
-              streamActions.length > 0
-                ? streamActions.map((b) => ({ ...b, status: "pending" as const }))
-                : undefined;
-
+            // Append only new text to avoid duplicates
+            accumulatedTextRef.current = text; // Replace, not append - server sends cumulative
+            const newContent = accumulatedTextRef.current;
+            
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === tempAgentId
-                  ? { ...m, content: text, actions: liveActions }
+                  ? { ...m, content: newContent }
                   : m,
               ),
             );
           },
+<<<<<<< Updated upstream
           onDone: async (text, agentMessageId, actions) => {
             // Ensure message is persisted — only send content if SSE didn't provide a messageId
             let finalMessageId = agentMessageId;
@@ -244,14 +292,34 @@ export function useChat(
                       content: text,
                       streaming: false,
                       actions,
+=======
+          onDone: (fullText) => {
+            // Use the server's final text as source of truth
+            const actions = parseActionBlocks(fullText);
+            
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === tempAgentId
+                  ? { 
+                      ...m, 
+                      content: fullText, // Use server's final text
+                      streaming: false, 
+                      actions: actions.length > 0 ? actions : undefined 
+>>>>>>> Stashed changes
                     }
                   : m,
               ),
             );
             setIsStreaming(false);
+<<<<<<< Updated upstream
             setConnectionStatus("idle");
             sseCleanupRef.current = null;
             options?.onComplete?.();
+=======
+            sseCleanupRef.current = null;
+            accumulatedTextRef.current = "";
+            options?.onComplete?.(fullText);
+>>>>>>> Stashed changes
           },
           onError: () => {
             setMessages((prev) =>
@@ -262,6 +330,7 @@ export function useChat(
               ),
             );
             setIsStreaming(false);
+<<<<<<< Updated upstream
             setConnectionStatus("disconnected");
             sseCleanupRef.current = null;
           },
@@ -279,13 +348,31 @@ export function useChat(
           },
           onTimeout: () => {
             setConnectionStatus("timeout");
+=======
+            sseCleanupRef.current = null;
+            accumulatedTextRef.current = "";
+>>>>>>> Stashed changes
           },
         },
         token,
       );
+      
+      sseCleanupRef.current = cleanup;
     },
     [conversationId, workspaceId, getToken, options],
   );
 
+<<<<<<< Updated upstream
   return { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction, connectionStatus, retryInfo };
+=======
+  return {
+    messages,
+    isStreaming,
+    isLoading,
+    agentOffline,
+    sendMessage,
+    updateAction,
+    setMessages,
+  };
+>>>>>>> Stashed changes
 }

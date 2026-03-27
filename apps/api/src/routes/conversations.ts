@@ -14,11 +14,16 @@ import {
   getConversationsByWorkspaceId,
   getConversationsByProject,
   updateConversationTitle,
+<<<<<<< Updated upstream
   updateConversation,
   deleteConversation,
   getOrCreateHackathonConversation,
   getHackathonConversation,
   deleteHackathonConversation,
+=======
+  getOrCreateHackathonConversation,
+  getHackathonConversation,
+>>>>>>> Stashed changes
 } from "../dal/conversations";
 import { getProjectById } from "../dal/projects";
 import { getWorkspaceById } from "../dal/workspaces";
@@ -61,13 +66,19 @@ app.post(
     return c.json(conversation, 201);
   },
 );
+<<<<<<< Updated upstream
 // POST /api/conversations/hackathon — Get or create hackathon conversation (by hackathonId)
+=======
+
+// POST /api/conversations/hackathon — Get or create hackathon conversation
+>>>>>>> Stashed changes
 app.post(
   "/hackathon",
   zValidator(
     "json",
     z.object({
       workspaceId: z.number(),
+<<<<<<< Updated upstream
       hackathonId: z.number(),
       hackathonName: z.string(),
     }),
@@ -78,25 +89,43 @@ app.post(
     if (!(await verifyWorkspaceAccess(userId, workspaceId))) {
       return c.json({ error: "Not a workspace member" }, 403);
     }
+=======
+    }),
+  ),
+  async (c) => {
+    const { workspaceId } = c.req.valid("json");
+
+>>>>>>> Stashed changes
     const workspace = await getWorkspaceById(workspaceId);
     if (!workspace?.agentId) {
       return c.json({ error: "No agent assigned to this workspace" }, 400);
     }
+<<<<<<< Updated upstream
     const conversation = await getOrCreateHackathonConversation(
       workspaceId,
       workspace.agentId,
       hackathonId,
       hackathonName,
+=======
+
+    const conversation = await getOrCreateHackathonConversation(
+      workspaceId,
+      workspace.agentId,
+>>>>>>> Stashed changes
     );
     return c.json(conversation);
   },
 );
+<<<<<<< Updated upstream
 // DELETE /api/conversations/hackathon/:hackathonId — Delete hackathon conversation
 app.delete("/hackathon/:hackathonId", async (c) => {
   const hackathonId = parseInt(c.req.param("hackathonId"));
   const result = await deleteHackathonConversation(hackathonId);
   return c.json(result);
 });
+=======
+
+>>>>>>> Stashed changes
 // GET /api/conversations/:id — Get conversation detail
 app.get("/:id", async (c) => {
   const userId = c.get("userId");

@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 import { useQuery } from "@tanstack/react-query";
 import { Trophy, Clock } from "lucide-react";
 import { useAuth } from "@clerk/clerk-react";
@@ -5,10 +6,20 @@ import { apiFetch } from "@/lib/api";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+=======
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useParams } from "react-router-dom";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+>>>>>>> Stashed changes
 import ReactMarkdown from "react-markdown";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
+<<<<<<< Updated upstream
 import { useChat, type ChatAttachment } from "@/hooks/use-chat";
+=======
+import { useChat } from "@/hooks/use-chat";
+import { useHackathon } from "@/hooks/use-hackathon";
+>>>>>>> Stashed changes
 import { useActionExecutor } from "@/hooks/use-action-executor";
 import { useHackathonActions } from "@/hooks/use-hackathon-actions";
 import { ActionCard } from "@/components/chat/ActionCard";
@@ -16,7 +27,9 @@ import { FileAttachmentButton, AttachmentPreview, MessageAttachment } from "@/co
 import { DropZone } from "@/components/chat/DropZone";
 import { stripActionBlocks } from "@/lib/action-parser";
 import AgentOfflineBanner from "@/components/AgentOfflineBanner";
+import { HackathonBanner } from "@/components/hackathon/HackathonBanner";
 import { content } from "@/lib/content";
+<<<<<<< Updated upstream
 
 const { chat } = content.studio;
 
@@ -64,10 +77,23 @@ function ElapsedTime({ startedAt }: { startedAt: number }) {
     return () => clearInterval(timer);
   }, [startedAt]);
   return <span>{elapsed}s</span>;
+=======
+import { apiFetch } from "@/lib/api";
+import { useAuth } from "@clerk/clerk-react";
+import type { ActionType } from "@godinez/types";
+
+const { chat } = content.studio;
+
+interface ConversationDetails {
+  id: number;
+  isHackathon: boolean;
+  title: string | null;
+>>>>>>> Stashed changes
 }
 
 export default function ChatConversation() {
   const { conversationId } = useParams<{ conversationId: string }>();
+<<<<<<< Updated upstream
   const { workspace, slug } = useWorkspace();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -112,10 +138,67 @@ export default function ChatConversation() {
     return `${minutes}min restantes`;
   }, [hackathonData?.deadline]);
 
+=======
+  const { workspace } = useWorkspace();
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  
+  // Get hackathon context FIRST (needed for processHackathonCommands)
+  const { hackathon, getTimeRemaining, addNote, updatePhase } = useHackathon(workspace?.id?.toString(), workspace?.slug);
+  
+  // Process hackathon commands from agent response
+  const processHackathonCommands = useCallback(async (text: string) => {
+    if (!hackathon?.active || !workspace?.id) return;
+    
+    // Parse [NOTA: ...] commands
+    const noteRegex = /\[NOTA:\s*(.+?)\]/g;
+    let match;
+    while ((match = noteRegex.exec(text)) !== null) {
+      try {
+        await addNote({
+          workspaceId: String(workspace.id),
+          phaseNumber: hackathon.currentPhase,
+          note: match[1].trim(),
+        });
+        console.log("📝 Nota guardada:", match[1].trim());
+      } catch (err) {
+        console.error("Error saving note:", err);
+      }
+    }
+    
+    // Parse [FASE_COMPLETADA] command
+    if (text.includes("[FASE_COMPLETADA]")) {
+      try {
+        // Mark current phase as done
+        await updatePhase({
+          workspaceId: String(workspace.id),
+          phaseNumber: hackathon.currentPhase,
+          status: "done",
+        });
+        // Mark next phase as current (if not last phase)
+        if (hackathon.currentPhase < 8) {
+          await updatePhase({
+            workspaceId: String(workspace.id),
+            phaseNumber: hackathon.currentPhase + 1,
+            status: "current",
+          });
+        }
+        console.log("✅ Fase completada, avanzando...");
+      } catch (err) {
+        console.error("Error updating phase:", err);
+      }
+    }
+  }, [hackathon, workspace?.id, addNote, updatePhase]);
+  
+>>>>>>> Stashed changes
   const onComplete = useCallback(
-    () => qc.invalidateQueries({ queryKey: ["conversations", workspace?.id] }),
-    [qc, workspace?.id],
+    (text: string) => {
+      qc.invalidateQueries({ queryKey: ["conversations", workspace?.id] });
+      processHackathonCommands(text);
+    },
+    [qc, workspace?.id, processHackathonCommands],
   );
+<<<<<<< Updated upstream
 
   const { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction, connectionStatus, retryInfo } =
     useChat(Number(conversationId), workspace?.id ?? 0, { onComplete });
@@ -169,6 +252,24 @@ export default function ChatConversation() {
   }, [isStreaming, messages, hackathonId, executeHackathonAction, updateAction, conversationId]);
 
   const virtuosoRef = useRef<VirtuosoHandle>(null);
+=======
+  
+  const { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction } =
+    useChat(Number(conversationId), workspace?.id ?? 0, { onComplete });
+  const { execute } = useActionExecutor(updateAction);
+  
+  // Fetch conversation details to check if it's a hackathon conversation
+  const { data: conversation } = useQuery({
+    queryKey: ["conversation", conversationId],
+    queryFn: async () => {
+      const token = await getToken();
+      return apiFetch<ConversationDetails>(`/api/conversations/${conversationId}`, { token });
+    },
+    enabled: !!conversationId,
+  });
+  
+  const bottomRef = useRef<HTMLDivElement>(null);
+>>>>>>> Stashed changes
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [input, setInput] = useState("");
@@ -286,6 +387,7 @@ export default function ChatConversation() {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [input]);
 
+<<<<<<< Updated upstream
   // Handle file drop from DropZone
   const handleFileDrop = useCallback(
     async (file: File) => {
@@ -295,6 +397,31 @@ export default function ChatConversation() {
         const formData = new FormData();
         formData.append("file", file);
         formData.append("workspaceId", String(workspace?.id));
+=======
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const value = input.trim();
+    if (!value || isStreaming) return;
+    setInput("");
+    
+    // Only send hackathon context if THIS conversation is marked as hackathon
+    const isHackathonConversation = conversation?.isHackathon === true;
+    const hackathonContext = isHackathonConversation && hackathon?.active ? {
+      active: true,
+      name: hackathon.name,
+      deadline: hackathon.deadline,
+      timeRemaining: getTimeRemaining() || "Calculando...",
+      currentPhase: hackathon.currentPhase,
+      phases: hackathon.phases.map(p => ({
+        number: p.number,
+        status: p.status,
+        notes: p.notes || [],
+      })),
+    } : null;
+    
+    sendMessage(value, hackathonContext);
+  }
+>>>>>>> Stashed changes
 
         const response = await fetch(
           `${import.meta.env.VITE_API_URL || ""}/api/files/upload`,
@@ -392,7 +519,10 @@ export default function ChatConversation() {
 
   const previewWidth = previewDevice === "mobile" ? "375px" : "100%";
 
+  const isHackathonChat = conversation?.isHackathon === true;
+
   return (
+<<<<<<< Updated upstream
     <DropZone onFileDrop={handleFileDrop} disabled={isStreaming || agentOffline}>
       <div className="flex h-[calc(100vh-4rem)] flex-col">
         {/* Hackathon Banner */}
@@ -422,6 +552,28 @@ export default function ChatConversation() {
             </div>
           </div>
         )}
+=======
+    <div className="flex h-[calc(100vh-8rem)] flex-col">
+      {agentOffline && (
+        <div className="px-4 pt-3">
+          <AgentOfflineBanner />
+        </div>
+      )}
+
+      {/* Hackathon Banner - only show in hackathon conversations */}
+      {isHackathonChat && (
+        <HackathonBanner workspaceId={workspace?.id?.toString() || ""} />
+      )}
+      
+      {/* Typing indicator */}
+      {isStreaming && (
+        <div className="border-b border-[hsl(var(--border))] px-4 py-1.5">
+          <p className="text-xs text-magenta animate-pulse">
+            Agente está escribiendo...
+          </p>
+        </div>
+      )}
+>>>>>>> Stashed changes
 
         {/* Agent offline banner */}
         {agentOffline && (
@@ -608,6 +760,19 @@ export default function ChatConversation() {
               </div>
             </form>
           </div>
+<<<<<<< Updated upstream
+=======
+        ))}
+
+        {messages.length === 0 && !isLoading && (
+          <p className="text-center text-sm text-[hsl(var(--muted-foreground))] py-8">
+            {isHackathonChat 
+              ? "¡Bienvenido al chat de hackathon! Cuéntame sobre tu proyecto."
+              : "Envía un mensaje para empezar la conversación"
+            }
+          </p>
+        )}
+>>>>>>> Stashed changes
 
           {/* Preview panel - slides in with animation */}
           {showPreview && !isMobile && (

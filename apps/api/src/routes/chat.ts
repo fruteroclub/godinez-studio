@@ -43,7 +43,10 @@ import {
   prependContext,
 } from "../services/message-context";
 import { buildHackathonContext, type HackathonContext } from "../services/hackathon-context";
+<<<<<<< Updated upstream
 import { buildHistoryContext } from "../services/conversation-history-context";
+=======
+>>>>>>> Stashed changes
 import { syncWorkspaceFile } from "../services/workspace-sync";
 import { storage } from "../services/storage";
 import { db } from "../db";
@@ -73,7 +76,10 @@ app.post(
       conversationId: z.number(),
       workspaceId: z.number(),
       content: z.string().min(1),
+<<<<<<< Updated upstream
       attachments: z.array(attachmentSchema).optional(),
+=======
+>>>>>>> Stashed changes
       hackathonContext: z.object({
         active: z.boolean(),
         name: z.string(),
@@ -90,12 +96,16 @@ app.post(
   ),
   async (c) => {
     const userId = c.get("userId");
+<<<<<<< Updated upstream
     const { conversationId, workspaceId, content, attachments, hackathonContext } = c.req.valid("json");
 
     // Save user message with attachment metadata
     const messageMetadata = attachments?.length
       ? { attachments: attachments.map(a => ({ fileId: a.fileId, url: a.url, mimeType: a.mimeType, filename: a.filename })) }
       : undefined;
+=======
+    const { conversationId, workspaceId, content, hackathonContext } = c.req.valid("json");
+>>>>>>> Stashed changes
 
     const message = await createMessage({
       conversationId,
@@ -126,8 +136,12 @@ app.post(
     // Build context-enriched content for the agent
     const contextHeader = await buildMessageContext(conversationId, workspaceId);
     const hackathonHeader = buildHackathonContext(hackathonContext);
+<<<<<<< Updated upstream
     const historyContext = await buildHistoryContext(conversationId);
     const combinedHeader = [hackathonHeader, historyContext, contextHeader].filter(Boolean).join("\n\n");
+=======
+    const combinedHeader = [hackathonHeader, contextHeader].filter(Boolean).join("\n\n");
+>>>>>>> Stashed changes
     const enrichedContent = prependContext(combinedHeader, content);
 
     // Send to Gateway or use stub

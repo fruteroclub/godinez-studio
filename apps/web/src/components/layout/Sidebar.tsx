@@ -38,6 +38,7 @@ interface NavSection {
 
 function getNavSections(slug: string): NavSection[] {
   return [
+<<<<<<< Updated upstream
     {
       title: "ZONA DE TRABAJO",
       items: [
@@ -97,6 +98,16 @@ function getNavSections(slug: string): NavSection[] {
         },
       ],
     },
+=======
+    { label: sidebar.dashboard, href: `/studio/${slug}`, icon: "◻" },
+    { label: sidebar.chat, href: `/studio/${slug}/chat`, icon: "💬" },
+    { label: sidebar.projects, href: `/studio/${slug}/projects`, icon: "📁" },
+    { label: sidebar.agent, href: `/studio/${slug}/agents`, icon: "🤖" },
+    { label: "Hackathon", href: `/studio/${slug}/hackathon`, icon: "🏆" },
+    { label: sidebar.tasks, href: `/studio/${slug}/tasks`, icon: "✓" },
+    { label: sidebar.files, href: `/studio/${slug}/files`, icon: "📄" },
+    { label: sidebar.activity, href: `/studio/${slug}/activity`, icon: "📊" },
+>>>>>>> Stashed changes
   ];
 }
 

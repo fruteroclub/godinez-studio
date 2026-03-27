@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PageLayout from "./components/layout/PageLayout";
 import Shell from "./components/layout/Shell";
+<<<<<<< Updated upstream
 
 // Lazy load pages for code splitting
 const SignIn = lazy(() => import("./pages/SignIn"));
@@ -37,6 +38,25 @@ function PageLoader() {
 function LazyPage({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
 }
+=======
+import SignIn from "./pages/SignIn";
+import SignUp from "./pages/SignUp";
+import WorkspaceSelector from "./pages/WorkspaceSelector";
+import OnboardingWizard from "./pages/OnboardingWizard";
+import Dashboard from "./pages/Dashboard";
+import Chat from "./pages/Chat";
+import ChatConversation from "./pages/ChatConversation";
+import Projects from "./pages/Projects";
+import ProjectDetail from "./pages/ProjectDetail";
+import Tasks from "./pages/Tasks";
+import Files from "./pages/Files";
+import Agents from "./pages/Agents";
+import Activity from "./pages/Activity";
+import Team from "./pages/Team";
+import Settings from "./pages/Settings";
+import Admin from "./pages/Admin";
+import { Hackathon } from "./pages/Hackathon";
+>>>>>>> Stashed changes
 
 export const router = createBrowserRouter([
   {
@@ -76,6 +96,7 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
+<<<<<<< Updated upstream
       { index: true, element: <LazyPage><Dashboard /></LazyPage> },
       { path: "chat", element: <LazyPage><Chat /></LazyPage> },
       { path: "chat/new", element: <LazyPage><ChatNew /></LazyPage> },
@@ -89,6 +110,20 @@ export const router = createBrowserRouter([
       { path: "activity", element: <LazyPage><Activity /></LazyPage> },
       { path: "team", element: <LazyPage><Team /></LazyPage> },
       { path: "settings", element: <LazyPage><Settings /></LazyPage> },
+=======
+      { index: true, element: <Dashboard /> },
+      { path: "chat", element: <Chat /> },
+      { path: "chat/:conversationId", element: <ChatConversation /> },
+      { path: "projects", element: <Projects /> },
+      { path: "projects/:projectId", element: <ProjectDetail /> },
+      { path: "tasks", element: <Tasks /> },
+      { path: "files", element: <Files /> },
+      { path: "agents", element: <Agents /> },
+      { path: "hackathon", element: <Hackathon /> },
+      { path: "activity", element: <Activity /> },
+      { path: "team", element: <Team /> },
+      { path: "settings", element: <Settings /> },
+>>>>>>> Stashed changes
     ],
   },
   {
