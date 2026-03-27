@@ -91,7 +91,11 @@ ${PERSONALITY_INSTRUCTIONS[ctx.personality] || PERSONALITY_INSTRUCTIONS.friendly
   // Build "Who your user is" section with natural sentence
   const userParts: string[] = [];
   if (ctx.userName) {
-    const rolePart = ctx.userRole ? `, a **${ROLE_LABELS[ctx.userRole] || ctx.userRole}**` : "";
+    // Support multiple roles separated by comma
+    const roleLabels = ctx.userRole 
+      ? ctx.userRole.split(",").map(r => ROLE_LABELS[r.trim()] || r.trim()).filter(Boolean).join(", ")
+      : "";
+    const rolePart = roleLabels ? `, works in **${roleLabels}**` : "";
     const bizPart = ctx.businessDescription ? ` — "${ctx.businessDescription}"` : "";
     userParts.push(`Your user's name is **${ctx.userName}**${rolePart}${bizPart}. Use their name naturally in conversation — in greetings and when it makes sense, but don't overdo it.`);
   }

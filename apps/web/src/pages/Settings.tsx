@@ -10,6 +10,7 @@ import { content } from "@/lib/content";
 const { settings: sc, onboarding } = content.studio;
 
 const ROLE_IDS = ["negocio", "marketing", "ventas", "admin", "tech", "educacion", "creatividad", "consultoria", "otra"] as const;
+const MAX_ROLES = 5;
 
 interface UserContext {
   projectType: string | null;
@@ -27,7 +28,7 @@ export default function Settings() {
   
   const [name, setName] = useState(workspace?.name ?? "");
   const [deleteSlug, setDeleteSlug] = useState("");
-  const [userRole, setUserRole] = useState<string>("");
+  const [userRoles, setUserRoles] = useState<string[]>([]);
   const [saveFlash, setSaveFlash] = useState(false);
 
   // Fetch user context (includes jobRole)
@@ -39,10 +40,10 @@ export default function Settings() {
     },
   });
 
-  // Update role when context loads
+  // Update roles when context loads
   useEffect(() => {
     if (userContext?.jobRole) {
-      setUserRole(userContext.jobRole);
+      setUserRoles(userContext.jobRole.split(",").map(r => r.trim()).filter(Boolean));
     }
   }, [userContext]);
 
@@ -68,9 +69,10 @@ export default function Settings() {
     // Save workspace name
     await updateWorkspace.mutateAsync({ name: name.trim() });
     
-    // Save role if changed
-    if (userRole && userRole !== userContext?.jobRole) {
-      await updateRole.mutateAsync(userRole);
+    // Save roles if changed
+    const rolesString = userRoles.join(",");
+    if (rolesString && rolesString !== userContext?.jobRole) {
+      await updateRole.mutateAsync(rolesString);
     }
     
     setSaveFlash(true);
@@ -126,15 +128,25 @@ export default function Settings() {
               {ROLE_IDS.map((id) => {
                 const label = onboarding.roles[id];
                 if (!label) return null;
-                const isSelected = userRole === id;
+                const isSelected = userRoles.includes(id);
+                const isDisabled = !isSelected && userRoles.length >= MAX_ROLES;
                 return (
                   <button
                     key={id}
                     type="button"
-                    onClick={() => setUserRole(isSelected ? "" : id)}
+                    disabled={isDisabled}
+                    onClick={() => {
+                      if (isSelected) {
+                        setUserRoles(userRoles.filter(r => r !== id));
+                      } else if (userRoles.length < MAX_ROLES) {
+                        setUserRoles([...userRoles, id]);
+                      }
+                    }}
                     className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
                       isSelected
                         ? "border-magenta bg-magenta/10 text-[hsl(var(--foreground))]"
+                        : isDisabled
+                        ? "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] opacity-40 cursor-not-allowed"
                         : "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] hover:border-white/20"
                     }`}
                   >
@@ -143,6 +155,9 @@ export default function Settings() {
                 );
               })}
             </div>
+            {userRoles.length >= MAX_ROLES && (
+              <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Máximo {MAX_ROLES} roles</p>
+            )}
           </div>
           
           {/* Slug (read-only) */}

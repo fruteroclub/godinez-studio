@@ -14,6 +14,7 @@ import {
   getConversationsByWorkspaceId,
   getConversationsByProject,
   updateConversationTitle,
+  updateConversation,
   deleteConversation,
   getOrCreateHackathonConversation,
   getHackathonConversation,
@@ -110,7 +111,7 @@ app.get("/:id", async (c) => {
 // PATCH /api/conversations/:id — Update conversation title
 app.patch(
   "/:id",
-  zValidator("json", z.object({ title: z.string().min(1).max(255) })),
+  zValidator("json", z.object({ title: z.string().min(1).max(255).optional(), isStarred: z.boolean().optional() }).refine(data => data.title !== undefined || data.isStarred !== undefined, { message: "At least one field required" })),
   async (c) => {
     const userId = c.get("userId");
     const id = parseInt(c.req.param("id"));
@@ -119,8 +120,8 @@ app.patch(
     if (!(await verifyWorkspaceAccess(userId, conversation.workspaceId))) {
       return c.json({ error: "Not a workspace member" }, 403);
     }
-    const { title } = c.req.valid("json");
-    const updated = await updateConversationTitle(id, title);
+    const { title, isStarred } = c.req.valid("json");
+    const updated = await updateConversation(id, { title, isStarred });
     if (!updated) return c.json({ error: "Conversation not found" }, 404);
     return c.json(updated);
   },
