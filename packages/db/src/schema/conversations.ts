@@ -27,6 +27,7 @@ export const conversations = pgTable(
     title: varchar("title", { length: 255 }),
     channel: varchar("channel", { length: 50 }).notNull().default("web"),
     isHackathon: boolean("is_hackathon").notNull().default(false),
+    isStarred: boolean("is_starred").notNull().default(false),
     lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
