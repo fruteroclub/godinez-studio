@@ -160,9 +160,17 @@ app.post(
       stubRuns.set(runId, { stub, conversationId, workspaceId, createdAt: Date.now() });
     }
 
+    // Track hackathon runs for extended SSE timeout (10 min vs 5 min)
+    if (hackathonContext?.active) {
+      hackathonRunIds.add(runId);
+    }
+
     return c.json({ runId, messageId: message.id });
   },
 );
+
+// Set of runIds that were initiated in hackathon mode (for extended timeout)
+const hackathonRunIds = new Set<string>();
 
 // Map for stub runs waiting to be streamed (with TTL cleanup)
 const stubRuns = new Map<
@@ -419,13 +427,16 @@ app.get("/stream/:runId", async (c) => {
         },
       });
 
-      // Timeout after 5 minutes
+      // Timeout: 10 min for hackathon runs (longer agent processing), 5 min otherwise
+      const isHackathonRun = hackathonRunIds.has(runId);
+      hackathonRunIds.delete(runId); // consume — avoid memory leak
+      const streamTimeoutMs = isHackathonRun ? 10 * 60 * 1000 : 5 * 60 * 1000;
       setTimeout(async () => {
         cleanup();
         await deleteRunContext(runId);
         resolve();
         try { await stream.close(); } catch { /* already closed */ }
-      }, 5 * 60 * 1000);
+      }, streamTimeoutMs);
     });
   });
 });
