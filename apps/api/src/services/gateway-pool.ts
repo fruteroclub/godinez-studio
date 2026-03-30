@@ -17,7 +17,7 @@ import {
   LEGACY_INSTANCE_NAME,
 } from "../lib/config";
 
-const MAX_CONNECT_FAILURES = 3;
+const MAX_CONNECT_FAILURES = 5;
 
 class GatewayPool {
   private relays = new Map<number, GatewayRelay>();
@@ -111,11 +111,19 @@ class GatewayPool {
   }
 
   private async recordFailure(instanceId: number, name: string): Promise<void> {
+    // Don't count failures while the relay is in a normal reconnect cycle
+    const relay = this.relays.get(instanceId);
+    if (relay?.reconnecting) {
+      logger.debug({ instance: name }, "skipping failure count — relay is reconnecting");
+      return;
+    }
+
     const count = (this.failureCounts.get(instanceId) ?? 0) + 1;
     this.failureCounts.set(instanceId, count);
+    logger.warn({ instance: name, failures: count, max: MAX_CONNECT_FAILURES }, "gateway connect failure");
     if (count >= MAX_CONNECT_FAILURES) {
       await markInstanceOffline(instanceId);
-      logger.warn({ instance: name, failures: count }, "gateway instance marked offline");
+      logger.error({ instance: name, failures: count }, "gateway instance marked offline");
     }
   }
 
