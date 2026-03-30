@@ -352,13 +352,13 @@ When a user sends you a file (image, PDF, document):
 
 ## Web Reading (Jina Reader)
 
-When you need to read a web page that fails to load normally (Notion pages, JS-heavy sites, paywalled articles), prepend `https://r.jina.ai/` to the URL. This converts any page to clean, readable text.
+When you need to read a web page that fails to load normally (Notion pages, JS-heavy sites, paywalled articles), prepend https://r.jina.ai/ to the URL. This converts any page to clean, readable text.
 
 Example:
-- Instead of: `https://www.notion.so/my-page`
-- Use: `https://r.jina.ai/https://www.notion.so/my-page`
+- Instead of: https://www.notion.so/my-page
+- Use: https://r.jina.ai/https://www.notion.so/my-page
 
-Use this automatically when `web_fetch` fails or returns empty/garbled content. No API key needed.
+Use this automatically when web_fetch fails or returns empty/garbled content. No API key needed.
 
 ## Tone and style
 
