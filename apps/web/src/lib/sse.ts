@@ -4,7 +4,8 @@ const API_URL = import.meta.env.VITE_API_URL || "";
 
 const MAX_RETRIES = 3;
 const RETRY_DELAYS = [1000, 2000, 4000];
-const INACTIVITY_TIMEOUT_MS = 60_000;
+const DEFAULT_INACTIVITY_TIMEOUT_MS = 60_000;
+const HACKATHON_INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 min
 
 export interface SSEHandlers {
   onDelta?: (text: string) => void;
@@ -14,11 +15,20 @@ export interface SSEHandlers {
   onTimeout?: () => void;
 }
 
+export interface SSEOptions {
+  hackathonMode?: boolean;
+}
+
 export function connectSSE(
   runId: string,
   handlers: SSEHandlers,
   token?: string | null,
+  options?: SSEOptions,
 ): () => void {
+  const inactivityTimeoutMs = options?.hackathonMode
+    ? HACKATHON_INACTIVITY_TIMEOUT_MS
+    : DEFAULT_INACTIVITY_TIMEOUT_MS;
+
   let attempt = 0;
   let es: EventSource | null = null;
   let closed = false;
@@ -29,7 +39,7 @@ export function connectSSE(
     if (inactivityTimer) clearTimeout(inactivityTimer);
     inactivityTimer = setTimeout(() => {
       handlers.onTimeout?.();
-    }, INACTIVITY_TIMEOUT_MS);
+    }, inactivityTimeoutMs);
   }
 
   function cleanup() {
@@ -42,9 +52,10 @@ export function connectSSE(
   function connect() {
     if (closed) return;
 
+    const hackathonParam = options?.hackathonMode ? "&hackathon=1" : "";
     const url = token
-      ? `${API_URL}/api/chat/stream/${runId}?token=${encodeURIComponent(token)}`
-      : `${API_URL}/api/chat/stream/${runId}`;
+      ? `${API_URL}/api/chat/stream/${runId}?token=${encodeURIComponent(token)}${hackathonParam}`
+      : `${API_URL}/api/chat/stream/${runId}${hackathonParam ? `?${hackathonParam.slice(1)}` : ""}`;
     es = new EventSource(url);
 
     es.addEventListener("open", () => {
