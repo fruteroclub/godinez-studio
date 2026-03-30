@@ -21,6 +21,7 @@ const MAX_CONNECT_FAILURES = 3;
 
 class GatewayPool {
   private relays = new Map<number, GatewayRelay>();
+  private connecting = new Map<number, Promise<GatewayRelay>>();
   private healthTimer: ReturnType<typeof setInterval> | null = null;
   private legacyInstanceId: number | null = null;
   private failureCounts = new Map<number, number>();
@@ -40,7 +41,18 @@ class GatewayPool {
       return cached;
     }
 
-    // Cache miss or disconnected — load from DB and connect
+    // If a connection is already in flight, wait for it instead of opening a second WS
+    const inFlight = this.connecting.get(instanceId);
+    if (inFlight) return inFlight;
+
+    const connectPromise = this._connectRelay(instanceId).finally(() => {
+      this.connecting.delete(instanceId);
+    });
+    this.connecting.set(instanceId, connectPromise);
+    return connectPromise;
+  }
+
+  private async _connectRelay(instanceId: number): Promise<GatewayRelay> {
     const instance = await getInstanceById(instanceId);
     if (!instance) {
       throw new Error(`Instance ${instanceId} not found`);
@@ -56,7 +68,6 @@ class GatewayPool {
       const relay = new GatewayRelay(instanceId);
       await relay.connect(instance.url, instance.token);
       this.relays.set(instanceId, relay);
-      // Reset failure count on success and ensure active status
       if (this.failureCounts.has(instanceId)) {
         this.failureCounts.delete(instanceId);
         await markInstanceActive(instanceId);
