@@ -777,15 +777,10 @@ export class GatewayRelay {
 
 
   private scheduleReconnect(): void {
-    // Fix 7: Notify all active runs that gateway is reconnecting
-    for (const [runId, handler] of this.pendingRuns) {
-      try {
-        handler.onError?.("GATEWAY_RECONNECTING");
-      } catch {
-        // handler already closed
-      }
-    }
-    this.pendingRuns.clear();
+    // Preserve run handlers across reconnect — active streams survive WS drops.
+    // When WS reconnects, OpenClaw resends pending events or the handler
+    // times out naturally via the SSE stream timeout on the client side.
+    log.warn({ activeRuns: this.pendingRuns.size }, "WS disconnected — preserving run handlers for reconnect");
 
     const delay = Math.min(
       1000 * Math.pow(2, this.reconnectAttempt),
