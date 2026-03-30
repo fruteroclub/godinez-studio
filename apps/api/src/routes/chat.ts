@@ -119,10 +119,15 @@ const stubRuns = new Map<
   }
 >();
 
+const DEFAULT_STREAM_TIMEOUT_MS = 5 * 60 * 1000;  // 5 min
+const HACKATHON_STREAM_TIMEOUT_MS = 10 * 60 * 1000; // 10 min
+
 // GET /api/chat/stream/:runId — SSE stream of agent response
 app.get("/stream/:runId", async (c) => {
   const runId = c.req.param("runId");
   const userId = c.get("userId");
+  const isHackathon = c.req.query("hackathon") === "1";
+  const streamTimeoutMs = isHackathon ? HACKATHON_STREAM_TIMEOUT_MS : DEFAULT_STREAM_TIMEOUT_MS;
 
   return streamSSE(c, async (stream) => {
     let keepaliveTimer: ReturnType<typeof setInterval> | null = null;
@@ -350,12 +355,12 @@ app.get("/stream/:runId", async (c) => {
         },
       });
 
-      // Timeout after 5 minutes
+      // Timeout after 5 min (default) or 10 min (hackathon mode)
       setTimeout(() => {
         cleanup();
         runContexts.delete(runId);
         resolve();
-      }, 5 * 60 * 1000);
+      }, streamTimeoutMs);
     });
   });
 });

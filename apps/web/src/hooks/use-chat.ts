@@ -20,7 +20,7 @@ export type ConnectionStatus = "idle" | "connected" | "reconnecting" | "disconne
 export function useChat(
   conversationId: number,
   workspaceId: number,
-  options?: { onComplete?: () => void },
+  options?: { onComplete?: () => void; hackathonContext?: boolean },
 ) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -161,6 +161,7 @@ export function useChat(
       sseCleanupRef.current?.();
 
       // Connect SSE (pass token via query param — EventSource can't send headers)
+      const isHackathon = !!options?.hackathonContext;
       sseCleanupRef.current = connectSSE(
         runId,
         {
@@ -219,9 +220,10 @@ export function useChat(
           },
         },
         token,
+        { hackathonMode: isHackathon },
       );
     },
-    [conversationId, workspaceId, getToken],
+    [conversationId, workspaceId, getToken, options?.hackathonContext],
   );
 
   return { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction, connectionStatus };
