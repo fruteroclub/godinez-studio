@@ -25,8 +25,8 @@ export const POOL_IDLE_TIMEOUT_MS = parseInt(
   10,
 ); // 10 min
 export const POOL_HEALTH_INTERVAL_MS = parseInt(
-  process.env.POOL_HEALTH_INTERVAL_MS || "60000",
+  process.env.POOL_HEALTH_INTERVAL_MS || "15000",
   10,
-); // 60s
+); // 15s
 export const LEGACY_INSTANCE_NAME =
   process.env.LEGACY_INSTANCE_NAME || "godin-001";
