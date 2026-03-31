@@ -13,19 +13,45 @@ interface Agent {
   status: string;
 }
 
+// Indicador de estado con punto de color
+function StatusIndicator({ state }: { state: string }) {
+  const config: Record<string, { color: string; text: string; pulse?: boolean }> = {
+    connected: { color: "bg-green-500", text: "En línea", pulse: true },
+    offline: { color: "bg-red-500", text: "Desconectado" },
+    disconnected: { color: "bg-red-500", text: "Desconectado" },
+    reconnecting: { color: "bg-yellow-500", text: "Reconectando...", pulse: true },
+    timeout: { color: "bg-orange-500", text: "Sin conexión" },
+    unstable: { color: "bg-amber-500", text: "Inestable", pulse: true },
+  };
+  
+  const { color, text, pulse } = config[state] || config.connected;
+  
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-[hsl(var(--muted-foreground))]">
+      <span className="relative flex h-2 w-2">
+        {pulse && (
+          <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${color} opacity-75`} />
+        )}
+        <span className={`relative inline-flex rounded-full h-2 w-2 ${color}`} />
+      </span>
+      {text}
+    </span>
+  );
+}
+
 // Obtener título simple según la página actual
 function getPageTitle(
   pathname: string, 
   agentName?: string,
   workspaceName?: string
-): { title: string; subtitle?: string } {
+): { title: string; showStatus?: boolean } {
   const segments = pathname.split("/").filter(Boolean);
   
   // Chat con agente
   if (segments.includes("chat") && segments.some(s => /^\d+$/.test(s))) {
     return {
       title: agentName || "Agente",
-      subtitle: "Chat activo"
+      showStatus: true
     };
   }
   
@@ -40,7 +66,7 @@ function getPageTitle(
   if (segments.includes("agents")) {
     return {
       title: agentName || "Agente",
-      subtitle: "Configuración"
+      showStatus: true
     };
   }
   
@@ -155,10 +181,8 @@ export default function TopBar({
           <span className="text-[hsl(var(--foreground))] font-medium text-sm leading-tight">
             {pageInfo.title}
           </span>
-          {pageInfo.subtitle && (
-            <span className="text-[hsl(var(--muted-foreground))] text-xs leading-tight">
-              {pageInfo.subtitle}
-            </span>
+          {pageInfo.showStatus && (
+            <StatusIndicator state={connectionState} />
           )}
         </Link>
       )}
