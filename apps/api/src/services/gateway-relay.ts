@@ -310,6 +310,7 @@ export class GatewayRelay {
   private token = "";
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private _reconnecting = false;
   private serverInfo: { version: string; connId: string } | null = null;
   private device = loadOrCreateDeviceIdentity();
 
@@ -326,6 +327,11 @@ export class GatewayRelay {
 
   get isConnected(): boolean {
     return this._connected;
+  }
+
+  /** True while the relay is in a backoff-reconnect cycle. */
+  get reconnecting(): boolean {
+    return this._reconnecting;
   }
 
 
@@ -480,6 +486,7 @@ export class GatewayRelay {
     this.ws?.close();
     this.ws = null;
     this._connected = false;
+    this._reconnecting = false;
     this.serverInfo = null;
   }
 
@@ -777,15 +784,11 @@ export class GatewayRelay {
 
 
   private scheduleReconnect(): void {
-    // Fix 7: Notify all active runs that gateway is reconnecting
-    for (const [runId, handler] of this.pendingRuns) {
-      try {
-        handler.onError?.("GATEWAY_RECONNECTING");
-      } catch {
-        // handler already closed
-      }
-    }
-    this.pendingRuns.clear();
+    // Preserve run handlers across reconnect — active streams survive WS drops.
+    // When WS reconnects, OpenClaw resends pending events or the handler
+    // times out naturally via the SSE stream timeout on the client side.
+    log.warn({ activeRuns: this.pendingRuns.size }, "WS disconnected — preserving run handlers for reconnect");
+    this._reconnecting = true;
 
     const delay = Math.min(
       1000 * Math.pow(2, this.reconnectAttempt),
@@ -797,6 +800,7 @@ export class GatewayRelay {
     this.reconnectTimer = setTimeout(async () => {
       try {
         await this.connect(this.url, this.token);
+        this._reconnecting = false;
         log.info("reconnected");
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
