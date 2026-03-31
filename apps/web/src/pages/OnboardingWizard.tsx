@@ -326,17 +326,18 @@ export default function OnboardingWizard() {
       <div className="mt-8 flex items-center justify-between">
         <button
           onClick={handleBack}
-          disabled={step === 1}
+          disabled={step === 1 || isProvisioning}
           className="rounded-md px-4 py-2 text-sm font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--foreground))] disabled:invisible"
         >
           {onboarding.back}
         </button>
 
-        {step < 4 ? (
+        {/* Only show Next on non-review steps — review step has its own Launch CTA */}
+        {step < totalSteps ? (
           <button
             onClick={handleNext}
             disabled={!canAdvance()}
-            className="rounded-md bg-magenta px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-magenta/90 disabled:opacity-50"
+            className={`rounded-md bg-magenta px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-magenta/90 disabled:cursor-not-allowed disabled:opacity-50`}
           >
             {onboarding.next}
           </button>
@@ -628,7 +629,7 @@ function StepReviewV3({
         <button
           onClick={onLaunch}
           disabled={isProvisioning}
-          className="inline-flex items-center justify-center gap-2 rounded-md bg-magenta px-8 py-3 text-base font-semibold text-white transition-colors hover:bg-magenta/90 disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-2 rounded-md bg-magenta px-8 py-3 text-base font-semibold text-white transition-colors hover:bg-magenta/90 disabled:cursor-not-allowed disabled:opacity-70"
         >
           {isProvisioning ? (
             <>
@@ -643,9 +644,12 @@ function StepReviewV3({
           )}
         </button>
 
-        {error && (
-          <p className="mt-4 text-sm text-[hsl(var(--destructive))]">{error}</p>
-        )}
+        {/* Fixed-height slot prevents layout shift when error appears */}
+        <div className="mt-4 min-h-[1.25rem]">
+          {error && (
+            <p className="text-sm text-[hsl(var(--destructive))]">{error}</p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -942,7 +946,7 @@ function StepReviewLegacy({
         <button
           onClick={onLaunch}
           disabled={isProvisioning}
-          className="inline-flex items-center justify-center gap-2 rounded-md bg-magenta px-8 py-3 text-base font-semibold text-white transition-colors hover:bg-magenta/90 disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-2 rounded-md bg-magenta px-8 py-3 text-base font-semibold text-white transition-colors hover:bg-magenta/90 disabled:cursor-not-allowed disabled:opacity-70"
         >
           {isProvisioning ? (
             <>
@@ -957,9 +961,12 @@ function StepReviewLegacy({
           )}
         </button>
 
-        {error && (
-          <p className="mt-4 text-sm text-[hsl(var(--destructive))]">{error}</p>
-        )}
+        {/* Fixed-height slot prevents layout shift when error appears */}
+        <div className="mt-4 min-h-[1.25rem]">
+          {error && (
+            <p className="text-sm text-[hsl(var(--destructive))]">{error}</p>
+          )}
+        </div>
       </div>
     </div>
   );
