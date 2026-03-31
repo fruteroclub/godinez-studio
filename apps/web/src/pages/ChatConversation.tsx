@@ -116,6 +116,8 @@ export default function ChatConversation() {
   useEffect(() => {
     if (agentOffline) {
       setConnectionState("offline");
+    } else if (connectionStatus === "disconnected") {
+      setConnectionState("offline"); // disconnected también es offline
     } else if (connectionStatus === "reconnecting") {
       setConnectionState("reconnecting");
     } else if (connectionStatus === "timeout") {
@@ -123,7 +125,7 @@ export default function ChatConversation() {
     } else if (connectionStatus === "unstable") {
       setConnectionState("unstable");
     } else {
-      setConnectionState("connected");
+      setConnectionState("connected"); // idle y connected = connected
     }
   }, [agentOffline, connectionStatus, setConnectionState]);
   const { execute } = useActionExecutor(updateAction);
@@ -400,7 +402,7 @@ export default function ChatConversation() {
   const previewWidth = previewDevice === "mobile" ? "375px" : "100%";
 
   return (
-    <DropZone onFileDrop={handleFileDrop} disabled={isStreaming || agentOffline || connectionStatus === "reconnecting" || connectionStatus === "timeout"}>
+    <DropZone onFileDrop={handleFileDrop} disabled={isStreaming || agentOffline || connectionStatus === "reconnecting" || connectionStatus === "timeout" || connectionStatus === "disconnected"}>
       <div className="flex h-[calc(100vh-4rem)] flex-col">
         {/* Hackathon Banner */}
         {isHackathon && hackathonData && (
@@ -569,7 +571,7 @@ export default function ChatConversation() {
                   onAttach={setAttachment}
                   onRemove={() => setAttachment(null)}
                   attachment={attachment}
-                  disabled={isStreaming || agentOffline || connectionStatus === "reconnecting" || connectionStatus === "timeout"}
+                  disabled={isStreaming || agentOffline || connectionStatus === "reconnecting" || connectionStatus === "timeout" || connectionStatus === "disconnected"}
                 />
                 <textarea
                   ref={textareaRef}
@@ -582,15 +584,15 @@ export default function ChatConversation() {
                     connectionStatus === "timeout" ? "Sin conexión..." :
                     chat.placeholder
                   }
-                  disabled={isStreaming || agentOffline || connectionStatus === "reconnecting" || connectionStatus === "timeout"}
+                  disabled={isStreaming || agentOffline || connectionStatus === "reconnecting" || connectionStatus === "timeout" || connectionStatus === "disconnected"}
                   rows={1}
                   className="flex-1 resize-none rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-4 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20 disabled:opacity-50"
                 />
                 <button
                   type="submit"
-                  disabled={isStreaming || agentOffline || connectionStatus === "reconnecting" || connectionStatus === "timeout" || (!input.trim() && !attachment)}
+                  disabled={isStreaming || agentOffline || connectionStatus === "reconnecting" || connectionStatus === "timeout" || connectionStatus === "disconnected" || (!input.trim() && !attachment)}
                   className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                    agentOffline || connectionStatus === "reconnecting" || connectionStatus === "timeout"
+                    agentOffline || connectionStatus === "reconnecting" || connectionStatus === "timeout" || connectionStatus === "disconnected"
                       ? "bg-zinc-600 text-zinc-400 cursor-not-allowed" 
                       : "bg-magenta text-white hover:bg-magenta/90 disabled:opacity-50"
                   }`}
