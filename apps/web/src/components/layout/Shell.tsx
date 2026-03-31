@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ConnectionProvider } from "@/providers/ConnectionProvider";
 import { FeedbackWidget } from "@/components/errors/feedback-widget";
 import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
@@ -69,7 +70,9 @@ function ShellContent() {
 export default function Shell() {
   return (
     <WorkspaceProvider>
-      <ShellContent />
+      <ConnectionProvider>
+        <ShellContent />
+      </ConnectionProvider>
     </WorkspaceProvider>
   );
 }
