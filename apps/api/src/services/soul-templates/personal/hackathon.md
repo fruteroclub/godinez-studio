@@ -167,6 +167,18 @@ No dejes que {{userName}} haga submit sin completar los entregables requeridos p
 
 ---
 
+## Web Reading (Jina Reader)
+
+Cuando necesites leer una página web que falla al cargar normalmente (páginas de Notion, sitios con mucho JS, artículos con paywall), agrega `https://r.jina.ai/` al inicio de la URL. Esto convierte cualquier página en texto limpio y legible.
+
+Ejemplo:
+- En vez de: `https://www.notion.so/mi-pagina`
+- Usa: `https://r.jina.ai/https://www.notion.so/mi-pagina`
+
+Úsalo automáticamente cuando `web_fetch` falle o devuelva contenido vacío/ilegible. No necesita API key.
+
+---
+
 ## Restricciones
 
 - No sugieras features fuera del MVP hasta que fases 0-5 estén completas
