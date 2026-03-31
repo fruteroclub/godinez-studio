@@ -23,7 +23,7 @@ export interface ChatMessage {
   createdAt?: string;
 }
 
-export type ConnectionStatus = "idle" | "connected" | "reconnecting" | "disconnected" | "timeout";
+export type ConnectionStatus = "idle" | "connected" | "reconnecting" | "disconnected" | "timeout" | "unstable";
 
 export interface RetryInfo {
   retryCount: number;
@@ -44,6 +44,11 @@ export function useChat(
   const [retryInfo, setRetryInfo] = useState<RetryInfo | null>(null);
   const { getToken } = useAuth();
   const sseCleanupRef = useRef<(() => void) | null>(null);
+  
+  // Tracking para detectar conexión inestable
+  const reconnectHistoryRef = useRef<number[]>([]);
+  const UNSTABLE_THRESHOLD = 3; // 3+ reconexiones en 5 minutos = inestable
+  const UNSTABLE_WINDOW_MS = 5 * 60 * 1000; // 5 minutos
 
   // Cleanup SSE on unmount
   useEffect(() => {
@@ -164,12 +169,24 @@ export function useChat(
         messageId = res.messageId;
         setAgentOffline(false);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "";
-        if (msg.includes("AGENT_OFFLINE") || msg.includes("GATEWAY_OFFLINE")) {
+        const msg = err instanceof Error ? err.message : String(err);
+        // Detectar cualquier error de conexión como offline
+        const isOffline = 
+          msg.includes("AGENT_OFFLINE") || 
+          msg.includes("GATEWAY_OFFLINE") ||
+          msg.includes("fetch") ||
+          msg.includes("network") ||
+          msg.includes("Failed to fetch") ||
+          msg.includes("NetworkError") ||
+          msg.includes("ECONNREFUSED") ||
+          msg.includes("TypeError");
+        
+        if (isOffline) {
           setAgentOffline(true);
-          // Remove the optimistic user message
-          setMessages((prev) => prev.filter((m) => m.id !== tempUserId));
+          setConnectionStatus("timeout");
         }
+        // Remove the optimistic user message
+        setMessages((prev) => prev.filter((m) => m.id !== tempUserId));
         return;
       }
 
@@ -266,7 +283,34 @@ export function useChat(
             sseCleanupRef.current = null;
           },
           onStatus: (info: SSEStatusInfo) => {
-            setConnectionStatus(info.status as ConnectionStatus);
+            // Detectar conexión inestable basado en historial de reconexiones
+            if (info.status === "reconnecting") {
+              const now = Date.now();
+              reconnectHistoryRef.current.push(now);
+              // Limpiar reconexiones viejas (fuera de la ventana de 5 min)
+              reconnectHistoryRef.current = reconnectHistoryRef.current.filter(
+                t => now - t < UNSTABLE_WINDOW_MS
+              );
+              // Si hay 3+ reconexiones en 5 min, marcar como inestable
+              if (reconnectHistoryRef.current.length >= UNSTABLE_THRESHOLD) {
+                setConnectionStatus("unstable");
+              } else {
+                setConnectionStatus("reconnecting");
+              }
+            } else if (info.status === "connected") {
+              // Si teníamos muchas reconexiones, mantener como inestable
+              const now = Date.now();
+              const recentReconnects = reconnectHistoryRef.current.filter(
+                t => now - t < UNSTABLE_WINDOW_MS
+              ).length;
+              if (recentReconnects >= UNSTABLE_THRESHOLD) {
+                setConnectionStatus("unstable");
+              } else {
+                setConnectionStatus("connected");
+              }
+            } else {
+              setConnectionStatus(info.status as ConnectionStatus);
+            }
             if (info.status === "reconnecting" && info.retryCount != null && info.maxRetries != null) {
               setRetryInfo((prev) => ({
                 retryCount: info.retryCount!,
