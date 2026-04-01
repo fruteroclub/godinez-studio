@@ -13,8 +13,13 @@ import { referralCodes } from "./referral-codes";
 import { gatewayInstances } from "./gateway-instances";
 import { hackathonProgress } from "./hackathon-progress";
 import { runContexts } from "./run-contexts";
+import { accounts } from "./accounts";
 
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
+  account: one(accounts, {
+    fields: [users.id],
+    references: [accounts.ownerId],
+  }),
   ownedWorkspaces: many(workspaces),
   memberships: many(workspaceMembers),
   messages: many(messages),
@@ -200,5 +205,12 @@ export const runContextsRelations = relations(runContexts, ({ one }) => ({
   instance: one(gatewayInstances, {
     fields: [runContexts.instanceId],
     references: [gatewayInstances.id],
+  }),
+}));
+
+export const accountsRelations = relations(accounts, ({ one }) => ({
+  owner: one(users, {
+    fields: [accounts.ownerId],
+    references: [users.id],
   }),
 }));

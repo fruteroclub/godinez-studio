@@ -32,4 +32,12 @@ health.get("/", async (c) => {
   return c.json({ status, db: dbStatus, gateway: gatewayStatus, uptime: uptimeMs }, httpStatus);
 });
 
+health.get("/stats", async (c) => {
+  c.header("Access-Control-Allow-Origin", "*");
+  const [result] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(sql`agents`);
+  return c.json({ activeAgents: result?.count ?? 0 });
+});
+
 export default health;

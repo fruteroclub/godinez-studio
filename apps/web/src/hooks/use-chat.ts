@@ -40,6 +40,7 @@ export function useChat(
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [agentOffline, setAgentOffline] = useState(false);
+  const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("idle");
   const [retryInfo, setRetryInfo] = useState<RetryInfo | null>(null);
   const { getToken } = useAuth();
@@ -170,9 +171,15 @@ export function useChat(
         setAgentOffline(false);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
+        // Check subscription status first
+        if (msg.includes("SUBSCRIPTION_REQUIRED")) {
+          setSubscriptionExpired(true);
+          setMessages((prev) => prev.filter((m) => m.id !== tempUserId));
+          return;
+        }
         // Detectar cualquier error de conexión como offline
-        const isOffline = 
-          msg.includes("AGENT_OFFLINE") || 
+        const isOffline =
+          msg.includes("AGENT_OFFLINE") ||
           msg.includes("GATEWAY_OFFLINE") ||
           msg.includes("fetch") ||
           msg.includes("network") ||
@@ -180,7 +187,7 @@ export function useChat(
           msg.includes("NetworkError") ||
           msg.includes("ECONNREFUSED") ||
           msg.includes("TypeError");
-        
+
         if (isOffline) {
           setAgentOffline(true);
           setConnectionStatus("timeout");
@@ -331,5 +338,5 @@ export function useChat(
     [conversationId, workspaceId, getToken, options],
   );
 
-  return { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction, connectionStatus, retryInfo };
+  return { messages, sendMessage, isStreaming, isLoading, agentOffline, subscriptionExpired, updateAction, connectionStatus, retryInfo };
 }

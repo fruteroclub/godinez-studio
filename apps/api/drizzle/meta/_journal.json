@@ -43,6 +43,13 @@
       "when": 1774469168254,
       "tag": "0005_light_songbird",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1775018726914,
+      "tag": "0006_tense_pete_wisdom",
+      "breakpoints": true
     }
   ]
 }

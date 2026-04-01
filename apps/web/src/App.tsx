@@ -23,6 +23,9 @@ const Team = lazy(() => import("./pages/Team"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Hackathon = lazy(() => import("./pages/Hackathon").then(m => ({ default: m.Hackathon })));
+const BillingCheckout = lazy(() => import("./pages/BillingCheckout"));
+const BillingSuccess = lazy(() => import("./pages/BillingSuccess"));
+const BillingCancel = lazy(() => import("./pages/BillingCancel"));
 
 // Loading fallback
 function PageLoader() {
@@ -49,6 +52,18 @@ export const router = createBrowserRouter([
       {
         path: "/sign-up/*",
         element: <LazyPage><SignUp /></LazyPage>,
+      },
+      {
+        path: "/billing/checkout",
+        element: <LazyPage><BillingCheckout /></LazyPage>,
+      },
+      {
+        path: "/billing/success",
+        element: <LazyPage><BillingSuccess /></LazyPage>,
+      },
+      {
+        path: "/billing/cancel",
+        element: <LazyPage><BillingCancel /></LazyPage>,
       },
       {
         path: "/studio",

@@ -14,3 +14,4 @@ export { hackathonProgress, type HackathonPhase } from "./hackathon-progress";
 export * from "./relations";
 export { errors, feedback } from "./errors";
 export { runContexts } from "./run-contexts";
+export { accounts } from "./accounts";
