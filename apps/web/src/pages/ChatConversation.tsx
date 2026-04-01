@@ -59,6 +59,29 @@ async function reportError(error: unknown, context: { path: string; action: stri
   }
 }
 
+
+// Formatear hora del mensaje - muestra fecha solo si es de otro día
+function formatTime(dateStr?: string): string {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  const now = new Date();
+  
+  const isToday = date.toDateString() === now.toDateString();
+  const time = date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  
+  if (isToday) {
+    return time;
+  }
+  
+  // Si es de otro día, mostrar fecha + hora
+  const dateFormatted = date.toLocaleDateString("es-MX", { 
+    day: "2-digit", 
+    month: "2-digit",
+    year: "numeric"
+  });
+  return `${dateFormatted} ${time}`;
+}
+
 export default function ChatConversation() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const { workspace, slug } = useWorkspace();
@@ -505,7 +528,8 @@ export default function ChatConversation() {
                   className="h-full"
                   itemContent={(_index, msg) => (
                     <div className={`flex px-4 py-1.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                      <div
+                      <div className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                        <div
                         className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
                           msg.role === "user"
                             ? "bg-magenta text-white rounded-br-md whitespace-pre-wrap"
@@ -572,6 +596,12 @@ export default function ChatConversation() {
                             {msg.content !== "📎" && msg.content}
                           </>
                         )}
+                      </div>
+                      {msg.createdAt && (
+                        <span className="text-[10px] text-zinc-500 mt-0.5 px-1">
+                          {formatTime(msg.createdAt)}
+                        </span>
+                      )}
                       </div>
                     </div>
                   )}

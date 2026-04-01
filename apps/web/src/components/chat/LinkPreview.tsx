@@ -1,24 +1,29 @@
 import { ExternalLink } from "lucide-react";
+import { useState } from "react";
 
 interface LinkPreviewProps {
   url: string;
 }
 
-// Color del borde según servicio
-function getBorderColor(url: string): string {
-  try {
-    const hostname = new URL(url).hostname.toLowerCase();
-    if (hostname.includes("github.com")) return "border-l-zinc-400";
-    if (hostname.includes("figma.com")) return "border-l-purple-500";
-    if (hostname.includes("youtube.com") || hostname.includes("youtu.be")) return "border-l-red-500";
-    if (hostname.includes("loca.lt") || hostname.includes("ngrok") || hostname.includes("trycloudflare")) return "border-l-green-500";
-    if (hostname.includes("vercel")) return "border-l-white";
-  } catch {}
-  return "border-l-zinc-500";
+// Detectar si es tunnel URL (no tiene favicon útil)
+function isTunnelUrl(url: string): boolean {
+  const tunnelDomains = ["loca.lt", "ngrok", "trycloudflare", "localhost.run"];
+  return tunnelDomains.some(d => url.includes(d));
 }
 
-// Título corto
-function getTitle(url: string): string {
+// Obtener favicon URL (solo para sitios que lo tienen)
+function getFaviconUrl(url: string): string | null {
+  if (isTunnelUrl(url)) return null;
+  try {
+    const hostname = new URL(url).hostname;
+    return `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
+  } catch {
+    return null;
+  }
+}
+
+// Obtener nombre del sitio
+function getSiteName(url: string): string {
   try {
     const parsed = new URL(url);
     const hostname = parsed.hostname.replace("www.", "");
@@ -27,41 +32,41 @@ function getTitle(url: string): string {
     if (hostname.includes("github.com") && path.length >= 2) {
       return `${path[0]}/${path[1]}`;
     }
-    if (hostname.includes("loca.lt") || hostname.includes("ngrok") || hostname.includes("trycloudflare")) {
-      return "Preview en vivo";
+    // Para tunnels, mostrar el subdominio
+    if (isTunnelUrl(url)) {
+      return hostname.split(".")[0];
     }
-    return path[path.length - 1] || hostname;
+    return hostname;
   } catch {
-    return url;
+    return "Link";
   }
 }
 
 export function LinkPreview({ url }: LinkPreviewProps) {
-  const borderColor = getBorderColor(url);
-  const title = getTitle(url);
-  
-  let hostname = "";
-  try {
-    hostname = new URL(url).hostname.replace("www.", "");
-  } catch {
-    hostname = url;
-  }
+  const [faviconError, setFaviconError] = useState(false);
+  const siteName = getSiteName(url);
+  const faviconUrl = getFaviconUrl(url);
+  const showFavicon = faviconUrl && !faviconError;
 
   return (
     <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
-      className={`
-        inline-flex items-center gap-2 px-2 py-1 my-1
-        text-sm rounded border-l-2 ${borderColor}
-        bg-zinc-800/50 hover:bg-zinc-700/50
-        transition-colors
-      `}
+      className="inline-flex items-center gap-1.5 px-2 py-0.5 text-sm text-magenta hover:underline"
     >
-      <span className="text-zinc-200 truncate max-w-[200px]">{title}</span>
-      <span className="text-zinc-500 text-xs hidden sm:inline">{hostname}</span>
-      <ExternalLink className="w-3 h-3 text-zinc-500" />
+      {showFavicon && (
+        <img 
+          src={faviconUrl} 
+          alt="" 
+          className="w-4 h-4"
+          onError={() => setFaviconError(true)}
+        />
+      )}
+      <span>{siteName}</span>
+      <span className="opacity-60">·</span>
+      <span className="opacity-80">Ver preview</span>
+      <ExternalLink className="w-3 h-3 opacity-50" />
     </a>
   );
 }
