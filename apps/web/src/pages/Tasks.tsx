@@ -379,6 +379,7 @@ export default function Tasks() {
   const updateStatus = useUpdateTaskStatus(workspace?.id ?? 0);
   const updateProject = useUpdateTaskProject(workspace?.id ?? 0);
   const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("medium");
   const [projectId, setProjectId] = useState<number | undefined>(undefined);
   const [filterProjectId, setFilterProjectId] = useState<string>("all");
@@ -412,10 +413,12 @@ export default function Tasks() {
     if (!title.trim()) return;
     await createTask.mutateAsync({
       title: title.trim(),
+      description: description.trim() || undefined,
       priority,
       projectId,
     });
     setTitle("");
+    setDescription("");
     setPriority("medium");
   }
 
@@ -466,7 +469,7 @@ export default function Tasks() {
 
       <form
         onSubmit={handleCreate}
-        className="flex flex-wrap gap-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4"
+        className="flex items-center gap-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4"
       >
         <input
           type="text"
@@ -474,7 +477,14 @@ export default function Tasks() {
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Nombre de la tarea"
           required
-          className="min-w-[200px] flex-1 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
+          className="w-48 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
+        />
+        <input
+          type="text"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder="Descripción (opcional)"
+          className="flex-1 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
         />
         <select
           value={projectId ?? ""}
@@ -503,7 +513,7 @@ export default function Tasks() {
         <button
           type="submit"
           disabled={createTask.isPending}
-          className="rounded-md bg-magenta px-4 py-2 text-sm font-medium text-white hover:bg-magenta/90 transition-colors disabled:opacity-50"
+          className="rounded-md bg-magenta px-5 py-2 text-sm font-medium text-white hover:bg-magenta/90 transition-colors disabled:opacity-50"
         >
           {tc.create}
         </button>
