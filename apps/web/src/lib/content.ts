@@ -13,11 +13,11 @@ export const content = {
       settings: "Configuración",
     },
     dashboard: {
-      title: "Dashboard",
-      welcome: "Bienvenido a tu espacio de trabajo",
-      activeProjects: "Proyectos activos",
+      title: "Bienvenido",
+      welcome: "A tu espacio de trabajo",
+      activeProjects: "Proyectos",
       pendingTasks: "Tareas pendientes",
-      recentMessages: "Mensajes recientes",
+      recentMessages: "Chats recientes",
       agentStatus: "Estado del agente",
     },
     chat: {

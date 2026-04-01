@@ -51,19 +51,19 @@ export default function OnboardingWizard() {
   const { getToken } = useAuth();
   const createWorkspace = useCreateWorkspace();
 
-  // V3 Form state
+  // V3 Form state - NOTHING preselected
   const [userName, setUserName] = useState("");
   const [projectType, setProjectType] = useState<ProjectType | null>(null);
   const [projectSubtype, setProjectSubtype] = useState<ProjectSubtype | null>(null);
-  const [userRoles, setUserRoles] = useState<string[]>([]);  // Multiple roles allowed
-  const [businessDescription, setBusinessDescription] = useState("");  // Only for profesional
+  const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [businessDescription, setBusinessDescription] = useState("");
   
-  // Legacy form state (for non-V3 or profesional needs)
+  // Legacy form state
   const [selectedNeeds, setSelectedNeeds] = useState<string[]>([]);
   
-  // Agent config
+  // Agent config - NO preselection
   const [agentName, setAgentName] = useState("");
-  const [personality, setPersonality] = useState<string>("friendly");
+  const [personality, setPersonality] = useState<string | null>(null);
   
   // Auto-generated workspace name
   const [workspaceName, setWorkspaceName] = useState("");
@@ -74,6 +74,9 @@ export default function OnboardingWizard() {
   const [provisionSlug, setProvisionSlug] = useState<string | null>(null);
   const [provisionError, setProvisionError] = useState<string | null>(null);
   const [isProvisioning, setIsProvisioning] = useState(false);
+  
+  // Validation state
+  const [showValidation, setShowValidation] = useState(false);
 
   // Provision hook
   const provision = useProvision(provisionSlug || "");
@@ -94,6 +97,11 @@ export default function OnboardingWizard() {
     setSelectedNeeds([]);
   }, [projectType]);
 
+  // Hide validation when user interacts
+  useEffect(() => {
+    setShowValidation(false);
+  }, [userName, userRoles, projectType, projectSubtype, agentName, personality]);
+
   function toggleNeed(id: string) {
     setNeedsError(false);
     setSelectedNeeds((prev) =>
@@ -108,20 +116,15 @@ export default function OnboardingWizard() {
     if (USE_ONBOARDING_V3) {
       switch (step) {
         case 1:
-          // Name + Type + Subtype required
-          const hasBasics = userName.trim().length > 0 && projectType && projectSubtype;
-          return Boolean(hasBasics);
+          return Boolean(userName.trim() && userRoles.length > 0 && projectType && projectSubtype);
         case 2:
-          // Agent name required
-          return agentName.trim().length > 0;
+          return Boolean(agentName.trim() && personality);
         case 3:
-          // Review step - always can proceed
           return true;
         default:
           return false;
       }
     } else {
-      // Legacy validation
       switch (step) {
         case 1:
           return (
@@ -143,14 +146,20 @@ export default function OnboardingWizard() {
   }
 
   function handleNext() {
+    if (!canAdvance()) {
+      setShowValidation(true);
+      return;
+    }
     if (step === 2 && !USE_ONBOARDING_V3 && selectedNeeds.length === 0) {
       setNeedsError(true);
       return;
     }
+    setShowValidation(false);
     if (step < totalSteps) setStep((step + 1) as Step);
   }
 
   function handleBack() {
+    setShowValidation(false);
     if (step > 1) setStep((step - 1) as Step);
   }
 
@@ -185,7 +194,7 @@ export default function OnboardingWizard() {
           workspaceId: ws.id,
           userName: userName.trim(),
           agentName: agentName.trim(),
-          personality,
+          personality: personality || "friendly",
           needs: selectedNeeds.length > 0 ? selectedNeeds : undefined,
           userRole: userRoles.length > 0 ? userRoles.join(",") : undefined,
           businessDescription: businessDescription.trim() || undefined,
@@ -248,6 +257,7 @@ export default function OnboardingWizard() {
                 setProjectSubtype={setProjectSubtype}
                 userRoles={userRoles}
                 setUserRoles={setUserRoles}
+                showValidation={showValidation}
               />
             )}
             {step === 2 && (
@@ -256,6 +266,7 @@ export default function OnboardingWizard() {
                 setAgentName={setAgentName}
                 personality={personality}
                 setPersonality={setPersonality}
+                showValidation={showValidation}
               />
             )}
             {step === 3 && (
@@ -268,7 +279,7 @@ export default function OnboardingWizard() {
                 workspaceName={workspaceName}
                 setWorkspaceName={setWorkspaceName}
                 agentName={agentName}
-                personality={personality}
+                personality={personality || "friendly"}
                 isProvisioning={isProvisioning}
                 error={provisionError}
                 onLaunch={handleLaunch}
@@ -302,6 +313,7 @@ export default function OnboardingWizard() {
                 setAgentName={setAgentName}
                 personality={personality}
                 setPersonality={setPersonality}
+                showValidation={false}
               />
             )}
             {step === 4 && (
@@ -312,7 +324,7 @@ export default function OnboardingWizard() {
                 businessDescription={businessDescription}
                 selectedNeeds={selectedNeeds}
                 agentName={agentName}
-                personality={personality}
+                personality={personality || "friendly"}
                 isProvisioning={isProvisioning}
                 error={provisionError}
                 onLaunch={handleLaunch}
@@ -332,12 +344,11 @@ export default function OnboardingWizard() {
           {onboarding.back}
         </button>
 
-        {/* Only show Next on non-review steps — review step has its own Launch CTA */}
+        {/* Always clickable Next - shows validation on click */}
         {step < totalSteps ? (
           <button
             onClick={handleNext}
-            disabled={!canAdvance()}
-            className={`rounded-md bg-magenta px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-magenta/90 disabled:cursor-not-allowed disabled:opacity-50`}
+            className="rounded-md bg-magenta px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-magenta/90"
           >
             {onboarding.next}
           </button>
@@ -360,6 +371,7 @@ function StepContextV3({
   setProjectSubtype,
   userRoles,
   setUserRoles,
+  showValidation,
 }: {
   userName: string;
   setUserName: (v: string) => void;
@@ -369,6 +381,7 @@ function StepContextV3({
   setProjectSubtype: (v: ProjectSubtype) => void;
   userRoles: string[];
   setUserRoles: (v: string[]) => void;
+  showValidation: boolean;
 }) {
   const subtypes = projectType ? PROJECT_SUBTYPES_BY_TYPE[projectType] : [];
 
@@ -381,23 +394,29 @@ function StepContextV3({
       {/* User name */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
-          ¿Cómo te llamas?
+          ¿Cómo te llamas? <span className="text-magenta">*</span>
         </label>
         <input
           type="text"
           value={userName}
           onChange={(e) => setUserName(e.target.value)}
           placeholder="Tu nombre"
-          className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
+          className={`w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus:ring-2 focus:ring-magenta/20 ${
+            showValidation && !userName.trim()
+              ? "border-[hsl(var(--destructive))] focus:border-[hsl(var(--destructive))]"
+              : "border-[hsl(var(--input))] focus:border-magenta"
+          }`}
           autoFocus
         />
+        {showValidation && !userName.trim() && (
+          <p className="mt-1 text-xs text-[hsl(var(--destructive))]">Ingresa tu nombre</p>
+        )}
       </div>
-
 
       {/* User role */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
-          ¿A qué te dedicas?
+          ¿A qué te dedicas? <span className="text-magenta">*</span>
         </label>
         <div className="flex flex-wrap gap-2">
           {ROLE_IDS.map((id) => {
@@ -422,6 +441,8 @@ function StepContextV3({
                     ? "border-magenta bg-magenta/10 text-[hsl(var(--foreground))]"
                     : isDisabled
                     ? "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] opacity-40 cursor-not-allowed"
+                    : showValidation && userRoles.length === 0
+                    ? "border-[hsl(var(--destructive))]/50 bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] hover:border-white/20"
                     : "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] hover:border-white/20"
                 }`}
               >
@@ -433,11 +454,15 @@ function StepContextV3({
         {userRoles.length >= MAX_ROLES && (
           <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Máximo {MAX_ROLES} roles</p>
         )}
+        {showValidation && userRoles.length === 0 && (
+          <p className="mt-1 text-xs text-[hsl(var(--destructive))]">Selecciona al menos una opción</p>
+        )}
       </div>
+
       {/* Project type */}
       <div>
         <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
-          ¿Cómo vas a usar Godínez?
+          ¿Cómo vas a usar Godínez? <span className="text-magenta">*</span>
         </label>
         <div className="grid grid-cols-3 gap-3">
           {PROJECT_TYPES.map((type) => {
@@ -451,6 +476,8 @@ function StepContextV3({
                 className={`relative flex flex-col items-center rounded-lg border p-4 text-center transition-all ${
                   isSelected
                     ? "border-magenta bg-magenta/10"
+                    : showValidation && !projectType
+                    ? "border-[hsl(var(--destructive))]/50 bg-[hsl(var(--card))] hover:border-white/20"
                     : "border-white/10 bg-[hsl(var(--card))] hover:border-white/20"
                 }`}
               >
@@ -465,13 +492,16 @@ function StepContextV3({
             );
           })}
         </div>
+        {showValidation && !projectType && (
+          <p className="mt-2 text-xs text-[hsl(var(--destructive))]">Selecciona una opción</p>
+        )}
       </div>
 
       {/* Project subtype (appears after selecting type) */}
       {projectType && subtypes.length > 0 && (
         <div className="animate-in fade-in slide-in-from-top-2 duration-300">
           <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
-            ¿Por dónde empezamos?
+            ¿Por dónde empezamos? <span className="text-magenta">*</span>
           </label>
           <div className={`grid gap-3 ${subtypes.length > 3 ? 'grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 sm:grid-cols-' + subtypes.length}`}>
             {subtypes.map((subtype) => {
@@ -486,6 +516,8 @@ function StepContextV3({
                   className={`flex flex-col items-start rounded-lg border p-3 text-left transition-all ${
                     isSelected
                       ? "border-magenta bg-magenta/10"
+                      : showValidation && !projectSubtype
+                      ? "border-[hsl(var(--destructive))]/50 bg-[hsl(var(--card))] hover:border-white/20"
                       : "border-white/10 bg-[hsl(var(--card))] hover:border-white/20"
                   }`}
                 >
@@ -502,6 +534,9 @@ function StepContextV3({
               );
             })}
           </div>
+          {showValidation && !projectSubtype && (
+            <p className="mt-2 text-xs text-[hsl(var(--destructive))]">Selecciona una opción</p>
+          )}
         </div>
       )}
 
@@ -605,8 +640,8 @@ function StepReviewV3({
 
       <div className="space-y-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5">
         <ReviewRow label="Tu nombre" value={userName} />
+        <ReviewRow label="Te dedicas a" value={roleLabels} />
         <ReviewRow label="Contexto" value={`${typeLabel} → ${subtypeLabel}`} />
-        {roleLabels && <ReviewRow label="Tu rol" value={roleLabels} />}
         {businessDescription && <ReviewRow label="Tu negocio" value={businessDescription} />}
         <ReviewRow label="Tu agente" value={agentName} />
         <ReviewRow label="Personalidad" value={personalityLabel} />
@@ -644,7 +679,6 @@ function StepReviewV3({
           )}
         </button>
 
-        {/* Fixed-height slot prevents layout shift when error appears */}
         <div className="mt-4 min-h-[1.25rem]">
           {error && (
             <p className="text-sm text-[hsl(var(--destructive))]">{error}</p>
@@ -655,18 +689,20 @@ function StepReviewV3({
   );
 }
 
-/* ── Shared: Step 3 Agent ──────────────────────────────────── */
+/* ── Shared: Step 2 Agent ──────────────────────────────────── */
 
 function StepAgent({
   agentName,
   setAgentName,
   personality,
   setPersonality,
+  showValidation,
 }: {
   agentName: string;
   setAgentName: (v: string) => void;
-  personality: string;
+  personality: string | null;
   setPersonality: (v: string) => void;
+  showValidation: boolean;
 }) {
   return (
     <div className="space-y-6">
@@ -676,7 +712,7 @@ function StepAgent({
 
       <div>
         <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
-          {onboarding.agentNameLabel}
+          {onboarding.agentNameLabel} <span className="text-magenta">*</span>
         </label>
         <input
           type="text"
@@ -684,14 +720,21 @@ function StepAgent({
           onChange={(e) => setAgentName(e.target.value)}
           placeholder={onboarding.agentNamePlaceholder}
           maxLength={50}
-          className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
+          className={`w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus:ring-2 focus:ring-magenta/20 ${
+            showValidation && !agentName.trim()
+              ? "border-[hsl(var(--destructive))] focus:border-[hsl(var(--destructive))]"
+              : "border-[hsl(var(--input))] focus:border-magenta"
+          }`}
           autoFocus
         />
+        {showValidation && !agentName.trim() && (
+          <p className="mt-1 text-xs text-[hsl(var(--destructive))]">Ingresa un nombre para tu agente</p>
+        )}
       </div>
 
       <div>
         <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
-          {onboarding.personalityLabel}
+          {onboarding.personalityLabel} <span className="text-magenta">*</span>
         </label>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {PERSONALITY_IDS.map((id) => {
@@ -706,6 +749,8 @@ function StepAgent({
                 className={`flex flex-col rounded-lg border p-3 text-left transition-all ${
                   isSelected
                     ? "border-magenta bg-magenta/10"
+                    : showValidation && !personality
+                    ? "border-[hsl(var(--destructive))]/50 bg-[hsl(var(--card))] hover:border-white/20"
                     : "border-white/10 bg-[hsl(var(--card))] hover:border-white/20"
                 }`}
               >
@@ -719,6 +764,9 @@ function StepAgent({
             );
           })}
         </div>
+        {showValidation && !personality && (
+          <p className="mt-2 text-xs text-[hsl(var(--destructive))]">Selecciona una personalidad</p>
+        )}
       </div>
     </div>
   );
@@ -961,7 +1009,6 @@ function StepReviewLegacy({
           )}
         </button>
 
-        {/* Fixed-height slot prevents layout shift when error appears */}
         <div className="mt-4 min-h-[1.25rem]">
           {error && (
             <p className="text-sm text-[hsl(var(--destructive))]">{error}</p>

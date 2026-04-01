@@ -68,6 +68,18 @@ function getNavSections(slug: string): NavSection[] {
       ],
     },
     {
+      title: "MODO ESPECIAL",
+      items: [
+        { 
+          label: "Hackathon", 
+          subtitle: "Flujo guiado",
+          href: `/studio/${slug}/hackathon`, 
+          icon: Trophy,
+          highlight: "amber",
+        },
+      ],
+    },
+    {
       title: "RECURSOS",
       items: [
         { 
@@ -82,18 +94,6 @@ function getNavSections(slug: string): NavSection[] {
           href: `/studio/${slug}/activity`, 
           icon: BarChart3,
           disabled: true,
-        },
-      ],
-    },
-    {
-      title: "MODO ESPECIAL",
-      items: [
-        { 
-          label: "Hackathon", 
-          subtitle: "Flujo guiado",
-          href: `/studio/${slug}/hackathon`, 
-          icon: Trophy,
-          highlight: "amber",
         },
       ],
     },
