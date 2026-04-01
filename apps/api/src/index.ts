@@ -26,6 +26,7 @@ import users from "./routes/users";
 import hackathons from "./routes/hackathons";
 import errors from "./routes/errors";
 import watchdog from "./routes/watchdog";
+import billing from "./routes/billing";
 import { logError } from "./dal/errors";
 import "./services/gateway-pool"; // initialize pool (lazy connections)
 import { initSentry, Sentry } from "./lib/sentry";
@@ -80,6 +81,7 @@ app.route("/api/admin/errors", errors); // before /api/admin to avoid admin midd
 app.route("/api/admin", admin);
 app.route("/api/users", users);
 app.route("/api/hackathons", hackathons);
+app.route("/api/billing", billing);
 app.route("/webhooks", webhooks);
 app.route("/api/watchdog", watchdog);
 app.route("/api/context", context);

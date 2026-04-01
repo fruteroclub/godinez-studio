@@ -52,10 +52,11 @@ import { db } from "../db";
 import { files as filesTable } from "@godinez/db";
 import { eq, and } from "drizzle-orm";
 import { requireQuota } from "../middleware/require-quota";
+import { resolveAccount } from "../middleware/resolve-account";
 
 const app = new Hono<AuthEnv>();
 
-app.use("*", requireAuth, resolveUser);
+app.use("*", requireAuth, resolveUser, resolveAccount);
 
 // Attachment schema for validation
 const attachmentSchema = z.object({
@@ -91,6 +92,20 @@ app.post(
     }),
   ),
   async (c) => {
+    // Billing gate (only enforced when BILLING_ENABLED=true)
+    if (process.env.BILLING_ENABLED === "true") {
+      const account = c.get("account");
+      if (account.subscriptionStatus !== "active") {
+        return c.json(
+          {
+            error: "SUBSCRIPTION_REQUIRED",
+            message: "Suscripción vencida. Actualiza tu método de pago.",
+          },
+          402,
+        );
+      }
+    }
+
     const userId = c.get("userId");
     const { conversationId, workspaceId, content, attachments, hackathonContext } = c.req.valid("json");
 

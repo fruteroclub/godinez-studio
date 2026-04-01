@@ -18,6 +18,7 @@ import { ActionCard } from "@/components/chat/ActionCard";
 import { FileAttachmentButton, AttachmentPreview, MessageAttachment } from "@/components/chat/FileAttachment";
 import { DropZone } from "@/components/chat/DropZone";
 import { stripActionBlocks } from "@/lib/action-parser";
+import SubscriptionGate from "@/components/billing/SubscriptionGate";
 import { content } from "@/lib/content";
 
 const { chat } = content.studio;
@@ -133,7 +134,7 @@ export default function ChatConversation() {
     [qc, workspace?.id],
   );
 
-  const { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction, connectionStatus } =
+  const { messages, sendMessage, isStreaming, isLoading, agentOffline, subscriptionExpired, updateAction, connectionStatus } =
     useChat(Number(conversationId), workspace?.id ?? 0, { onComplete });
   
   // Sincronizar estado de conexión con el contexto global (para TopBar)
@@ -457,7 +458,8 @@ export default function ChatConversation() {
           </div>
         )}
 
-
+        {/* Subscription gate */}
+        {subscriptionExpired && <SubscriptionGate />}
 
         {/* Mobile banner when preview available */}
         {isMobile && previewUrl && (
