@@ -6,6 +6,8 @@ import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { LinkPreview } from "@/components/chat/LinkPreview";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
 import { useConnection } from "@/providers/ConnectionProvider";
@@ -55,6 +57,29 @@ async function reportError(error: unknown, context: { path: string; action: stri
     // Silent fail - don't block user flow
     console.error("[ErrorReporter] Failed to report error:", error);
   }
+}
+
+
+// Formatear hora del mensaje - muestra fecha solo si es de otro día
+function formatTime(dateStr?: string): string {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  const now = new Date();
+  
+  const isToday = date.toDateString() === now.toDateString();
+  const time = date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  
+  if (isToday) {
+    return time;
+  }
+  
+  // Si es de otro día, mostrar fecha + hora
+  const dateFormatted = date.toLocaleDateString("es-MX", { 
+    day: "2-digit", 
+    month: "2-digit",
+    year: "numeric"
+  });
+  return `${dateFormatted} ${time}`;
 }
 
 export default function ChatConversation() {
@@ -503,7 +528,8 @@ export default function ChatConversation() {
                   className="h-full"
                   itemContent={(_index, msg) => (
                     <div className={`flex px-4 py-1.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                      <div
+                      <div className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                        <div
                         className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
                           msg.role === "user"
                             ? "bg-magenta text-white rounded-br-md whitespace-pre-wrap"
@@ -514,7 +540,34 @@ export default function ChatConversation() {
                       >
                         {msg.role === "agent" ? (
                           <>
-                            <ReactMarkdown>{stripActionBlocks(msg.content)}</ReactMarkdown>
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              components={{
+                                a: ({ href, children }) => {
+                                  // Si el link es una URL completa, mostrar preview
+                                  if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+                                    // Si el texto del link es igual a la URL, mostrar tarjeta
+                                    const childText = String(children);
+                                    if (childText === href || childText.includes(href.replace('https://', '').replace('http://', ''))) {
+                                      return <LinkPreview url={href} />;
+                                    }
+                                  }
+                                  // Si no, mostrar link normal
+                                  return (
+                                    <a 
+                                      href={href} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="text-magenta hover:underline"
+                                    >
+                                      {children}
+                                    </a>
+                                  );
+                                },
+                              }}
+                            >
+                              {stripActionBlocks(msg.content)}
+                            </ReactMarkdown>
                             {msg.actions && msg.actions.length > 0 && (
                               <div className="mt-2 not-prose">
                                 {msg.actions.map((action) => (
@@ -543,6 +596,12 @@ export default function ChatConversation() {
                             {msg.content !== "📎" && msg.content}
                           </>
                         )}
+                      </div>
+                      {msg.createdAt && (
+                        <span className="text-[10px] text-zinc-500 mt-0.5 px-1">
+                          {formatTime(msg.createdAt)}
+                        </span>
+                      )}
                       </div>
                     </div>
                   )}
