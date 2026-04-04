@@ -314,6 +314,64 @@ app.get("/stream/:runId", async (c) => {
       return;
     }
 
+    // Check Redis Stream for completed run replay (handles navigate-away + return)
+    const redis = getRedis();
+    if (redis) {
+      const streamEntries = await redis.xrange(`rs:${runId}`, "-", "+", 100);
+      if (streamEntries.length > 0) {
+        // Find the final/aborted/error entry
+        const finalEntry = streamEntries.find(([, fields]) => {
+          const typeIdx = fields.indexOf("t");
+          const type = typeIdx >= 0 ? fields[typeIdx + 1] : null;
+          return type === "f" || type === "a" || type === "e";
+        });
+
+        if (finalEntry) {
+          const [, fields] = finalEntry;
+          const typeIdx = fields.indexOf("t");
+          const type = fields[typeIdx + 1];
+          const textIdx = fields.indexOf("text");
+          const text = textIdx >= 0 ? fields[textIdx + 1] : "";
+          const msgIdx = fields.indexOf("msg");
+          const errorMsg = msgIdx >= 0 ? fields[msgIdx + 1] : "unknown";
+
+          if (type === "e") {
+            await stream.writeSSE({ event: "error", data: JSON.stringify({ type: "error", error: errorMsg }) });
+          } else {
+            // Persist message if not already saved
+            const runCtx = ctx ?? await getRunContext(runId);
+            let messageId: number | undefined;
+            if (runCtx) {
+              const cleanText = stripTitleBlocks(text);
+              const suggestedTitle = parseTitleBlock(text);
+              const actionBlocks = parseActionBlocks(cleanText);
+              const actions: ActionCard[] = actionBlocks.map((b) => ({ ...b, status: "pending" as const }));
+              const agentMessage = await createMessage({
+                conversationId: runCtx.conversationId,
+                workspaceId: runCtx.workspaceId,
+                role: "agent",
+                content: cleanText,
+                ...(actions.length > 0 ? { metadata: { actions } } : {}),
+              });
+              messageId = agentMessage.id;
+              if (suggestedTitle) await updateConversationTitle(runCtx.conversationId, suggestedTitle);
+              await deleteRunContext(runId);
+            }
+            await stream.writeSSE({
+              event: "done",
+              data: JSON.stringify({ type: "done", text: stripTitleBlocks(text), ...(messageId ? { messageId } : {}) }),
+            });
+          }
+
+          logger.info({ runId, type }, "replayed completed run from Redis Stream");
+          cleanup();
+          await redis.del(`rs:${runId}`);
+          await stream.close();
+          return;
+        }
+      }
+    }
+
     // If no relay from DB context, check Redis run-intent as fallback
     if (!relay && !ctx) {
       const redis = getRedis();

@@ -15,6 +15,8 @@ import { logger } from "./logger";
 
 const log = logger.child({ service: "redis" });
 
+export type StreamEntry = [id: string, fields: string[]];
+
 export interface RedisClient {
   get(key: string): Promise<string | null>;
   set(key: string, value: string, options?: { ex?: number }): Promise<"OK">;
@@ -22,6 +24,10 @@ export interface RedisClient {
   incr(key: string): Promise<number>;
   expire(key: string, seconds: number): Promise<number>;
   ping(): Promise<string>;
+  /** Append entry to a Redis Stream. Returns the entry ID. */
+  xadd(key: string, id: string, ...fieldValues: string[]): Promise<string>;
+  /** Read a range of entries from a Redis Stream. */
+  xrange(key: string, start: string, end: string, count?: number): Promise<StreamEntry[]>;
 }
 
 let _redis: RedisClient | null = null;
@@ -83,6 +89,18 @@ function buildClient(): RedisClient | null {
     async ping() {
       const r = await request(["PING"]);
       return r.result as string;
+    },
+    async xadd(key, id, ...fieldValues) {
+      const r = await request(["XADD", key, id, ...fieldValues]);
+      return r.result as string;
+    },
+    async xrange(key, start, end, count) {
+      const cmd = ["XRANGE", key, start, end];
+      if (count) cmd.push("COUNT", String(count));
+      const r = await request(cmd);
+      // Upstash returns [[id, [field, value, ...]], ...]
+      const raw = r.result as Array<[string, string[]]> | null;
+      return (raw ?? []) as StreamEntry[];
     },
   };
 

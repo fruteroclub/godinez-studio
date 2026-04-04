@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import { logger as rootLogger } from "../lib/logger";
+import { getRedis } from "../lib/redis";
 
 const log = rootLogger.child({ service: "gateway" });
 
@@ -764,6 +765,20 @@ export class GatewayRelay {
         });
         this.earlyEvents.set(runId, buf);
         log.info({ runId, state, seq, buffered: buf.length }, "buffered early event (no handler yet)");
+
+        // Also persist to Redis Stream so SSE can replay even if in-memory buffer is lost
+        const redis = getRedis();
+        if (redis) {
+          const streamKey = `rs:${runId}`;
+          const type = state === "delta" ? "d" : state === "final" ? "f" : state === "aborted" ? "a" : "e";
+          const fields = type === "e"
+            ? ["t", type, "msg", errorMessage ?? "unknown", "seq", String(seq)]
+            : ["t", type, "text", text, "seq", String(seq)];
+          redis.xadd(streamKey, "*", ...fields)
+            .then(() => { if (state !== "delta") return redis.expire(streamKey, 600); })
+            .catch(err => log.debug({ err: String(err) }, "redis stream early event write failed"));
+        }
+
         return;
       }
 
@@ -772,24 +787,47 @@ export class GatewayRelay {
       if (seq < handler.lastSeq || (seq === handler.lastSeq && state === "delta")) return;
       handler.lastSeq = seq;
 
+      // Write to Redis Stream (fire-and-forget for persistence/replay)
+      const redis = getRedis();
+      const streamKey = `rs:${runId}`;
+
       if (state === "delta") {
         handler.onDelta(text, message as Record<string, unknown>);
+        if (redis) {
+          redis.xadd(streamKey, "*", "t", "d", "text", text, "seq", String(seq))
+            .catch(err => log.debug({ err: String(err) }, "redis stream delta write failed"));
+        }
       }
 
       log.debug({ state, runId }, "chat event state");
       if (state === "final") {
         handler.onFinal(text, message as Record<string, unknown>);
         this.pendingRuns.delete(runId);
+        if (redis) {
+          redis.xadd(streamKey, "*", "t", "f", "text", text, "seq", String(seq))
+            .then(() => redis.expire(streamKey, 600))
+            .catch(err => log.debug({ err: String(err) }, "redis stream final write failed"));
+        }
       }
 
       if (state === "aborted") {
         handler.onFinal(text, message as Record<string, unknown>);
         this.pendingRuns.delete(runId);
+        if (redis) {
+          redis.xadd(streamKey, "*", "t", "a", "text", text, "seq", String(seq))
+            .then(() => redis.expire(streamKey, 600))
+            .catch(err => log.debug({ err: String(err) }, "redis stream aborted write failed"));
+        }
       }
 
       if (state === "error") {
         handler.onError(errorMessage ?? "unknown error");
         this.pendingRuns.delete(runId);
+        if (redis) {
+          redis.xadd(streamKey, "*", "t", "e", "msg", errorMessage ?? "unknown", "seq", String(seq))
+            .then(() => redis.expire(streamKey, 600))
+            .catch(err => log.debug({ err: String(err) }, "redis stream error write failed"));
+        }
       }
 
     }
