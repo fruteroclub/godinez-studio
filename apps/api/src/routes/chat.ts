@@ -22,10 +22,12 @@ import { createTask } from "../dal/tasks";
 import { updateFileMessageLink, getFileById, createFile as createFileRecord } from "../dal/files";
 import { getWorkspaceById, activateWorkspace } from "../dal/workspaces";
 import { pool } from "../services/gateway-pool";
+import type { GatewayRelay } from "../services/gateway-relay";
 import { resolveAgentSession } from "../services/agent-mapping";
 import { createStubRun } from "../services/stub-agent";
 import { parseActionBlocks, stripActionBlocks } from "../lib/action-parser";
 import { logger } from "../lib/logger";
+import { getRedis } from "../lib/redis";
 import {
   saveRunContext,
   getRunContext,
@@ -149,6 +151,16 @@ app.post(
         // Send with attachments if present
         runId = await relay.chatSend(sessionKey, enrichedContent, attachments);
         await saveRunContext({ runId, conversationId, workspaceId, instanceId: workspace!.instanceId });
+
+        // Save run intent in Redis so SSE handler can validate quickly
+        const redis = getRedis();
+        if (redis) {
+          await redis.set(
+            `run-intent:${runId}`,
+            JSON.stringify({ conversationId, workspaceId, instanceId: workspace!.instanceId }),
+            { ex: 600 },
+          );
+        }
       } catch (err) {
         const error = err instanceof Error ? err.message : "Gateway error";
         return c.json({ error }, 502);
@@ -201,7 +213,7 @@ app.get("/stream/:runId", async (c) => {
 
     // Resolve the relay for this run (needed for onRun/offRun)
     const ctx = await getRunContext(runId);
-    let relay;
+    let relay: GatewayRelay | null = null;
     try {
       relay = ctx?.instanceId != null
         ? await pool.getRelayForWorkspace(ctx.instanceId)
@@ -213,6 +225,9 @@ app.get("/stream/:runId", async (c) => {
     const cleanup = () => {
       if (keepaliveTimer) clearInterval(keepaliveTimer);
       relay?.offRun(runId);
+      // Clean Redis run-intent (fire-and-forget)
+      const redis = getRedis();
+      if (redis) redis.del(`run-intent:${runId}`).catch(() => {});
     };
 
     // Keepalive every 30 seconds
@@ -297,6 +312,24 @@ app.get("/stream/:runId", async (c) => {
         },
       });
       return;
+    }
+
+    // If no relay from DB context, check Redis run-intent as fallback
+    if (!relay && !ctx) {
+      const redis = getRedis();
+      if (redis) {
+        const intent = await redis.get(`run-intent:${runId}`);
+        if (intent) {
+          try {
+            const parsed = JSON.parse(intent);
+            if (parsed.instanceId != null) {
+              try {
+                relay = await pool.getRelayForWorkspace(parsed.instanceId);
+              } catch { /* fall through to AGENT_OFFLINE */ }
+            }
+          } catch { /* invalid JSON, ignore */ }
+        }
+      }
     }
 
     // Real Gateway mode — register handlers
