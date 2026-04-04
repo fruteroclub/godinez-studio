@@ -294,11 +294,27 @@ type RunHandler = {
   lastSeq: number;
 };
 
+// ─── Early event buffer ─────────────────────────────────────────────
+// Events that arrive before onRun() registers a handler are buffered here
+// and replayed when the handler is attached. TTL prevents memory leaks.
+
+interface BufferedEvent {
+  state: "delta" | "final" | "aborted" | "error";
+  text: string;
+  message?: Record<string, unknown>;
+  errorMessage?: string;
+  seq: number;
+  bufferedAt: number;
+}
+
+const EARLY_EVENT_BUFFER_TTL_MS = 30_000; // 30s — enough for SSE handler to connect
+
 // ─── Gateway Relay ──────────────────────────────────────────────────
 
 export class GatewayRelay {
   private ws: WebSocket | null = null;
   private pendingRuns = new Map<string, RunHandler>();
+  private earlyEvents = new Map<string, BufferedEvent[]>();
   private pendingRequests = new Map<
     string,
     { resolve: (frame: ResponseFrame) => void }
@@ -488,6 +504,7 @@ export class GatewayRelay {
     this._connected = false;
     this._reconnecting = false;
     this.serverInfo = null;
+    this.earlyEvents.clear();
   }
 
 
@@ -655,13 +672,54 @@ export class GatewayRelay {
 
   onRun(runId: string, handlers: Omit<RunHandler, "lastSeq">): void {
     this.lastActivityAt = new Date();
-    this.pendingRuns.set(runId, { ...handlers, lastSeq: -1 });
+    const handler: RunHandler = { ...handlers, lastSeq: -1 };
+    this.pendingRuns.set(runId, handler);
+
+    // Replay any events that arrived before the handler was registered
+    const buffered = this.earlyEvents.get(runId);
+    if (buffered && buffered.length > 0) {
+      this.earlyEvents.delete(runId);
+      log.info({ runId, count: buffered.length }, "replaying buffered early events");
+      for (const evt of buffered) {
+        if (evt.seq < handler.lastSeq || (evt.seq === handler.lastSeq && evt.state === "delta")) continue;
+        handler.lastSeq = evt.seq;
+
+        if (evt.state === "delta") {
+          handler.onDelta(evt.text, evt.message);
+        } else if (evt.state === "final" || evt.state === "aborted") {
+          handler.onFinal(evt.text, evt.message);
+          this.pendingRuns.delete(runId);
+          return;
+        } else if (evt.state === "error") {
+          handler.onError(evt.errorMessage ?? "unknown error");
+          this.pendingRuns.delete(runId);
+          return;
+        }
+      }
+    }
   }
 
 
   offRun(runId: string): void {
     this.lastActivityAt = new Date();
     this.pendingRuns.delete(runId);
+    this.earlyEvents.delete(runId);
+  }
+
+  /** Check if a handler or buffered events exist for a runId. */
+  hasRun(runId: string): boolean {
+    return this.pendingRuns.has(runId) || this.earlyEvents.has(runId);
+  }
+
+  /** Remove early event buffers older than TTL to prevent memory leaks. */
+  cleanStaleBuffers(): void {
+    const cutoff = Date.now() - EARLY_EVENT_BUFFER_TTL_MS;
+    for (const [runId, events] of this.earlyEvents) {
+      if (events.length > 0 && events[0].bufferedAt < cutoff) {
+        this.earlyEvents.delete(runId);
+        log.debug({ runId }, "cleaned stale early event buffer");
+      }
+    }
   }
 
 
@@ -690,16 +748,29 @@ export class GatewayRelay {
       }
 
       const { runId, seq, state, message, errorMessage } = parsed.data;
+      const text = this.extractText(message);
       const handler = this.pendingRuns.get(runId);
-      if (!handler) return;
+
+      if (!handler) {
+        // No handler yet — buffer the event for replay when onRun() is called
+        const buf = this.earlyEvents.get(runId) ?? [];
+        buf.push({
+          state,
+          text,
+          message: message as Record<string, unknown> | undefined,
+          errorMessage,
+          seq,
+          bufferedAt: Date.now(),
+        });
+        this.earlyEvents.set(runId, buf);
+        log.info({ runId, state, seq, buffered: buf.length }, "buffered early event (no handler yet)");
+        return;
+      }
 
       // Deduplicate by seq — skip events we've already seen
       // Dedupe: skip if seq already processed, BUT allow final event with same seq as last delta
       if (seq < handler.lastSeq || (seq === handler.lastSeq && state === "delta")) return;
       handler.lastSeq = seq;
-
-      // Extract text from message content blocks
-      const text = this.extractText(message);
 
       if (state === "delta") {
         handler.onDelta(text, message as Record<string, unknown>);
