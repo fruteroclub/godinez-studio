@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ConnectionProvider } from "@/providers/ConnectionProvider";
 import { FeedbackWidget } from "@/components/errors/feedback-widget";
 import { Outlet, useLocation } from "react-router-dom";
@@ -14,6 +14,15 @@ function ShellContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const { workspace, isLoading, slug } = useWorkspace();
   const location = useLocation();
+
+  // Auto-collapse on /settings, expand on other pages
+  useEffect(() => {
+    if (location.pathname.includes("/settings")) {
+      setSidebarCollapsed(true);
+    } else {
+      setSidebarCollapsed(false);
+    }
+  }, [location.pathname]);
 
   if (isLoading) {
     return (

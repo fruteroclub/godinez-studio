@@ -269,6 +269,7 @@ export const content = {
     configSaved: "Configuración guardada",
     fileUploaded: "Archivo subido",
     projectCreated: "Proyecto creado",
+    projectDeleted: "Proyecto eliminado",
     taskCreated: "Tarea creada",
     fetchError: "Error de conexión. Intenta de nuevo.",
     timeout: "La solicitud tardó demasiado. Intenta de nuevo.",

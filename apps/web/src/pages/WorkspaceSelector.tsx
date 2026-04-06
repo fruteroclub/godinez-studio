@@ -54,7 +54,7 @@ export default function WorkspaceSelector() {
           <p className="mt-3 text-lg text-[hsl(var(--muted-foreground))]">
             {(!workspaces || workspaces.length === 0) 
               ? "Crea tu primer espacio de trabajo"
-              : "¿Con cuál espacio quieres trabajar?"}
+              : "¿En cuál espacio quieres trabajar?"}
           </p>
         </div>
 

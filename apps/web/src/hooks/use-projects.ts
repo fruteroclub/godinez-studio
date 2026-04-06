@@ -27,6 +27,8 @@ export function useProjects(workspaceId: number | undefined) {
       );
     },
     enabled: !!workspaceId,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 }
 
@@ -39,6 +41,8 @@ export function useProject(projectId: string | undefined) {
       return apiFetch<ProjectDetail>(`/api/projects/${projectId}`, { token });
     },
     enabled: !!projectId,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 }
 
@@ -51,6 +55,8 @@ export function useProjectTasks(projectId: string | undefined) {
       return apiFetch<Task[]>(`/api/projects/${projectId}/tasks`, { token });
     },
     enabled: !!projectId,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 }
 
@@ -65,6 +71,8 @@ export function useProjectFiles(projectId: string | undefined) {
       });
     },
     enabled: !!projectId,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 }
 
@@ -80,6 +88,8 @@ export function useProjectConversations(projectId: string | undefined) {
       );
     },
     enabled: !!projectId,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 }
 
@@ -99,6 +109,25 @@ export function useCreateProject(workspaceId: number) {
       qc.invalidateQueries({ queryKey: ["projects", workspaceId] });
       toast.success(content.toast.projectCreated);
       trackEvent("project_created");
+    },
+  });
+}
+
+export function useDeleteProject(workspaceId: number) {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (projectId: number) => {
+      const token = await getToken();
+      return apiFetch(`/api/projects/${projectId}`, {
+        method: "DELETE",
+        token,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["projects", workspaceId] });
+      toast.success(content.toast.projectDeleted ?? "Proyecto eliminado");
+      trackEvent("project_deleted");
     },
   });
 }
