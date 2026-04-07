@@ -23,8 +23,17 @@ import conversations, {
 import referralCodes from "./routes/referral-codes";
 import admin from "./routes/admin";
 import users from "./routes/users";
+import hackathons from "./routes/hackathons";
+import errors from "./routes/errors";
+import watchdog from "./routes/watchdog";
+import billing from "./routes/billing";
+import { logError } from "./dal/errors";
 import "./services/gateway-pool"; // initialize pool (lazy connections)
 import { initSentry, Sentry } from "./lib/sentry";
+import context from "./routes/context";
+import { isAppError, formatErrorResponse } from "./lib/errors";
+import { rateLimits } from "./middleware/rate-limit";
+import { deployRateLimit } from "./middleware/deploy-rate-limit";
 
 initSentry();
 
@@ -35,7 +44,7 @@ app.use(
   "*",
   cors({
     origin: process.env.CORS_ORIGIN?.split(",") ?? [],
-    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization", "X-Service-Key"],
     exposeHeaders: ["Content-Type"],
     credentials: true,
@@ -60,21 +69,63 @@ app.route("/api/tasks", tasks);
 app.route("/api/files", files);
 app.route("/api/agents", agents);
 app.route("/api/agents", provision);
+// Rate-limited routes
+app.use("/api/chat/*", rateLimits.chat);
+app.use("/api/hackathons/*", rateLimits.hackathon);
+app.use("/api/deploy/*", deployRateLimit());
+
 app.route("/api/chat", chat);
 app.route("/api/conversations", conversations);
 app.route("/api/referral-codes", referralCodes);
+app.route("/api/admin/errors", errors); // before /api/admin to avoid admin middleware catch-all
 app.route("/api/admin", admin);
 app.route("/api/users", users);
+app.route("/api/hackathons", hackathons);
+app.route("/api/billing", billing);
 app.route("/webhooks", webhooks);
+app.route("/api/watchdog", watchdog);
+app.route("/api/context", context);
 
 app.onError((err, c) => {
   Sentry.captureException(err);
-  logger.error({ err: err.message }, "unhandled error");
-  return c.json({ error: "Internal server error" }, 500);
+  
+  // Log to Error Observatory
+  logError({
+    code: isAppError(err) ? err.code : "INTERNAL_ERROR",
+    message: err.message,
+    userMessage: "Algo salió mal.",
+    priority: "P2",
+    path: c.req.path,
+  }).catch(() => {});
+  
+  if (isAppError(err)) {
+    if (err.statusCode >= 500) {
+      logger.error({ err: err.message, code: err.code }, "server error");
+    } else {
+      logger.warn({ code: err.code, details: err.details }, err.message);
+    }
+    const response = formatErrorResponse(err);
+    return c.json(response, err.statusCode as 400 | 401 | 403 | 404 | 429 | 500);
+  }
+  
+  logger.error({ err: err.message, path: c.req.path }, "unhandled error");
+  return c.json({
+    error: "Algo salió mal. Por favor, intenta de nuevo.",
+    code: "INTERNAL_ERROR",
+  }, 500);
 });
 
 // Serve uploaded files in development (in production, R2 serves files directly)
 app.use("/uploads/*", serveStatic({ root: "./" }));
+
+// 404 handler for undefined routes
+app.notFound((c) => {
+  return c.json({
+    error: "La página que buscas no existe",
+    code: "NOT_FOUND",
+    message: `Route ${c.req.path} not found`,
+  }, 404);
+});
 
 app.get("/", (c) => {
   return c.json({

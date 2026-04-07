@@ -1,53 +1,72 @@
-import { useState } from "react";
+import { ProjectTypeIcon, ProjectSubtypeIcon } from "@/lib/icons";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@clerk/clerk-react";
 import { useCreateWorkspace } from "@/hooks/use-workspace";
 import { useProvision } from "@/hooks/use-provision";
+import { apiFetch } from "@/lib/api";
 import { content } from "@/lib/content";
+import type { Workspace } from "@godinez/types";
+import { PROJECT_TYPES, PROJECT_SUBTYPES_BY_TYPE, type ProjectType, type ProjectSubtype } from "@godinez/types";
 
 const { onboarding } = content.studio;
 
-const ROLE_IDS = [
-  "founder",
-  "marketing",
-  "sales",
-  "operations",
-  "tech",
-  "support",
-  "other",
-] as const;
+// Feature flag for V3 onboarding
+const USE_ONBOARDING_V3 = true;
 
-const NEED_IDS = [
-  "launch",
-  "automate",
-  "social",
-  "sales",
-  "time",
-  "research",
-  "support",
-  "build",
-] as const;
+// V3 Labels
+const PROJECT_TYPE_CONFIG = {
+  educacion: { title: "Educación", description: "Bootcamp, curso o aprendizaje autodidacta" },
+  profesional: { title: "Profesional", description: "Trabajo, negocio o empresa" },
+  personal: { title: "Personal", description: "Hackathon, emprendimiento o proyecto propio" },
+};
 
-const PERSONALITY_IDS = [
-  "professional",
-  "friendly",
-  "creative",
-  "technical",
-] as const;
+const PROJECT_SUBTYPE_CONFIG: Record<string, { title: string; description: string }> = {
+  // educacion
+  bootcamp: { title: "Bootcamp o curso", description: "Estoy en un programa de aprendizaje estructurado" },
+  aprender: { title: "Aprender por mi cuenta", description: "Quiero aprender algo nuevo de forma autodidacta" },
+  // personal
+  hackathon: { title: "Hackathon", description: "Estoy participando en un hackathon" },
+  emprendimiento: { title: "Emprendimiento", description: "Estoy construyendo mi propio negocio" },
+  proyecto: { title: "Proyecto en marcha", description: "Tengo un proyecto personal que quiero avanzar" },
+  // profesional
+  crear_contenido: { title: "Crear contenido", description: "Posts, copy, videos, marketing" },
+  automatizar: { title: "Automatizar tareas", description: "Procesos, flujos, integraciones" },
+  construir: { title: "Construir", description: "Apps, sitios, landing pages" },
+  investigar: { title: "Investigar y analizar", description: "Datos, mercado, competencia" },
+  vender: { title: "Vender y atender", description: "Comercial, soporte, clientes" },
+  organizar: { title: "Organizar y planear", description: "Reportes, gestión, admin" },
+};
+
+// Legacy constants (for backward compatibility)
+const ROLE_IDS = ["negocio", "marketing", "ventas", "admin", "tech", "educacion", "creatividad", "consultoria", "otra"] as const;
+const MAX_ROLES = 5; // DB limit: VARCHAR(50)
+const NEED_IDS = ["launch", "automate", "social", "sales", "time", "research", "support", "build"] as const;
+const PERSONALITY_IDS = ["professional", "friendly", "creative", "technical"] as const;
 
 type Step = 1 | 2 | 3 | 4;
 
 export default function OnboardingWizard() {
   const navigate = useNavigate();
+  const { getToken } = useAuth();
   const createWorkspace = useCreateWorkspace();
 
-  // Form state
-  const [workspaceName, setWorkspaceName] = useState("");
+  // V3 Form state - NOTHING preselected
   const [userName, setUserName] = useState("");
-  const [userRole, setUserRole] = useState("");
+  const [projectType, setProjectType] = useState<ProjectType | null>(null);
+  const [projectSubtype, setProjectSubtype] = useState<ProjectSubtype | null>(null);
+  const [userRoles, setUserRoles] = useState<string[]>([]);
   const [businessDescription, setBusinessDescription] = useState("");
+  
+  // Legacy form state
   const [selectedNeeds, setSelectedNeeds] = useState<string[]>([]);
+  
+  // Agent config - NO preselection
   const [agentName, setAgentName] = useState("");
-  const [personality, setPersonality] = useState<string>("friendly");
+  const [personality, setPersonality] = useState<string | null>(null);
+  
+  // Auto-generated workspace name
+  const [workspaceName, setWorkspaceName] = useState("");
 
   // Wizard state
   const [step, setStep] = useState<Step>(1);
@@ -55,46 +74,92 @@ export default function OnboardingWizard() {
   const [provisionSlug, setProvisionSlug] = useState<string | null>(null);
   const [provisionError, setProvisionError] = useState<string | null>(null);
   const [isProvisioning, setIsProvisioning] = useState(false);
+  
+  // Validation state
+  const [showValidation, setShowValidation] = useState(false);
 
-  // Provision hook — slug is set after workspace creation
+  // Provision hook
   const provision = useProvision(provisionSlug || "");
+
+  // Auto-generate workspace name based on user name and type
+  useEffect(() => {
+    if (userName.trim() && projectType) {
+      const typeLabel = PROJECT_TYPE_CONFIG[projectType].title;
+      setWorkspaceName(`${userName.trim()} - ${typeLabel}`);
+    }
+  }, [userName, projectType]);
+
+  // Reset subtype when type changes
+  useEffect(() => {
+    setProjectSubtype(null);
+    setUserRoles([]);
+    setBusinessDescription("");
+    setSelectedNeeds([]);
+  }, [projectType]);
+
+  // Hide validation when user interacts
+  useEffect(() => {
+    setShowValidation(false);
+  }, [userName, userRoles, projectType, projectSubtype, agentName, personality]);
 
   function toggleNeed(id: string) {
     setNeedsError(false);
     setSelectedNeeds((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id],
+      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
     );
   }
 
+  // V3 uses 3 steps, legacy uses 4
+  const totalSteps = USE_ONBOARDING_V3 ? 3 : 4;
+
   function canAdvance(): boolean {
-    switch (step) {
-      case 1:
-        return (
-          workspaceName.trim().length > 0 &&
-          userName.trim().length > 0 &&
-          userRole.length > 0 &&
-          businessDescription.trim().length > 0
-        );
-      case 2:
-        return selectedNeeds.length > 0;
-      case 3:
-        return agentName.trim().length > 0;
-      case 4:
-        return true;
-      default:
-        return false;
+    if (USE_ONBOARDING_V3) {
+      switch (step) {
+        case 1:
+          return Boolean(userName.trim() && userRoles.length > 0 && projectType && projectSubtype);
+        case 2:
+          return Boolean(agentName.trim() && personality);
+        case 3:
+          return true;
+        default:
+          return false;
+      }
+    } else {
+      switch (step) {
+        case 1:
+          return (
+            workspaceName.trim().length > 0 &&
+            userName.trim().length > 0 &&
+            userRoles.length > 0 &&
+            businessDescription.trim().length > 0
+          );
+        case 2:
+          return selectedNeeds.length > 0;
+        case 3:
+          return agentName.trim().length > 0;
+        case 4:
+          return true;
+        default:
+          return false;
+      }
     }
   }
 
   function handleNext() {
-    if (step === 2 && selectedNeeds.length === 0) {
+    if (!canAdvance()) {
+      setShowValidation(true);
+      return;
+    }
+    if (step === 2 && !USE_ONBOARDING_V3 && selectedNeeds.length === 0) {
       setNeedsError(true);
       return;
     }
-    if (step < 4) setStep((step + 1) as Step);
+    setShowValidation(false);
+    if (step < totalSteps) setStep((step + 1) as Step);
   }
 
   function handleBack() {
+    setShowValidation(false);
     if (step > 1) setStep((step - 1) as Step);
   }
 
@@ -103,20 +168,48 @@ export default function OnboardingWizard() {
     setIsProvisioning(true);
 
     try {
+      let ws: Workspace;
+
       // 1. Create workspace
-      const ws = await createWorkspace.mutateAsync(workspaceName.trim());
+      try {
+        ws = await createWorkspace.mutateAsync(workspaceName.trim());
+      } catch (createErr) {
+        const createMsg = createErr instanceof Error ? createErr.message : "";
+        if (createMsg.includes("WORKSPACE_LIMIT")) {
+          const token = await getToken();
+          const workspaces = await apiFetch<Workspace[]>("/api/workspaces", { token });
+          if (!workspaces || workspaces.length === 0) throw createErr;
+          ws = workspaces[0];
+        } else {
+          throw createErr;
+        }
+      }
+
       setProvisionSlug(ws.slug);
 
-      // 2. Provision agent
-      const result = await provision.mutateAsync({
-        workspaceId: ws.id,
-        userName: userName.trim(),
-        agentName: agentName.trim(),
-        personality,
-        needs: selectedNeeds,
-        userRole,
-        businessDescription: businessDescription.trim(),
-      });
+      // 2. Provision agent with V3 fields
+      let result: { agent: { id: number; openclawId: string; name: string }; conversationId: number };
+      try {
+        result = await provision.mutateAsync({
+          workspaceId: ws.id,
+          userName: userName.trim(),
+          agentName: agentName.trim(),
+          personality: personality || "friendly",
+          needs: selectedNeeds.length > 0 ? selectedNeeds : undefined,
+          userRole: userRoles.length > 0 ? userRoles.join(",") : undefined,
+          businessDescription: businessDescription.trim() || undefined,
+          // V3 fields
+          projectType: projectType || undefined,
+          projectSubtype: projectSubtype || undefined,
+        });
+      } catch (provisionErr) {
+        const provisionMsg = provisionErr instanceof Error ? provisionErr.message : "";
+        if (provisionMsg.includes("already has an agent")) {
+          navigate(`/studio/${ws.slug}`);
+          return;
+        }
+        throw provisionErr;
+      }
 
       // 3. Navigate to chat
       navigate(`/studio/${ws.slug}/chat/${result.conversationId}`);
@@ -137,7 +230,7 @@ export default function OnboardingWizard() {
     <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-2xl flex-col px-4 py-12">
       {/* Progress indicator */}
       <div className="mb-8 flex items-center justify-center gap-2">
-        {[1, 2, 3, 4].map((s) => (
+        {Array.from({ length: totalSteps }, (_, i) => i + 1).map((s) => (
           <div
             key={s}
             className={`h-2 w-12 rounded-full transition-colors ${
@@ -146,52 +239,98 @@ export default function OnboardingWizard() {
           />
         ))}
         <span className="ml-3 text-xs text-[hsl(var(--muted-foreground))]">
-          {onboarding.step} {step} {onboarding.of} 4
+          {onboarding.step} {step} {onboarding.of} {totalSteps}
         </span>
       </div>
 
       {/* Step content */}
       <div className="flex-1">
-        {step === 1 && (
-          <StepWorkspace
-            workspaceName={workspaceName}
-            setWorkspaceName={setWorkspaceName}
-            userName={userName}
-            setUserName={setUserName}
-            userRole={userRole}
-            setUserRole={setUserRole}
-            businessDescription={businessDescription}
-            setBusinessDescription={setBusinessDescription}
-          />
-        )}
-        {step === 2 && (
-          <StepNeeds
-            selected={selectedNeeds}
-            onToggle={toggleNeed}
-            error={needsError}
-          />
-        )}
-        {step === 3 && (
-          <StepAgent
-            agentName={agentName}
-            setAgentName={setAgentName}
-            personality={personality}
-            setPersonality={setPersonality}
-          />
-        )}
-        {step === 4 && (
-          <StepReview
-            workspaceName={workspaceName}
-            userName={userName}
-            userRole={userRole}
-            businessDescription={businessDescription}
-            selectedNeeds={selectedNeeds}
-            agentName={agentName}
-            personality={personality}
-            isProvisioning={isProvisioning}
-            error={provisionError}
-            onLaunch={handleLaunch}
-          />
+        {USE_ONBOARDING_V3 ? (
+          <>
+            {step === 1 && (
+              <StepContextV3
+                userName={userName}
+                setUserName={setUserName}
+                projectType={projectType}
+                setProjectType={setProjectType}
+                projectSubtype={projectSubtype}
+                setProjectSubtype={setProjectSubtype}
+                userRoles={userRoles}
+                setUserRoles={setUserRoles}
+                showValidation={showValidation}
+              />
+            )}
+            {step === 2 && (
+              <StepAgent
+                agentName={agentName}
+                setAgentName={setAgentName}
+                personality={personality}
+                setPersonality={setPersonality}
+                showValidation={showValidation}
+              />
+            )}
+            {step === 3 && (
+              <StepReviewV3
+                userName={userName}
+                projectType={projectType}
+                projectSubtype={projectSubtype}
+                userRoles={userRoles}
+                businessDescription={businessDescription}
+                workspaceName={workspaceName}
+                setWorkspaceName={setWorkspaceName}
+                agentName={agentName}
+                personality={personality || "friendly"}
+                isProvisioning={isProvisioning}
+                error={provisionError}
+                onLaunch={handleLaunch}
+              />
+            )}
+          </>
+        ) : (
+          <>
+            {step === 1 && (
+              <StepWorkspaceLegacy
+                workspaceName={workspaceName}
+                setWorkspaceName={setWorkspaceName}
+                userName={userName}
+                setUserName={setUserName}
+                userRoles={userRoles}
+                setUserRoles={setUserRoles}
+                businessDescription={businessDescription}
+                setBusinessDescription={setBusinessDescription}
+              />
+            )}
+            {step === 2 && (
+              <StepNeeds
+                selected={selectedNeeds}
+                onToggle={toggleNeed}
+                error={needsError}
+              />
+            )}
+            {step === 3 && (
+              <StepAgent
+                agentName={agentName}
+                setAgentName={setAgentName}
+                personality={personality}
+                setPersonality={setPersonality}
+                showValidation={false}
+              />
+            )}
+            {step === 4 && (
+              <StepReviewLegacy
+                workspaceName={workspaceName}
+                userName={userName}
+                userRoles={userRoles}
+                businessDescription={businessDescription}
+                selectedNeeds={selectedNeeds}
+                agentName={agentName}
+                personality={personality || "friendly"}
+                isProvisioning={isProvisioning}
+                error={provisionError}
+                onLaunch={handleLaunch}
+              />
+            )}
+          </>
         )}
       </div>
 
@@ -199,22 +338,21 @@ export default function OnboardingWizard() {
       <div className="mt-8 flex items-center justify-between">
         <button
           onClick={handleBack}
-          disabled={step === 1}
+          disabled={step === 1 || isProvisioning}
           className="rounded-md px-4 py-2 text-sm font-medium text-[hsl(var(--muted-foreground))] transition-colors hover:text-[hsl(var(--foreground))] disabled:invisible"
         >
           {onboarding.back}
         </button>
 
-        {step < 4 ? (
+        {/* Always clickable Next - shows validation on click */}
+        {step < totalSteps ? (
           <button
             onClick={handleNext}
-            disabled={!canAdvance()}
-            className="rounded-md bg-magenta px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-magenta/90 disabled:opacity-50"
+            className="rounded-md bg-magenta px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-magenta/90"
           >
             {onboarding.next}
           </button>
         ) : (
-          /* Step 4 has its own launch button inside StepReview */
           <div />
         )}
       </div>
@@ -222,15 +360,427 @@ export default function OnboardingWizard() {
   );
 }
 
-/* ── Step 1: Workspace + User Name ─────────────────────────── */
+/* ── V3 Step 1: Context + Profile ─────────────────────────── */
 
-function StepWorkspace({
+function StepContextV3({
+  userName,
+  setUserName,
+  projectType,
+  setProjectType,
+  projectSubtype,
+  setProjectSubtype,
+  userRoles,
+  setUserRoles,
+  showValidation,
+}: {
+  userName: string;
+  setUserName: (v: string) => void;
+  projectType: ProjectType | null;
+  setProjectType: (v: ProjectType) => void;
+  projectSubtype: ProjectSubtype | null;
+  setProjectSubtype: (v: ProjectSubtype) => void;
+  userRoles: string[];
+  setUserRoles: (v: string[]) => void;
+  showValidation: boolean;
+}) {
+  const subtypes = projectType ? PROJECT_SUBTYPES_BY_TYPE[projectType] : [];
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-semibold text-[hsl(var(--foreground))]">
+        Cuéntanos sobre ti
+      </h2>
+
+      {/* User name */}
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
+          ¿Cómo te llamas? <span className="text-magenta">*</span>
+        </label>
+        <input
+          type="text"
+          value={userName}
+          onChange={(e) => setUserName(e.target.value)}
+          placeholder="Tu nombre"
+          className={`w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus:ring-2 focus:ring-magenta/20 ${
+            showValidation && !userName.trim()
+              ? "border-[hsl(var(--destructive))] focus:border-[hsl(var(--destructive))]"
+              : "border-[hsl(var(--input))] focus:border-magenta"
+          }`}
+          autoFocus
+        />
+        {showValidation && !userName.trim() && (
+          <p className="mt-1 text-xs text-[hsl(var(--destructive))]">Ingresa tu nombre</p>
+        )}
+      </div>
+
+      {/* User role */}
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
+          ¿A qué te dedicas? <span className="text-magenta">*</span>
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {ROLE_IDS.map((id) => {
+            const label = onboarding.roles[id];
+            if (!label) return null;
+            const isSelected = userRoles.includes(id);
+            const isDisabled = !isSelected && userRoles.length >= MAX_ROLES;
+            return (
+              <button
+                key={id}
+                type="button"
+                disabled={isDisabled}
+                onClick={() => {
+                  if (isSelected) {
+                    setUserRoles(userRoles.filter(r => r !== id));
+                  } else if (userRoles.length < MAX_ROLES) {
+                    setUserRoles([...userRoles, id]);
+                  }
+                }}
+                className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                  isSelected
+                    ? "border-magenta bg-magenta/10 text-[hsl(var(--foreground))]"
+                    : isDisabled
+                    ? "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] opacity-40 cursor-not-allowed"
+                    : showValidation && userRoles.length === 0
+                    ? "border-[hsl(var(--destructive))]/50 bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] hover:border-white/20"
+                    : "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] hover:border-white/20"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        {userRoles.length >= MAX_ROLES && (
+          <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Máximo {MAX_ROLES} roles</p>
+        )}
+        {showValidation && userRoles.length === 0 && (
+          <p className="mt-1 text-xs text-[hsl(var(--destructive))]">Selecciona al menos una opción</p>
+        )}
+      </div>
+
+      {/* Project type */}
+      <div>
+        <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
+          ¿Cómo vas a usar Godínez? <span className="text-magenta">*</span>
+        </label>
+        <div className="grid grid-cols-3 gap-3">
+          {PROJECT_TYPES.map((type) => {
+            const config = PROJECT_TYPE_CONFIG[type];
+            const isSelected = projectType === type;
+            return (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setProjectType(type)}
+                className={`relative flex flex-col items-center rounded-lg border p-4 text-center transition-all ${
+                  isSelected
+                    ? "border-magenta bg-magenta/10"
+                    : showValidation && !projectType
+                    ? "border-[hsl(var(--destructive))]/50 bg-[hsl(var(--card))] hover:border-white/20"
+                    : "border-white/10 bg-[hsl(var(--card))] hover:border-white/20"
+                }`}
+              >
+                <ProjectTypeIcon typeId={type} className="w-8 h-8 text-white" />
+                <span className="mt-2 text-sm font-medium text-[hsl(var(--foreground))]">
+                  {config.title}
+                </span>
+                <span className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
+                  {config.description}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {showValidation && !projectType && (
+          <p className="mt-2 text-xs text-[hsl(var(--destructive))]">Selecciona una opción</p>
+        )}
+      </div>
+
+      {/* Project subtype (appears after selecting type) */}
+      {projectType && subtypes.length > 0 && (
+        <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+          <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
+            ¿Por dónde empezamos? <span className="text-magenta">*</span>
+          </label>
+          <div className={`grid gap-3 ${subtypes.length > 3 ? 'grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 sm:grid-cols-' + subtypes.length}`}>
+            {subtypes.map((subtype) => {
+              const config = PROJECT_SUBTYPE_CONFIG[subtype];
+              if (!config) return null;
+              const isSelected = projectSubtype === subtype;
+              return (
+                <button
+                  key={subtype}
+                  type="button"
+                  onClick={() => setProjectSubtype(subtype as ProjectSubtype)}
+                  className={`flex flex-col items-start rounded-lg border p-3 text-left transition-all ${
+                    isSelected
+                      ? "border-magenta bg-magenta/10"
+                      : showValidation && !projectSubtype
+                      ? "border-[hsl(var(--destructive))]/50 bg-[hsl(var(--card))] hover:border-white/20"
+                      : "border-white/10 bg-[hsl(var(--card))] hover:border-white/20"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <ProjectSubtypeIcon subtypeId={subtype} className="w-5 h-5 text-white" />
+                    <span className="text-sm font-medium text-[hsl(var(--foreground))]">
+                      {config.title}
+                    </span>
+                  </div>
+                  <span className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">
+                    {config.description}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {showValidation && !projectSubtype && (
+            <p className="mt-2 text-xs text-[hsl(var(--destructive))]">Selecciona una opción</p>
+          )}
+        </div>
+      )}
+
+      {/* Role selector (only for profesional) */}
+      {projectType === "profesional" && projectSubtype && (
+        <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+          <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
+            ¿Cuál es tu rol?
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {ROLE_IDS.map((id) => {
+              const label = onboarding.roles[id];
+              if (!label) return null;
+              const isSelected = userRoles.includes(id);
+              const isDisabled = !isSelected && userRoles.length >= MAX_ROLES;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  disabled={isDisabled}
+                  onClick={() => {
+                    if (isSelected) {
+                      setUserRoles(userRoles.filter(r => r !== id));
+                    } else if (userRoles.length < MAX_ROLES) {
+                      setUserRoles([...userRoles, id]);
+                    }
+                  }}
+                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
+                    isSelected
+                      ? "border-magenta bg-magenta/10 text-[hsl(var(--foreground))]"
+                      : isDisabled
+                      ? "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] opacity-40 cursor-not-allowed"
+                      : "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] hover:border-white/20"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+          {userRoles.length >= MAX_ROLES && (
+            <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Máximo {MAX_ROLES} roles</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── V3 Step 3: Review + Launch ────────────────────────────── */
+
+function StepReviewV3({
+  userName,
+  projectType,
+  projectSubtype,
+  userRoles,
+  businessDescription,
+  workspaceName,
+  setWorkspaceName,
+  agentName,
+  personality,
+  isProvisioning,
+  error,
+  onLaunch,
+}: {
+  userName: string;
+  projectType: ProjectType | null;
+  projectSubtype: ProjectSubtype | null;
+  userRoles: string[];
+  businessDescription: string;
+  workspaceName: string;
+  setWorkspaceName: (v: string) => void;
+  agentName: string;
+  personality: string;
+  isProvisioning: boolean;
+  error: string | null;
+  onLaunch: () => void;
+}) {
+  const personalityLabel = onboarding.personalities[personality]?.title || personality;
+  const typeLabel = projectType ? PROJECT_TYPE_CONFIG[projectType].title : "";
+  const subtypeLabel = projectSubtype ? PROJECT_SUBTYPE_CONFIG[projectSubtype]?.title : "";
+  const roleLabels = userRoles.map(r => onboarding.roles[r]).filter(Boolean).join(", ");
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-semibold text-[hsl(var(--foreground))]">
+        Todo listo
+      </h2>
+
+      {/* Tip informativo */}
+      <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4">
+        <p className="text-sm text-[hsl(var(--muted-foreground))]">
+          <span className="mr-2">💡</span>
+          <span className="font-medium text-[hsl(var(--foreground))]">Tip:</span>{" "}
+          {projectType === "educacion" 
+            ? "Cuando actives un modo específico (bootcamp, curso), tu agente se adaptará automáticamente con deadline y prioridades."
+            : "Cuando actives un modo específico (hackathon, proyecto), tu agente se adaptará automáticamente con deadline y prioridades."
+          }
+        </p>
+      </div>
+
+      <div className="space-y-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5">
+        <ReviewRow label="Tu nombre" value={userName} />
+        <ReviewRow label="Te dedicas a" value={roleLabels} />
+        <ReviewRow label="Contexto" value={`${typeLabel} → ${subtypeLabel}`} />
+        {businessDescription && <ReviewRow label="Tu negocio" value={businessDescription} />}
+        <ReviewRow label="Tu agente" value={agentName} />
+        <ReviewRow label="Personalidad" value={personalityLabel} />
+        
+        {/* Editable workspace name */}
+        <div className="flex items-baseline justify-between gap-4 pt-2 border-t border-[hsl(var(--border))]">
+          <span className="text-sm text-[hsl(var(--muted-foreground))]">
+            Nombre del workspace
+          </span>
+          <input
+            type="text"
+            value={workspaceName}
+            onChange={(e) => setWorkspaceName(e.target.value)}
+            className="text-right text-sm font-medium text-[hsl(var(--foreground))] bg-transparent border-b border-dashed border-[hsl(var(--muted-foreground))] focus:outline-none focus:border-magenta"
+          />
+        </div>
+      </div>
+
+      <div className="text-center">
+        <button
+          onClick={onLaunch}
+          disabled={isProvisioning}
+          className="inline-flex items-center justify-center gap-2 rounded-md bg-magenta px-8 py-3 text-base font-semibold text-white transition-colors hover:bg-magenta/90 disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          {isProvisioning ? (
+            <>
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              {onboarding.launching}
+            </>
+          ) : (
+            onboarding.launchCta
+          )}
+        </button>
+
+        <div className="mt-4 min-h-[1.25rem]">
+          {error && (
+            <p className="text-sm text-[hsl(var(--destructive))]">{error}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Shared: Step 2 Agent ──────────────────────────────────── */
+
+function StepAgent({
+  agentName,
+  setAgentName,
+  personality,
+  setPersonality,
+  showValidation,
+}: {
+  agentName: string;
+  setAgentName: (v: string) => void;
+  personality: string | null;
+  setPersonality: (v: string) => void;
+  showValidation: boolean;
+}) {
+  return (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-semibold text-[hsl(var(--foreground))]">
+        {onboarding.step3Title}
+      </h2>
+
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
+          {onboarding.agentNameLabel} <span className="text-magenta">*</span>
+        </label>
+        <input
+          type="text"
+          value={agentName}
+          onChange={(e) => setAgentName(e.target.value)}
+          placeholder={onboarding.agentNamePlaceholder}
+          maxLength={50}
+          className={`w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus:ring-2 focus:ring-magenta/20 ${
+            showValidation && !agentName.trim()
+              ? "border-[hsl(var(--destructive))] focus:border-[hsl(var(--destructive))]"
+              : "border-[hsl(var(--input))] focus:border-magenta"
+          }`}
+          autoFocus
+        />
+        {showValidation && !agentName.trim() && (
+          <p className="mt-1 text-xs text-[hsl(var(--destructive))]">Ingresa un nombre para tu agente</p>
+        )}
+      </div>
+
+      <div>
+        <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
+          {onboarding.personalityLabel} <span className="text-magenta">*</span>
+        </label>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {PERSONALITY_IDS.map((id) => {
+            const p = onboarding.personalities[id];
+            if (!p) return null;
+            const isSelected = personality === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setPersonality(id)}
+                className={`flex flex-col rounded-lg border p-3 text-left transition-all ${
+                  isSelected
+                    ? "border-magenta bg-magenta/10"
+                    : showValidation && !personality
+                    ? "border-[hsl(var(--destructive))]/50 bg-[hsl(var(--card))] hover:border-white/20"
+                    : "border-white/10 bg-[hsl(var(--card))] hover:border-white/20"
+                }`}
+              >
+                <span className="text-sm font-medium text-[hsl(var(--foreground))]">
+                  {p.title}
+                </span>
+                <span className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
+                  {p.description}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {showValidation && !personality && (
+          <p className="mt-2 text-xs text-[hsl(var(--destructive))]">Selecciona una personalidad</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Legacy Components ─────────────────────────────────────── */
+
+function StepWorkspaceLegacy({
   workspaceName,
   setWorkspaceName,
   userName,
   setUserName,
-  userRole,
-  setUserRole,
+  userRoles,
+  setUserRoles,
   businessDescription,
   setBusinessDescription,
 }: {
@@ -238,8 +788,8 @@ function StepWorkspace({
   setWorkspaceName: (v: string) => void;
   userName: string;
   setUserName: (v: string) => void;
-  userRole: string;
-  setUserRole: (v: string) => void;
+  userRoles: string[];
+  setUserRoles: (v: string[]) => void;
   businessDescription: string;
   setBusinessDescription: (v: string) => void;
 }) {
@@ -285,15 +835,25 @@ function StepWorkspace({
             {ROLE_IDS.map((id) => {
               const label = onboarding.roles[id];
               if (!label) return null;
-              const isSelected = userRole === id;
+              const isSelected = userRoles.includes(id);
+              const isDisabled = !isSelected && userRoles.length >= MAX_ROLES;
               return (
                 <button
                   key={id}
                   type="button"
-                  onClick={() => setUserRole(id)}
+                  disabled={isDisabled}
+                  onClick={() => {
+                    if (isSelected) {
+                      setUserRoles(userRoles.filter(r => r !== id));
+                    } else if (userRoles.length < MAX_ROLES) {
+                      setUserRoles([...userRoles, id]);
+                    }
+                  }}
                   className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-all ${
                     isSelected
                       ? "border-magenta bg-magenta/10 text-[hsl(var(--foreground))]"
+                      : isDisabled
+                      ? "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] opacity-40 cursor-not-allowed"
                       : "border-[hsl(var(--input))] bg-[hsl(var(--background))] text-[hsl(var(--muted-foreground))] hover:border-white/20"
                   }`}
                 >
@@ -302,6 +862,9 @@ function StepWorkspace({
               );
             })}
           </div>
+          {userRoles.length >= MAX_ROLES && (
+            <p className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">Máximo {MAX_ROLES} roles</p>
+          )}
         </div>
 
         <div>
@@ -321,8 +884,6 @@ function StepWorkspace({
     </div>
   );
 }
-
-/* ── Step 2: Needs Selection ───────────────────────────────── */
 
 function StepNeeds({
   selected,
@@ -386,81 +947,10 @@ function StepNeeds({
   );
 }
 
-/* ── Step 3: Agent Personalization ─────────────────────────── */
-
-function StepAgent({
-  agentName,
-  setAgentName,
-  personality,
-  setPersonality,
-}: {
-  agentName: string;
-  setAgentName: (v: string) => void;
-  personality: string;
-  setPersonality: (v: string) => void;
-}) {
-  return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-semibold text-[hsl(var(--foreground))]">
-        {onboarding.step3Title}
-      </h2>
-
-      <div>
-        <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
-          {onboarding.agentNameLabel}
-        </label>
-        <input
-          type="text"
-          value={agentName}
-          onChange={(e) => setAgentName(e.target.value)}
-          placeholder={onboarding.agentNamePlaceholder}
-          maxLength={50}
-          className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
-          autoFocus
-        />
-      </div>
-
-      <div>
-        <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
-          {onboarding.personalityLabel}
-        </label>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {PERSONALITY_IDS.map((id) => {
-            const p = onboarding.personalities[id];
-            if (!p) return null;
-            const isSelected = personality === id;
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setPersonality(id)}
-                className={`flex flex-col rounded-lg border p-3 text-left transition-all ${
-                  isSelected
-                    ? "border-magenta bg-magenta/10"
-                    : "border-white/10 bg-[hsl(var(--card))] hover:border-white/20"
-                }`}
-              >
-                <span className="text-sm font-medium text-[hsl(var(--foreground))]">
-                  {p.title}
-                </span>
-                <span className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
-                  {p.description}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Step 4: Review + Launch ───────────────────────────────── */
-
-function StepReview({
+function StepReviewLegacy({
   workspaceName,
   userName,
-  userRole,
+  userRoles,
   businessDescription,
   selectedNeeds,
   agentName,
@@ -471,7 +961,7 @@ function StepReview({
 }: {
   workspaceName: string;
   userName: string;
-  userRole: string;
+  userRoles: string[];
   businessDescription: string;
   selectedNeeds: string[];
   agentName: string;
@@ -480,12 +970,9 @@ function StepReview({
   error: string | null;
   onLaunch: () => void;
 }) {
-  const personalityLabel =
-    onboarding.personalities[personality]?.title || personality;
-  const roleLabel = onboarding.roles[userRole] || userRole;
-  const needLabels = selectedNeeds
-    .map((id) => onboarding.needs[id]?.title)
-    .filter(Boolean);
+  const personalityLabel = onboarding.personalities[personality]?.title || personality;
+  const roleLabels = userRoles.map(r => onboarding.roles[r]).filter(Boolean).join(", ");
+  const needLabels = selectedNeeds.map((id) => onboarding.needs[id]?.title).filter(Boolean);
 
   return (
     <div className="space-y-6">
@@ -496,7 +983,7 @@ function StepReview({
       <div className="space-y-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-5">
         <ReviewRow label={onboarding.reviewWorkspace} value={workspaceName} />
         <ReviewRow label={onboarding.reviewUser} value={userName} />
-        <ReviewRow label={onboarding.reviewRole} value={roleLabel} />
+        <ReviewRow label={onboarding.reviewRole} value={roleLabels} />
         <ReviewRow label={onboarding.reviewBusiness} value={businessDescription} />
         <ReviewRow label={onboarding.reviewNeeds} value={needLabels.join(", ")} />
         <ReviewRow label={onboarding.reviewAgent} value={agentName} />
@@ -507,28 +994,13 @@ function StepReview({
         <button
           onClick={onLaunch}
           disabled={isProvisioning}
-          className="inline-flex items-center justify-center gap-2 rounded-md bg-magenta px-8 py-3 text-base font-semibold text-white transition-colors hover:bg-magenta/90 disabled:opacity-50"
+          className="inline-flex items-center justify-center gap-2 rounded-md bg-magenta px-8 py-3 text-base font-semibold text-white transition-colors hover:bg-magenta/90 disabled:cursor-not-allowed disabled:opacity-70"
         >
           {isProvisioning ? (
             <>
-              <svg
-                className="h-4 w-4 animate-spin"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                />
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
               </svg>
               {onboarding.launching}
             </>
@@ -537,9 +1009,11 @@ function StepReview({
           )}
         </button>
 
-        {error && (
-          <p className="mt-4 text-sm text-[hsl(var(--destructive))]">{error}</p>
-        )}
+        <div className="mt-4 min-h-[1.25rem]">
+          {error && (
+            <p className="text-sm text-[hsl(var(--destructive))]">{error}</p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -548,12 +1022,8 @@ function StepReview({
 function ReviewRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
-      <span className="text-sm text-[hsl(var(--muted-foreground))]">
-        {label}
-      </span>
-      <span className="text-right text-sm font-medium text-[hsl(var(--foreground))]">
-        {value}
-      </span>
+      <span className="text-sm text-[hsl(var(--muted-foreground))]">{label}</span>
+      <span className="text-right text-sm font-medium text-[hsl(var(--foreground))]">{value}</span>
     </div>
   );
 }

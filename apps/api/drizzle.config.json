@@ -1,0 +1,8 @@
+{
+  "schema": "../../packages/db/src/schema/*",
+  "out": "./drizzle",
+  "dialect": "postgresql",
+  "dbCredentials": {
+    "url": "postgresql://godinez:godinez123@localhost:5432/godinez_studio"
+  }
+}

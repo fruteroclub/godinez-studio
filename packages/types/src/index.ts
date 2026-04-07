@@ -27,7 +27,7 @@ export type MessageRole = "user" | "agent" | "system";
 export type LogLevel = "debug" | "info" | "warn" | "error";
 
 // Action cards — agent-proposed resource CRUD
-export type ActionType = "create_project" | "create_task" | "create_file";
+export type ActionType = "create_project" | "create_task" | "create_file" | "hackathon_advance" | "hackathon_note";
 export type ActionStatus = "pending" | "executing" | "completed" | "error";
 
 export interface CreateProjectPayload {
@@ -90,6 +90,8 @@ export interface Workspace {
   status: WorkspaceStatus;
   agentSlot: string | null;
   createdAt: string;
+  isHackathon: boolean;
+  hackathonId: number | null;
   updatedAt: string;
 }
 
@@ -100,6 +102,8 @@ export interface Project {
   description: string | null;
   status: ProjectStatus;
   createdAt: string;
+  isHackathon: boolean;
+  hackathonId: number | null;
   updatedAt: string;
 }
 
@@ -116,6 +120,8 @@ export interface Task {
   dueAt: string | null;
   completedAt: string | null;
   createdAt: string;
+  isHackathon: boolean;
+  hackathonId: number | null;
   updatedAt: string;
 }
 
@@ -131,7 +137,10 @@ export interface FileRecord {
   uploadedByUserId: number | null;
   uploadedByAgentId: number | null;
   messageId: number | null;
+  conversationId: number | null;
   createdAt: string;
+  isHackathon: boolean;
+  hackathonId: number | null;
 }
 
 export interface Conversation {
@@ -143,6 +152,9 @@ export interface Conversation {
   channel: string;
   lastMessageAt: string | null;
   createdAt: string;
+  isHackathon: boolean;
+  hackathonId: number | null;
+  isStarred: boolean;
 }
 
 export interface Message {
@@ -156,6 +168,8 @@ export interface Message {
   metadata: string | null;
   fileId: number | null;
   createdAt: string;
+  isHackathon: boolean;
+  hackathonId: number | null;
 }
 
 export interface Agent {
@@ -167,6 +181,8 @@ export interface Agent {
   config: AgentConfig | null;
   openclawId: string | null;
   createdAt: string;
+  isHackathon: boolean;
+  hackathonId: number | null;
   updatedAt: string;
 }
 
@@ -176,6 +192,8 @@ export interface WorkspaceMember {
   userId: number;
   role: MemberRole;
   createdAt: string;
+  isHackathon: boolean;
+  hackathonId: number | null;
 }
 
 // Chat streaming events
@@ -274,6 +292,15 @@ export interface AdminInstanceHealth extends AdminInstanceRow {
   }[];
 }
 
+export interface AdminUserRow {
+  id: number; email: string; name: string | null; role: UserRole;
+  jobRole: string | null; createdAt: string;
+  workspaceName: string | null; workspaceStatus: string | null;
+  agentName: string | null; agentStatus: string | null;
+  totalMessages: number; lastMessageAt: string | null;
+  avgMessagesPerDay: number;
+}
+
 export interface AdminGrowthPoint {
   date: string; newUsers: number; newWorkspaces: number;
   newConversations: number; messagesSent: number;
@@ -286,3 +313,21 @@ export interface CurrentUser {
 export { studioContent } from "./content";
 export { TIER_LIMITS, getTierLimits, TIER_INSTANCE_MAP, getInstanceTier } from "./quotas";
 export type { TierLimits } from "./quotas";
+
+// Onboarding V3: Project classification
+export const PROJECT_TYPES = ["educacion", "profesional", "personal"] as const;
+export type ProjectType = (typeof PROJECT_TYPES)[number];
+
+export const PROJECT_SUBTYPES_BY_TYPE = {
+  educacion: ["bootcamp", "aprender"],
+  personal: ["hackathon", "emprendimiento", "proyecto"],
+  profesional: ["crear_contenido", "automatizar", "construir", "investigar", "vender", "organizar"],
+} as const;
+
+export const PROJECT_SUBTYPES = [
+  "bootcamp", "aprender",
+  "hackathon", "emprendimiento", "proyecto",
+  "crear_contenido", "automatizar", "construir",
+  "investigar", "vender", "organizar",
+] as const;
+export type ProjectSubtype = (typeof PROJECT_SUBTYPES)[number];

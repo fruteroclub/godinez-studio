@@ -10,7 +10,9 @@ import {
   getAgentsList,
   getGrowthTimeSeries,
   getUsageByWorkspace,
+  getAdminUsersList,
 } from "../dal/admin";
+import { updateUserRole } from "../dal/users";
 import {
   getAllInstances,
   getInstanceById,
@@ -74,6 +76,22 @@ app.get("/usage", async (c) => {
   return c.json(result);
 });
 
+// --- Users ---
+
+app.get("/users", async (c) => {
+  const { limit, cursor } = paginationSchema.parse(c.req.query());
+  const result = await getAdminUsersList({ limit, cursor });
+  return c.json(result);
+});
+
+app.put("/users/:id/role", async (c) => {
+  const id = Number(c.req.param("id"));
+  const { role } = z.object({ role: z.enum(["user", "admin"]) }).parse(await c.req.json());
+  const updated = await updateUserRole(id, role);
+  if (!updated) return c.json({ error: "User not found" }, 404);
+  return c.json(updated);
+});
+
 // --- Instance registry ---
 
 const createInstanceSchema = z.object({
@@ -81,7 +99,7 @@ const createInstanceSchema = z.object({
   url: z.string().url(),
   token: z.string().min(1),
   tier: z.enum(["shared", "dedicated"]).default("shared"),
-  maxSlots: z.number().int().min(1).default(15),
+  maxSlots: z.number().int().min(1).default(25),
   workspaceBase: z.string().min(1).default("/home/openclaw/.openclaw/workspaces"),
   region: z.string().max(20).optional(),
   customerId: z.number().int().positive().optional(),

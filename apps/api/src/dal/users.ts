@@ -16,11 +16,27 @@ export async function getUserById(id: number) {
 
 export async function updateUser(
   id: number,
-  data: { name?: string; jobRole?: string; businessDescription?: string },
+  data: {
+    name?: string;
+    jobRole?: string;
+    businessDescription?: string;
+    projectType?: string;       // Onboarding V3
+    projectSubtype?: string;    // Onboarding V3
+    deadline?: Date | null;     // Onboarding V3
+  },
 ) {
   const [updated] = await db
     .update(users)
     .set(data)
+    .where(eq(users.id, id))
+    .returning();
+  return updated;
+}
+
+export async function updateUserRole(id: number, role: "user" | "admin") {
+  const [updated] = await db
+    .update(users)
+    .set({ role })
     .where(eq(users.id, id))
     .returning();
   return updated;

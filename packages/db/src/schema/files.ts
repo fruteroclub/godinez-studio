@@ -12,6 +12,7 @@ import { projects } from "./projects";
 import { users } from "./users";
 import { agents } from "./agents";
 import { messages } from "./messages";
+import { conversations } from "./conversations";
 
 export const files = pgTable(
   "files",
@@ -21,6 +22,7 @@ export const files = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
     projectId: integer("project_id").references(() => projects.id, { onDelete: "set null" }),
+    conversationId: integer("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
     storageKey: text("storage_key").notNull(),
     url: text("url").notNull(),
     filename: varchar("filename", { length: 255 }).notNull(),
@@ -37,5 +39,6 @@ export const files = pgTable(
   },
   (t) => [
     index("files_workspace_id_idx").on(t.workspaceId),
+    index("files_conversation_id_idx").on(t.conversationId),
   ],
 );

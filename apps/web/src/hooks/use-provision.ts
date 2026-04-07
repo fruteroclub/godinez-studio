@@ -15,6 +15,9 @@ interface ProvisionInput {
   needs?: string[];
   userRole?: string;
   businessDescription?: string;
+  // Onboarding V3 fields
+  projectType?: string;
+  projectSubtype?: string;
 }
 
 export function useProvision(workspaceSlug: string) {

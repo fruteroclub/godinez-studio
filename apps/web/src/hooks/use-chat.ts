@@ -2,9 +2,16 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import type { ActionCard } from "@godinez/types";
 import { apiFetch } from "@/lib/api";
-import { connectSSE } from "@/lib/sse";
+import { connectSSE, type SSEStatusInfo } from "@/lib/sse";
 import { parseActionBlocks } from "@/lib/action-parser";
 import { trackEvent } from "@/lib/posthog";
+
+export interface ChatAttachment {
+  fileId: number;
+  url: string;
+  mimeType: string;
+  filename: string;
+}
 
 export interface ChatMessage {
   id: number | string;
@@ -12,23 +19,37 @@ export interface ChatMessage {
   content: string;
   streaming?: boolean;
   actions?: ActionCard[];
+  attachments?: ChatAttachment[];
   createdAt?: string;
 }
 
-export type ConnectionStatus = "idle" | "connected" | "reconnecting" | "disconnected" | "timeout";
+export type ConnectionStatus = "idle" | "connected" | "reconnecting" | "disconnected" | "timeout" | "unstable";
+
+export interface RetryInfo {
+  retryCount: number;
+  maxRetries: number;
+  startedAt: number;
+}
 
 export function useChat(
   conversationId: number,
   workspaceId: number,
-  options?: { onComplete?: () => void },
+  options?: { onComplete?: () => void; hackathonContext?: { name: string; deadline: string; currentPhase: number; phases: Array<{ number: number; status: string; notes: string[] }>; hackathonUrl?: string; resourcesUrl?: string; } | null },
 ) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [agentOffline, setAgentOffline] = useState(false);
+  const [subscriptionExpired, setSubscriptionExpired] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>("idle");
+  const [retryInfo, setRetryInfo] = useState<RetryInfo | null>(null);
   const { getToken } = useAuth();
   const sseCleanupRef = useRef<(() => void) | null>(null);
+  
+  // Tracking para detectar conexión inestable
+  const reconnectHistoryRef = useRef<number[]>([]);
+  const UNSTABLE_THRESHOLD = 3; // 3+ reconexiones en 5 minutos = inestable
+  const UNSTABLE_WINDOW_MS = 5 * 60 * 1000; // 5 minutos
 
   // Cleanup SSE on unmount
   useEffect(() => {
@@ -57,11 +78,15 @@ export function useChat(
           setMessages(
             data.messages.map((m) => {
               let actions: ActionCard[] | undefined;
+              let attachments: ChatAttachment[] | undefined;
               if (m.metadata) {
                 try {
                   const meta = JSON.parse(m.metadata);
                   if (Array.isArray(meta.actions)) {
                     actions = meta.actions;
+                  }
+                  if (Array.isArray(meta.attachments)) {
+                    attachments = meta.attachments;
                   }
                 } catch {
                   // invalid metadata JSON
@@ -72,6 +97,7 @@ export function useChat(
                 role: m.role,
                 content: m.content,
                 actions,
+                attachments,
                 createdAt: m.createdAt,
               };
             }),
@@ -106,17 +132,21 @@ export function useChat(
   );
 
   const sendMessage = useCallback(
-    async (content: string) => {
+    async (
+      content: string,
+      hackathonContext?: { name: string; deadline: string; currentPhase: number; phases: Array<{ number: number; status: string; notes: string[] }>; hackathonUrl?: string; resourcesUrl?: string; active?: boolean; timeRemaining?: string; } | null,
+      attachments?: ChatAttachment[],
+    ) => {
       const token = await getToken();
       const tempUserId = `temp-${Date.now()}`;
       const tempAgentId = `temp-agent-${Date.now()}`;
 
-      // Optimistic user message
+      // Optimistic user message (with attachments)
       setMessages((prev) => [
         ...prev,
-        { id: tempUserId, role: "user", content },
+        { id: tempUserId, role: "user", content, attachments },
       ]);
-      trackEvent("chat_message_sent", { conversationId, workspaceId });
+      trackEvent("chat_message_sent", { conversationId, workspaceId, hasAttachment: !!attachments?.length });
 
       // POST to send
       let runId: string;
@@ -126,7 +156,13 @@ export function useChat(
           "/api/chat/send",
           {
             method: "POST",
-            body: JSON.stringify({ conversationId, workspaceId, content }),
+            body: JSON.stringify({
+              conversationId,
+              workspaceId,
+              content,
+              attachments,
+              hackathonContext: hackathonContext || undefined,
+            }),
             token,
           },
         );
@@ -134,12 +170,30 @@ export function useChat(
         messageId = res.messageId;
         setAgentOffline(false);
       } catch (err) {
-        const msg = err instanceof Error ? err.message : "";
-        if (msg.includes("AGENT_OFFLINE") || msg.includes("GATEWAY_OFFLINE")) {
-          setAgentOffline(true);
-          // Remove the optimistic user message
+        const msg = err instanceof Error ? err.message : String(err);
+        // Check subscription status first
+        if (msg.includes("SUBSCRIPTION_REQUIRED")) {
+          setSubscriptionExpired(true);
           setMessages((prev) => prev.filter((m) => m.id !== tempUserId));
+          return;
         }
+        // Detectar cualquier error de conexión como offline
+        const isOffline =
+          msg.includes("AGENT_OFFLINE") ||
+          msg.includes("GATEWAY_OFFLINE") ||
+          msg.includes("fetch") ||
+          msg.includes("network") ||
+          msg.includes("Failed to fetch") ||
+          msg.includes("NetworkError") ||
+          msg.includes("ECONNREFUSED") ||
+          msg.includes("TypeError");
+
+        if (isOffline) {
+          setAgentOffline(true);
+          setConnectionStatus("timeout");
+        }
+        // Remove the optimistic user message
+        setMessages((prev) => prev.filter((m) => m.id !== tempUserId));
         return;
       }
 
@@ -180,13 +234,37 @@ export function useChat(
               ),
             );
           },
-          onDone: (text, agentMessageId, actions) => {
+          onDone: async (text, agentMessageId, actions) => {
+            // Ensure message is persisted — only send content if SSE didn't provide a messageId
+            let finalMessageId = agentMessageId;
+            try {
+              const persistRes = await apiFetch<{ persisted: boolean; messageId: number; alreadyExisted: boolean }>(
+                "/api/chat/persist-response",
+                {
+                  method: "POST",
+                  body: JSON.stringify({
+                    conversationId,
+                    workspaceId,
+                    content: text,
+                    ...(agentMessageId ? { messageId: agentMessageId } : {}),
+                    ...(actions?.length ? { actions } : {}),
+                  }),
+                  token,
+                },
+              );
+              if (persistRes.persisted) {
+                finalMessageId = persistRes.messageId;
+              }
+            } catch (err) {
+              console.error("[use-chat] Failed to confirm persistence:", err);
+            }
+
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === tempAgentId
                   ? {
                       ...m,
-                      id: agentMessageId ?? tempAgentId,
+                      id: finalMessageId ?? tempAgentId,
                       content: text,
                       streaming: false,
                       actions,
@@ -211,8 +289,44 @@ export function useChat(
             setConnectionStatus("disconnected");
             sseCleanupRef.current = null;
           },
-          onStatus: (status) => {
-            setConnectionStatus(status);
+          onStatus: (info: SSEStatusInfo) => {
+            // Detectar conexión inestable basado en historial de reconexiones
+            if (info.status === "reconnecting") {
+              const now = Date.now();
+              reconnectHistoryRef.current.push(now);
+              // Limpiar reconexiones viejas (fuera de la ventana de 5 min)
+              reconnectHistoryRef.current = reconnectHistoryRef.current.filter(
+                t => now - t < UNSTABLE_WINDOW_MS
+              );
+              // Si hay 3+ reconexiones en 5 min, marcar como inestable
+              if (reconnectHistoryRef.current.length >= UNSTABLE_THRESHOLD) {
+                setConnectionStatus("unstable");
+              } else {
+                setConnectionStatus("reconnecting");
+              }
+            } else if (info.status === "connected") {
+              // Si teníamos muchas reconexiones, mantener como inestable
+              const now = Date.now();
+              const recentReconnects = reconnectHistoryRef.current.filter(
+                t => now - t < UNSTABLE_WINDOW_MS
+              ).length;
+              if (recentReconnects >= UNSTABLE_THRESHOLD) {
+                setConnectionStatus("unstable");
+              } else {
+                setConnectionStatus("connected");
+              }
+            } else {
+              setConnectionStatus(info.status as ConnectionStatus);
+            }
+            if (info.status === "reconnecting" && info.retryCount != null && info.maxRetries != null) {
+              setRetryInfo((prev) => ({
+                retryCount: info.retryCount!,
+                maxRetries: info.maxRetries!,
+                startedAt: prev?.startedAt ?? Date.now(),
+              }));
+            } else if (info.status === "connected" || info.status === "error") {
+              setRetryInfo(null);
+            }
           },
           onTimeout: () => {
             setConnectionStatus("timeout");
@@ -221,8 +335,8 @@ export function useChat(
         token,
       );
     },
-    [conversationId, workspaceId, getToken],
+    [conversationId, workspaceId, getToken, options],
   );
 
-  return { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction, connectionStatus };
+  return { messages, sendMessage, isStreaming, isLoading, agentOffline, subscriptionExpired, updateAction, connectionStatus, retryInfo };
 }
