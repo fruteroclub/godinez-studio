@@ -51,3 +51,21 @@ export function useDeleteConversation(workspaceId: number) {
       qc.invalidateQueries({ queryKey: ["conversations", workspaceId] }),
   });
 }
+
+export function useUpdateConversation(workspaceId: number) {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { conversationId: number; title?: string; isStarred?: boolean }) => {
+      const token = await getToken();
+      const { conversationId, ...body } = data;
+      return apiFetch(`/api/conversations/${conversationId}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+        token,
+      });
+    },
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ["conversations", workspaceId] }),
+  });
+}

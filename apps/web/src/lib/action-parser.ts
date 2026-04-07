@@ -6,6 +6,8 @@ const VALID_TYPES = new Set<ActionType>([
   "create_project",
   "create_task",
   "create_file",
+  "hackathon_advance",
+  "hackathon_note",
 ]);
 
 /**
@@ -28,9 +30,27 @@ export function parseActionBlocks(text: string): ActionBlock[] {
 
 /**
  * Strip :::action and :::title blocks from text, leaving only prose for markdown rendering.
+ * Also strips partial blocks that are still being streamed.
  */
 export function stripActionBlocks(text: string): string {
-  return text.replace(ACTION_BLOCK_RE, "").replace(TITLE_BLOCK_RE, "").trim();
+  // First strip complete blocks
+  let result = text.replace(ACTION_BLOCK_RE, "").replace(TITLE_BLOCK_RE, "");
+  
+  // Then strip partial/incomplete action blocks (during streaming)
+  // Only match :::action that is NOT followed by a closing ::: 
+  // This finds :::action at the end that has no closing :::
+  const lastActionIdx = result.lastIndexOf(":::action");
+  if (lastActionIdx !== -1) {
+    const afterAction = result.slice(lastActionIdx);
+    // Check if there is a closing ::: after the :::action
+    const closingIdx = afterAction.indexOf(":::", 9); // 9 = length of ":::action"
+    if (closingIdx === -1) {
+      // No closing found, this is a partial block - remove it
+      result = result.slice(0, lastActionIdx);
+    }
+  }
+  
+  return result.trim();
 }
 
 function parseBlockBody(body: string): ActionBlock | null {

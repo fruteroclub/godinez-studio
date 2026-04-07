@@ -17,5 +17,9 @@
     "turbo": "^2.4.0",
     "typescript": "^5.7.0"
   },
-  "packageManager": "pnpm@9.15.0"
+  "packageManager": "pnpm@9.15.0",
+  "dependencies": {
+    "convex": "^1.32.0",
+    "recharts": "^3.7.0"
+  }
 }

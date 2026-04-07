@@ -11,8 +11,15 @@ import { files } from "./files";
 import { agentLogs } from "./agent-logs";
 import { referralCodes } from "./referral-codes";
 import { gatewayInstances } from "./gateway-instances";
+import { hackathonProgress } from "./hackathon-progress";
+import { runContexts } from "./run-contexts";
+import { accounts } from "./accounts";
 
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ one, many }) => ({
+  account: one(accounts, {
+    fields: [users.id],
+    references: [accounts.ownerId],
+  }),
   ownedWorkspaces: many(workspaces),
   memberships: many(workspaceMembers),
   messages: many(messages),
@@ -178,3 +185,32 @@ export const gatewayInstancesRelations = relations(
     workspaces: many(workspaces),
   }),
 );
+
+export const hackathonProgressRelations = relations(hackathonProgress, ({ one }) => ({
+  workspace: one(workspaces, {
+    fields: [hackathonProgress.workspaceId],
+    references: [workspaces.id],
+  }),
+}));
+
+export const runContextsRelations = relations(runContexts, ({ one }) => ({
+  conversation: one(conversations, {
+    fields: [runContexts.conversationId],
+    references: [conversations.id],
+  }),
+  workspace: one(workspaces, {
+    fields: [runContexts.workspaceId],
+    references: [workspaces.id],
+  }),
+  instance: one(gatewayInstances, {
+    fields: [runContexts.instanceId],
+    references: [gatewayInstances.id],
+  }),
+}));
+
+export const accountsRelations = relations(accounts, ({ one }) => ({
+  owner: one(users, {
+    fields: [accounts.ownerId],
+    references: [users.id],
+  }),
+}));

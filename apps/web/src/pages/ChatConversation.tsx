@@ -1,14 +1,24 @@
+import { useQuery } from "@tanstack/react-query";
+import { Trophy, Clock } from "lucide-react";
+import { useAuth } from "@clerk/clerk-react";
+import { apiFetch } from "@/lib/api";
 import { useEffect, useRef, useState, useCallback, useMemo } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { LinkPreview } from "@/components/chat/LinkPreview";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
-import { useChat } from "@/hooks/use-chat";
+import { useConnection } from "@/providers/ConnectionProvider";
+import { useChat, type ChatAttachment } from "@/hooks/use-chat";
 import { useActionExecutor } from "@/hooks/use-action-executor";
+import { useHackathonActions } from "@/hooks/use-hackathon-actions";
 import { ActionCard } from "@/components/chat/ActionCard";
+import { FileAttachmentButton, AttachmentPreview, MessageAttachment } from "@/components/chat/FileAttachment";
+import { DropZone } from "@/components/chat/DropZone";
 import { stripActionBlocks } from "@/lib/action-parser";
-import AgentOfflineBanner from "@/components/AgentOfflineBanner";
+import SubscriptionGate from "@/components/billing/SubscriptionGate";
 import { content } from "@/lib/content";
 
 const { chat } = content.studio;
@@ -26,21 +36,179 @@ function extractTunnelUrl(messageContent: string): string | null {
   return matches ? matches[0] : null;
 }
 
+// Report error to Error Observatory
+async function reportError(error: unknown, context: { path: string; action: string }) {
+  try {
+    const message = error instanceof Error ? error.message : String(error);
+    await fetch(`${import.meta.env.VITE_API_URL || ""}/api/errors`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message,
+        userMessage: `Error en ${context.action}`,
+        path: context.path,
+        metadata: {
+          action: context.action,
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString(),
+        },
+      }),
+    });
+  } catch {
+    // Silent fail - don't block user flow
+    console.error("[ErrorReporter] Failed to report error:", error);
+  }
+}
+
+
+// Formatear hora del mensaje - muestra fecha solo si es de otro día
+function formatTime(dateStr?: string): string {
+  if (!dateStr) return "";
+  const date = new Date(dateStr);
+  const now = new Date();
+  
+  const isToday = date.toDateString() === now.toDateString();
+  const time = date.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+  
+  if (isToday) {
+    return time;
+  }
+  
+  // Si es de otro día, mostrar fecha + hora
+  const dateFormatted = date.toLocaleDateString("es-MX", { 
+    day: "2-digit", 
+    month: "2-digit",
+    year: "numeric"
+  });
+  return `${dateFormatted} ${time}`;
+}
+
 export default function ChatConversation() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const { workspace, slug } = useWorkspace();
+  const navigate = useNavigate();
   const qc = useQueryClient();
+  const { getToken } = useAuth();
+  
+  // Fetch conversation to check if it is hackathon
+  const { data: conversationData } = useQuery({
+    queryKey: ["conversation", conversationId],
+    queryFn: async () => {
+      const token = await getToken();
+      return apiFetch<{ id: number; isHackathon: boolean; hackathonId: number | null }>(`/api/conversations/${conversationId}`, { token });
+    },
+    enabled: !!conversationId,
+  });
+  
+  const isHackathon = conversationData?.isHackathon ?? false;
+  const hackathonId = conversationData?.hackathonId ?? null;
+  
+  // Fetch hackathon data if this is a hackathon chat
+  const { data: hackathonData } = useQuery({
+    queryKey: ["hackathon", hackathonId],
+    queryFn: async () => {
+      if (!hackathonId) return null;
+      const token = await getToken();
+      return apiFetch<{ name: string; deadline: string; currentPhase: number; phases: Array<{ number: number; status: string; notes: string[] }>; hackathonUrl?: string; resourcesUrl?: string; } | null>(`/api/hackathons/${hackathonId}`, { token });
+    },
+    enabled: isHackathon && !!hackathonId,
+  });
+  
+  // Calculate time remaining for hackathon
+  const hackathonTimeRemaining = useMemo(() => {
+    if (!hackathonData?.deadline) return null;
+    const deadline = new Date(hackathonData.deadline);
+    const now = new Date();
+    const diff = deadline.getTime() - now.getTime();
+    if (diff <= 0) return "Tiempo terminado";
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    const days = Math.floor(hours / 24);
+    if (days > 0) return `${days}d ${hours % 24}h restantes`;
+    if (hours > 0) return `${hours}h ${minutes}min restantes`;
+    return `${minutes}min restantes`;
+  }, [hackathonData?.deadline]);
+
   const onComplete = useCallback(
     () => qc.invalidateQueries({ queryKey: ["conversations", workspace?.id] }),
     [qc, workspace?.id],
   );
-  const { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction, connectionStatus } =
+
+  const { messages, sendMessage, isStreaming, isLoading, agentOffline, subscriptionExpired, updateAction, connectionStatus } =
     useChat(Number(conversationId), workspace?.id ?? 0, { onComplete });
+  
+  // Sincronizar estado de conexión con el contexto global (para TopBar)
+  const { setState: setConnectionState } = useConnection();
+  useEffect(() => {
+    if (agentOffline) {
+      setConnectionState("offline");
+    } else if (connectionStatus === "disconnected") {
+      setConnectionState("offline"); // disconnected también es offline
+    } else if (connectionStatus === "reconnecting") {
+      setConnectionState("reconnecting");
+    } else if (connectionStatus === "timeout") {
+      setConnectionState("timeout");
+    } else if (connectionStatus === "unstable") {
+      setConnectionState("unstable");
+    } else {
+      setConnectionState("connected"); // idle y connected = connected
+    }
+  }, [agentOffline, connectionStatus, setConnectionState]);
   const { execute } = useActionExecutor(updateAction);
+  
+  // Auto-execute hackathon actions
+  const { executeHackathonAction } = useHackathonActions(
+    hackathonId,
+    () => qc.invalidateQueries({ queryKey: ["hackathon", hackathonId] }),
+  );
+  
+  // Track which messages we already processed to avoid re-execution (Set survives re-renders, not remounts — but prevents duplicates within a mount cycle)
+  const processedMessagesRef = useRef(new Set<number | string>());
+
+  // Process hackathon actions when messages change (auto-execute)
+  useEffect(() => {
+    if (!hackathonId || isStreaming || messages.length === 0) return;
+
+    const lastMessage = messages[messages.length - 1];
+
+    // Skip if we already processed this message
+    if (processedMessagesRef.current.has(lastMessage.id)) return;
+
+    // Skip if not agent or no actions
+    if (lastMessage.role !== "agent" || !lastMessage.actions?.length) return;
+
+    // Mark as processed BEFORE executing
+    processedMessagesRef.current.add(lastMessage.id);
+
+    console.log("[Hackathon] Processing actions for message:", lastMessage.id, lastMessage.actions);
+
+    // Execute each hackathon action and mark as completed
+    const processActions = async () => {
+      for (const action of lastMessage.actions ?? []) {
+        if (action.type === "hackathon_advance" || action.type === "hackathon_note") {
+          try {
+            const success = await executeHackathonAction(action, typeof lastMessage.id === "number" ? lastMessage.id : undefined);
+            if (success) {
+              updateAction(lastMessage.id, action.id, { ...action, status: "completed" });
+            }
+          } catch (err) {
+            console.error("[Hackathon] Action failed:", err);
+            updateAction(lastMessage.id, action.id, { ...action, status: "error" });
+            reportError(err, { path: `/chat/${conversationId}`, action: "hackathon_action" });
+          }
+        }
+      }
+    };
+    
+    processActions();
+  }, [isStreaming, messages, hackathonId, executeHackathonAction, updateAction, conversationId]);
+
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [input, setInput] = useState("");
+  const [attachment, setAttachment] = useState<ChatAttachment | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   // Preview state
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -115,6 +283,36 @@ export default function ChatConversation() {
     return () => clearTimeout(timeout);
   }, [previewUrl, slug]);
 
+  // Scroll to bottom when messages finish loading (page refresh)
+  const hasScrolledRef = useRef(false);
+  useEffect(() => {
+    if (!isLoading && messages.length > 0 && !hasScrolledRef.current) {
+      hasScrolledRef.current = true;
+      const scrollToBottom = () => {
+        virtuosoRef.current?.scrollToIndex({
+          index: messages.length - 1,
+          align: "end",
+          behavior: "auto",
+        });
+      };
+      scrollToBottom();
+      setTimeout(scrollToBottom, 50);
+      setTimeout(scrollToBottom, 150);
+      setTimeout(scrollToBottom, 300);
+    }
+  }, [isLoading, messages.length]);
+
+  // Auto-scroll while streaming (keeps up with accelerating text)
+  useEffect(() => {
+    if (isStreaming && messages.length > 0 && virtuosoRef.current) {
+      virtuosoRef.current.scrollToIndex({
+        index: messages.length - 1,
+        align: "end",
+        behavior: "smooth",
+      });
+    }
+  }, [isStreaming, messages]);
+
   // Auto-resize textarea
   useEffect(() => {
     const el = textareaRef.current;
@@ -123,20 +321,87 @@ export default function ChatConversation() {
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [input]);
 
-  const handleSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    const value = input.trim();
-    if (!value || isStreaming) return;
-    setInput("");
-    sendMessage(value);
-  }, [input, isStreaming, sendMessage]);
+  // Handle file drop from DropZone
+  const handleFileDrop = useCallback(
+    async (file: File) => {
+      setUploadError(null);
+      try {
+        const token = await getToken();
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("workspaceId", String(workspace?.id));
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL || ""}/api/files/upload`,
+          {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+          },
+        );
+
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err.error || "Error al subir archivo");
+        }
+
+        const data = await response.json();
+        setAttachment({
+          fileId: data.id,
+          url: data.url,
+          mimeType: file.type,
+          filename: file.name,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Error al subir archivo";
+        setUploadError(message);
+        reportError(err, { path: `/chat/${conversationId}`, action: "file_upload" });
+      }
+    },
+    [getToken, workspace?.id, conversationId],
+  );
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
       e.preventDefault();
-      handleSubmit(e);
-    }
-  }, [handleSubmit]);
+      const value = input.trim();
+      // Allow sending with just attachment (no text required)
+      if ((!value && !attachment) || isStreaming) return;
+      
+      setInput("");
+      setUploadError(null);
+      
+      const ctx = isHackathon && hackathonData
+        ? {
+            active: true,
+            name: hackathonData.name,
+            deadline: hackathonData.deadline,
+            timeRemaining: hackathonTimeRemaining || undefined,
+            currentPhase: hackathonData.currentPhase,
+            phases: hackathonData.phases.map((p) => ({
+              number: p.number,
+              status: p.status as "done" | "current" | "pending",
+              notes: p.notes,
+            })),
+          }
+        : null;
+
+      const attachments = attachment ? [attachment] : undefined;
+      sendMessage(value || "📎", ctx, attachments);
+      setAttachment(null);
+    },
+    [input, isStreaming, sendMessage, isHackathon, hackathonData, hackathonTimeRemaining, attachment],
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        handleSubmit(e);
+      }
+    },
+    [handleSubmit],
+  );
 
   const handleRefreshPreview = useCallback(() => {
     if (iframeRef.current && previewUrl) {
@@ -149,282 +414,360 @@ export default function ChatConversation() {
 
   const statusColor = useMemo(() => {
     switch (tunnelStatus) {
-      case "live": return "bg-green-400";
-      case "checking": return "bg-yellow-400 animate-pulse";
-      case "dead": return "bg-red-400";
-      default: return "bg-gray-400";
+      case "live":
+        return "bg-green-400";
+      case "checking":
+        return "bg-yellow-400 animate-pulse";
+      case "dead":
+        return "bg-red-400";
+      default:
+        return "bg-gray-400";
     }
   }, [tunnelStatus]);
 
   const previewWidth = previewDevice === "mobile" ? "375px" : "100%";
 
   return (
-    <div className="flex h-[calc(100vh-8rem)] flex-col">
-      {/* Agent offline banner */}
-      {agentOffline && (
-        <div className="px-4 pt-3">
-          <AgentOfflineBanner />
-        </div>
-      )}
-
-      {/* Connection status banners */}
-      {connectionStatus === "reconnecting" && (
-        <div className="mx-4 mt-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-sm text-yellow-400">
-          {content.studio.connection.reconnecting}
-        </div>
-      )}
-      {connectionStatus === "timeout" && (
-        <div className="mx-4 mt-3 rounded-lg border border-orange-500/30 bg-orange-500/10 px-4 py-2 text-sm text-orange-400">
-          {content.studio.connection.timeout}
-        </div>
-      )}
-
-      {/* Mobile banner when preview available */}
-      {isMobile && previewUrl && (
-        <div className="bg-gradient-to-r from-magenta/10 to-violet/10 border-b border-magenta/20 px-4 py-3 animate-in slide-in-from-top duration-300">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${statusColor}`} />
-              <span className="text-sm font-medium text-[hsl(var(--foreground))]">
-                ✨ Preview listo
-              </span>
-            </div>
-            <a
-              href={previewUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-full bg-magenta px-4 py-1.5 text-xs font-medium text-white shadow-lg shadow-magenta/25 hover:shadow-magenta/40 transition-shadow"
-            >
-              Abrir ↗️
-            </a>
-          </div>
-          <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1.5">
-            💻 Para editar en vivo, usa escritorio
-          </p>
-        </div>
-      )}
-
-      {/* Main content with animated transition */}
-      <div className={`flex-1 flex overflow-hidden transition-all duration-500 ease-out ${
-        isTransitioning ? "opacity-50" : "opacity-100"
-      }`}>
-        {/* Chat panel */}
-        <div className={`flex flex-col transition-all duration-500 ease-out ${
-          showPreview && !isMobile
-            ? "w-1/2 border-r border-[hsl(var(--border))]"
-            : "w-full"
-        }`}>
-          {/* Typing indicator */}
-          {isStreaming && (
-            <div className="border-b border-[hsl(var(--border))] px-4 py-2 bg-magenta/5">
-              <div className="flex items-center gap-2">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-magenta rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-2 h-2 bg-magenta rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-2 h-2 bg-magenta rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-                </div>
-                <p className="text-xs text-magenta font-medium">
-                  Creando tu proyecto...
-                </p>
+    <DropZone onFileDrop={handleFileDrop} disabled={isStreaming || agentOffline || connectionStatus === "reconnecting" || connectionStatus === "timeout" || connectionStatus === "disconnected"}>
+      <div className="flex h-[calc(100vh-4rem)] flex-col">
+        {/* Hackathon Banner */}
+        {isHackathon && hackathonData && (
+          <div className="bg-[#d09306] border-b border-[#b8820a] px-4 py-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Trophy className="w-5 h-5 text-white stroke-[1.5]" />
+                <span className="font-medium text-white">{hackathonData.name}</span>
+                <span className="text-white/70">·</span>
+                <span className="text-sm text-white/80">Fase {hackathonData.currentPhase} de 8</span>
               </div>
-            </div>
-          )}
-
-          <div className="flex-1 overflow-hidden">
-            {isLoading ? (
-              <div className="flex justify-center py-8">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-magenta border-t-transparent" />
-              </div>
-            ) : messages.length === 0 ? (
-              <div className="flex h-full items-center justify-center">
-                <p className="text-center text-sm text-[hsl(var(--muted-foreground))] py-8">
-                  Envía un mensaje para empezar la conversación
-                </p>
-              </div>
-            ) : (
-              <Virtuoso
-                ref={virtuosoRef}
-                data={messages}
-                initialTopMostItemIndex={messages.length - 1}
-                followOutput="smooth"
-                className="h-full"
-                itemContent={(_index, msg) => (
-                  <div className={`flex px-4 py-1.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
-                        msg.role === "user"
-                          ? "bg-magenta text-white rounded-br-md whitespace-pre-wrap"
-                          : msg.role === "agent"
-                            ? "bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded-bl-md prose prose-invert prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2 prose-pre:my-2"
-                            : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] text-xs italic whitespace-pre-wrap"
-                      }`}
-                    >
-                      {msg.role === "agent" ? (
-                        <>
-                          <ReactMarkdown>
-                            {stripActionBlocks(msg.content)}
-                          </ReactMarkdown>
-                          {msg.actions && msg.actions.length > 0 && (
-                            <div className="mt-2 not-prose">
-                              {msg.actions.map((action) => (
-                                <ActionCard
-                                  key={action.id}
-                                  action={action}
-                                  messageId={msg.id}
-                                  onExecute={execute}
-                                  disabled={msg.streaming}
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        msg.content
-                      )}
-                    </div>
+              <div className="flex items-center gap-3">
+                {hackathonTimeRemaining && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="w-4 h-4 text-white stroke-[1.5]" />
+                    <span className="text-white">{hackathonTimeRemaining}</span>
                   </div>
                 )}
-              />
-            )}
-          </div>
-
-          <form
-            onSubmit={handleSubmit}
-            className="border-t border-[hsl(var(--border))] p-4"
-          >
-            <div className="flex gap-2 items-end">
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={agentOffline ? "Agente no disponible" : chat.placeholder}
-                disabled={isStreaming || agentOffline}
-                rows={1}
-                className="flex-1 resize-none rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-4 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20 disabled:opacity-50"
-              />
-              <button
-                type="submit"
-                disabled={isStreaming || agentOffline || !input.trim()}
-                className="rounded-md bg-magenta px-4 py-2 text-sm font-medium text-white hover:bg-magenta/90 transition-colors disabled:opacity-50"
-              >
-                {chat.send}
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Preview panel - slides in with animation */}
-        {showPreview && !isMobile && (
-          <div className="flex flex-col bg-[hsl(var(--muted))] w-1/2 animate-in slide-in-from-right duration-500">
-            {/* Preview header */}
-            <div className="flex items-center justify-between px-4 py-2 border-b border-[hsl(var(--border))] bg-[hsl(var(--card))]">
-              <div className="flex items-center gap-3">
-                <span className={`w-2 h-2 rounded-full ${statusColor}`} />
-                <span className="text-sm font-medium text-[hsl(var(--foreground))]">
-                  ✨ Preview
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                {/* Device toggle */}
-                <div className="flex gap-1 p-1 bg-[hsl(var(--muted))] rounded-lg">
-                  <button
-                    onClick={() => setPreviewDevice("desktop")}
-                    className={`px-2 py-1 text-xs rounded transition-colors ${
-                      previewDevice === "desktop"
-                        ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm"
-                        : "text-[hsl(var(--muted-foreground))]"
-                    }`}
-                    title="Desktop"
-                  >
-                    🖥️
-                  </button>
-                  <button
-                    onClick={() => setPreviewDevice("mobile")}
-                    className={`px-2 py-1 text-xs rounded transition-colors ${
-                      previewDevice === "mobile"
-                        ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm"
-                        : "text-[hsl(var(--muted-foreground))]"
-                    }`}
-                    title="Mobile"
-                  >
-                    📱
-                  </button>
-                </div>
                 <button
-                  onClick={handleRefreshPreview}
-                  className="p-1.5 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] rounded"
-                  title="Refresh"
+                  onClick={() => navigate(`/studio/${slug}/hackathon?selected=${hackathonId}`)}
+                  className="px-3 py-1 text-sm bg-black/20 hover:bg-black/30 rounded-lg text-white transition-colors"
                 >
-                  🔄
-                </button>
-                <a
-                  href={previewUrl || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-1.5 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] rounded"
-                  title="Abrir en nueva pestaña"
-                >
-                  ↗️
-                </a>
-                <button
-                  onClick={() => setShowPreview(false)}
-                  className="p-1.5 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] rounded"
-                  title="Cerrar preview"
-                >
-                  ✕
+                  ← Volver a fases
                 </button>
               </div>
-            </div>
-
-            {/* Preview content */}
-            <div className="flex-1 relative flex items-center justify-center bg-[hsl(var(--muted))] p-4">
-              {tunnelStatus === "live" && previewUrl ? (
-                <div
-                  className={`bg-white rounded-lg shadow-2xl overflow-hidden transition-all duration-300 ${
-                    previewDevice === "mobile" ? "h-[667px]" : "w-full h-full"
-                  }`}
-                  style={{ width: previewWidth }}
-                >
-                  <iframe
-                    ref={iframeRef}
-                    src={previewUrl}
-                    className="w-full h-full border-0"
-                    title="Preview"
-                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
-                  />
-                </div>
-              ) : tunnelStatus === "checking" ? (
-                <div className="text-center">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r from-magenta to-violet flex items-center justify-center animate-pulse">
-                    <span className="text-2xl">✨</span>
-                  </div>
-                  <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                    Conectando preview...
-                  </p>
-                </div>
-              ) : tunnelStatus === "dead" ? (
-                <div className="text-center p-8">
-                  <div className="text-4xl mb-4">🔌</div>
-                  <p className="text-sm text-destructive font-medium mb-2">
-                    Preview desconectado
-                  </p>
-                  <p className="text-xs text-[hsl(var(--muted-foreground))] max-w-xs">
-                    Pide al agente que regenere el tunnel
-                  </p>
-                </div>
-              ) : (
-                <div className="text-center p-8">
-                  <div className="text-4xl mb-4">🧪</div>
-                  <p className="text-sm text-[hsl(var(--muted-foreground))]">
-                    El preview aparecerá aquí
-                  </p>
-                </div>
-              )}
             </div>
           </div>
         )}
+
+        {/* Subscription gate */}
+        {subscriptionExpired && <SubscriptionGate />}
+
+        {/* Mobile banner when preview available */}
+        {isMobile && previewUrl && (
+          <div className="bg-gradient-to-r from-magenta/10 to-violet/10 border-b border-magenta/20 px-4 py-3 animate-in slide-in-from-top duration-300">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${statusColor}`} />
+                <span className="text-sm font-medium text-[hsl(var(--foreground))]">✨ Preview listo</span>
+              </div>
+              <a
+                href={previewUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full bg-magenta px-4 py-1.5 text-xs font-medium text-white shadow-lg shadow-magenta/25 hover:shadow-magenta/40 transition-shadow"
+              >
+                Abrir ↗️
+              </a>
+            </div>
+            <p className="text-xs text-[hsl(var(--muted-foreground))] mt-1.5">
+              💻 Para editar en vivo, usa escritorio
+            </p>
+          </div>
+        )}
+
+        {/* Main content with animated transition */}
+        <div
+          className={`flex-1 flex overflow-hidden transition-all duration-500 ease-out ${
+            isTransitioning ? "opacity-50" : "opacity-100"
+          }`}
+        >
+          {/* Chat panel */}
+          <div
+            className={`flex flex-col transition-all duration-500 ease-out ${
+              showPreview && !isMobile ? "w-1/2 border-r border-[hsl(var(--border))]" : "w-full"
+            }`}
+          >
+            {/* Typing indicator */}
+            {isStreaming && (
+              <div className="border-b border-[hsl(var(--border))] px-4 py-2 bg-magenta/5">
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-1">
+                    <span className="w-2 h-2 bg-magenta rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-2 h-2 bg-magenta rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-2 h-2 bg-magenta rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                  </div>
+                  <p className="text-xs text-magenta font-medium">Creando tu proyecto...</p>
+                </div>
+              </div>
+            )}
+
+            <div className="flex-1 overflow-hidden">
+              {isLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="h-6 w-6 animate-spin rounded-full border-2 border-magenta border-t-transparent" />
+                </div>
+              ) : messages.length === 0 ? (
+                <div className="flex h-full items-center justify-center">
+                  <p className="text-center text-sm text-[hsl(var(--muted-foreground))] py-8">
+                    Envía un mensaje para empezar la conversación
+                  </p>
+                </div>
+              ) : (
+                <Virtuoso
+                  ref={virtuosoRef}
+                  data={messages}
+                  initialTopMostItemIndex={messages.length - 1}
+                  followOutput="smooth"
+                  className="h-full"
+                  itemContent={(_index, msg) => (
+                    <div className={`flex px-4 py-1.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                      <div className={`flex flex-col ${msg.role === "user" ? "items-end" : "items-start"}`}>
+                        <div
+                        className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm ${
+                          msg.role === "user"
+                            ? "bg-magenta text-white rounded-br-md whitespace-pre-wrap"
+                            : msg.role === "agent"
+                              ? "bg-[hsl(var(--card))] border border-[hsl(var(--border))] text-[hsl(var(--foreground))] rounded-bl-md prose prose-invert prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0.5 prose-headings:my-2 prose-pre:my-2"
+                              : "bg-[hsl(var(--muted))] text-[hsl(var(--muted-foreground))] text-xs italic whitespace-pre-wrap"
+                        }`}
+                      >
+                        {msg.role === "agent" ? (
+                          <>
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              components={{
+                                a: ({ href, children }) => {
+                                  // Si el link es una URL completa, mostrar preview
+                                  if (href && (href.startsWith('http://') || href.startsWith('https://'))) {
+                                    // Si el texto del link es igual a la URL, mostrar tarjeta
+                                    const childText = String(children);
+                                    if (childText === href || childText.includes(href.replace('https://', '').replace('http://', ''))) {
+                                      return <LinkPreview url={href} />;
+                                    }
+                                  }
+                                  // Si no, mostrar link normal
+                                  return (
+                                    <a 
+                                      href={href} 
+                                      target="_blank" 
+                                      rel="noopener noreferrer"
+                                      className="text-magenta hover:underline"
+                                    >
+                                      {children}
+                                    </a>
+                                  );
+                                },
+                              }}
+                            >
+                              {stripActionBlocks(msg.content)}
+                            </ReactMarkdown>
+                            {msg.actions && msg.actions.length > 0 && (
+                              <div className="mt-2 not-prose">
+                                {msg.actions.map((action) => (
+                                  <ActionCard
+                                    key={action.id}
+                                    action={action}
+                                    messageId={msg.id}
+                                    onExecute={execute}
+                                    onHackathonExecute={executeHackathonAction}
+                                    disabled={msg.streaming}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            {/* User message attachments */}
+                            {msg.attachments && msg.attachments.length > 0 && (
+                              <div className="mb-2">
+                                {msg.attachments.map((att) => (
+                                  <MessageAttachment key={att.fileId} attachment={att} />
+                                ))}
+                              </div>
+                            )}
+                            {msg.content !== "📎" && msg.content}
+                          </>
+                        )}
+                      </div>
+                      {msg.createdAt && (
+                        <span className="text-[10px] text-zinc-500 mt-0.5 px-1">
+                          {formatTime(msg.createdAt)}
+                        </span>
+                      )}
+                      </div>
+                    </div>
+                  )}
+                />
+              )}
+            </div>
+
+            <form onSubmit={handleSubmit} className="border-t border-[hsl(var(--border))] px-4 py-2">
+              {/* Attachment preview */}
+              {attachment && (
+                <div className="mb-3">
+                  <AttachmentPreview attachment={attachment} onRemove={() => setAttachment(null)} />
+                </div>
+              )}
+              
+              {/* Upload error */}
+              {uploadError && (
+                <div className="mb-3 px-3 py-2 text-sm text-red-400 bg-red-950/50 rounded-lg border border-red-500/30">
+                  {uploadError}
+                </div>
+              )}
+
+              <div className="flex gap-2 items-end">
+                <FileAttachmentButton
+                  workspaceId={workspace?.id ?? 0}
+                  onAttach={setAttachment}
+                  onRemove={() => setAttachment(null)}
+                  attachment={attachment}
+                  disabled={isStreaming || agentOffline || connectionStatus === "reconnecting" || connectionStatus === "timeout" || connectionStatus === "disconnected"}
+                />
+                <textarea
+                  ref={textareaRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={
+                    agentOffline ? "Agente no disponible" : 
+                    connectionStatus === "reconnecting" ? "Reconectando..." :
+                    connectionStatus === "timeout" ? "Sin conexión..." :
+                    chat.placeholder
+                  }
+                  disabled={isStreaming || agentOffline || connectionStatus === "reconnecting" || connectionStatus === "timeout" || connectionStatus === "disconnected"}
+                  rows={1}
+                  className="flex-1 resize-none rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-4 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20 disabled:opacity-50"
+                />
+                <button
+                  type="submit"
+                  disabled={isStreaming || agentOffline || connectionStatus === "reconnecting" || connectionStatus === "timeout" || connectionStatus === "disconnected" || (!input.trim() && !attachment)}
+                  className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                    agentOffline || connectionStatus === "reconnecting" || connectionStatus === "timeout" || connectionStatus === "disconnected"
+                      ? "bg-zinc-600 text-zinc-400 cursor-not-allowed" 
+                      : "bg-magenta text-white hover:bg-magenta/90 disabled:opacity-50"
+                  }`}
+                >
+                  {chat.send}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* Preview panel - slides in with animation */}
+          {showPreview && !isMobile && (
+            <div className="flex flex-col bg-[hsl(var(--muted))] w-1/2 animate-in slide-in-from-right duration-500">
+              {/* Preview header */}
+              <div className="flex items-center justify-between px-4 py-2 border-b border-[hsl(var(--border))] bg-[hsl(var(--card))]">
+                <div className="flex items-center gap-3">
+                  <span className={`w-2 h-2 rounded-full ${statusColor}`} />
+                  <span className="text-sm font-medium text-[hsl(var(--foreground))]">✨ Preview</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {/* Device toggle */}
+                  <div className="flex gap-1 p-1 bg-[hsl(var(--muted))] rounded-lg">
+                    <button
+                      onClick={() => setPreviewDevice("desktop")}
+                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                        previewDevice === "desktop"
+                          ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm"
+                          : "text-[hsl(var(--muted-foreground))]"
+                      }`}
+                      title="Desktop"
+                    >
+                      🖥️
+                    </button>
+                    <button
+                      onClick={() => setPreviewDevice("mobile")}
+                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                        previewDevice === "mobile"
+                          ? "bg-[hsl(var(--background))] text-[hsl(var(--foreground))] shadow-sm"
+                          : "text-[hsl(var(--muted-foreground))]"
+                      }`}
+                      title="Mobile"
+                    >
+                      📱
+                    </button>
+                  </div>
+                  <button
+                    onClick={handleRefreshPreview}
+                    className="p-1.5 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] rounded"
+                    title="Refresh"
+                  >
+                    🔄
+                  </button>
+                  <a
+                    href={previewUrl || "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] rounded"
+                    title="Abrir en nueva pestaña"
+                  >
+                    ↗️
+                  </a>
+                  <button
+                    onClick={() => setShowPreview(false)}
+                    className="p-1.5 text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] rounded"
+                    title="Cerrar preview"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {/* Preview content */}
+              <div className="flex-1 relative flex items-center justify-center bg-[hsl(var(--muted))] p-4">
+                {tunnelStatus === "live" && previewUrl ? (
+                  <div
+                    className={`bg-white rounded-lg shadow-2xl overflow-hidden transition-all duration-300 ${
+                      previewDevice === "mobile" ? "h-[667px]" : "w-full h-full"
+                    }`}
+                    style={{ width: previewWidth }}
+                  >
+                    <iframe
+                      ref={iframeRef}
+                      src={previewUrl}
+                      className="w-full h-full border-0"
+                      title="Preview"
+                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                    />
+                  </div>
+                ) : tunnelStatus === "checking" ? (
+                  <div className="text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-r from-magenta to-violet flex items-center justify-center animate-pulse">
+                      <span className="text-2xl">✨</span>
+                    </div>
+                    <p className="text-sm text-[hsl(var(--muted-foreground))]">Conectando preview...</p>
+                  </div>
+                ) : tunnelStatus === "dead" ? (
+                  <div className="text-center p-8">
+                    <div className="text-4xl mb-4">🔌</div>
+                    <p className="text-sm text-destructive font-medium mb-2">Preview desconectado</p>
+                    <p className="text-xs text-[hsl(var(--muted-foreground))] max-w-xs">
+                      Pide al agente que regenere el tunnel
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center p-8">
+                    <div className="text-4xl mb-4">🧪</div>
+                    <p className="text-sm text-[hsl(var(--muted-foreground))]">El preview aparecerá aquí</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </DropZone>
   );
 }

@@ -1,18 +1,26 @@
 import type { ActionCard as ActionCardType } from "@godinez/types";
 import { content } from "@/lib/content";
+import { FolderPlus, CheckSquare, FilePlus, Rocket, StickyNote, Zap } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+// Hackathon action types
+const HACKATHON_TYPES = new Set(["hackathon_advance", "hackathon_note"]);
 
 const { actions: t } = content.studio;
 
-const TYPE_ICONS: Record<string, string> = {
-  create_project: "📁",
-  create_task: "✅",
-  create_file: "📄",
+const TYPE_ICONS: Record<string, LucideIcon> = {
+  create_project: FolderPlus,
+  create_task: CheckSquare,
+  create_file: FilePlus,
+  hackathon_advance: Rocket,
+  hackathon_note: StickyNote,
 };
 
 interface ActionCardProps {
   action: ActionCardType;
   messageId: number | string;
   onExecute: (messageId: number, actionId: string) => void;
+  onHackathonExecute?: (action: ActionCardType) => Promise<boolean | void>;
   disabled?: boolean;
 }
 
@@ -20,9 +28,19 @@ export function ActionCard({
   action,
   messageId,
   onExecute,
+  onHackathonExecute,
   disabled,
 }: ActionCardProps) {
-  const icon = TYPE_ICONS[action.type] || "⚡";
+  const isHackathonAction = HACKATHON_TYPES.has(action.type);
+  
+  const handleClick = async () => {
+    if (isHackathonAction && onHackathonExecute) {
+      await onHackathonExecute(action);
+    } else {
+      onExecute(Number(messageId), action.id);
+    }
+  };
+  const Icon = TYPE_ICONS[action.type] || Zap;
   const isPending = action.status === "pending";
   const isExecuting = action.status === "executing";
   const isCompleted = action.status === "completed";
@@ -41,14 +59,14 @@ export function ActionCard({
       }`}
     >
       <div className="flex items-center gap-2">
-        <span className="text-base">{icon}</span>
+        <Icon className="w-4 h-4 stroke-[1.5]" />
         <span className="flex-1 text-sm font-medium text-[hsl(var(--foreground))]">
           {action.label}
         </span>
 
         {isPending && (
           <button
-            onClick={() => onExecute(Number(messageId), action.id)}
+            onClick={handleClick}
             disabled={disabled}
             className="rounded-md bg-magenta px-3 py-1 text-xs font-medium text-white transition-colors hover:bg-magenta/90 disabled:opacity-50"
           >
@@ -80,7 +98,7 @@ export function ActionCard({
               {t.error}
             </span>
             <button
-              onClick={() => onExecute(Number(messageId), action.id)}
+              onClick={handleClick}
               disabled={disabled}
               className="rounded-md border border-red-500/30 px-2 py-0.5 text-xs text-red-400 transition-colors hover:bg-red-500/10 disabled:opacity-50"
             >

@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 import { logger as rootLogger } from "../lib/logger";
+import { getRedis } from "../lib/redis";
 
 const log = rootLogger.child({ service: "gateway" });
 
@@ -16,6 +17,7 @@ interface RequestFrame {
   params?: unknown;
 }
 
+
 interface ResponseFrame {
   type: "res";
   id: string;
@@ -24,12 +26,14 @@ interface ResponseFrame {
   error?: { code: string; message: string; details?: unknown };
 }
 
+
 interface EventFrame {
   type: "event";
   event: string;
   payload?: Record<string, unknown>;
   seq?: number;
 }
+
 
 type GatewayFrame = ResponseFrame | EventFrame;
 
@@ -39,6 +43,7 @@ interface HelloOk {
   server: { version: string; connId: string };
   features: { methods: string[]; events: string[] };
 }
+
 
 // ─── Device identity (Ed25519 challenge-response auth) ──────────────
 
@@ -51,11 +56,13 @@ function base64UrlEncode(buf: Buffer): string {
   return buf.toString("base64url");
 }
 
+
 interface DeviceIdentity {
   deviceId: string;
   publicKeyB64: string;
   privateKeyPem: string;
 }
+
 
 const DEVICE_IDENTITY_PATH = path.join(
   process.env.DEVICE_IDENTITY_DIR ?? ".openclaw",
@@ -69,9 +76,11 @@ function loadOrCreateDeviceIdentity(): DeviceIdentity {
       log.debug({ deviceId: data.deviceId.slice(0, 8) }, "loaded device identity");
       return data;
     }
+
   } catch {
     // File doesn't exist or is invalid — generate new identity
   }
+
 
   const { publicKey, privateKey } = crypto.generateKeyPairSync("ed25519");
   const rawPub = publicKey.export({ type: "spki", format: "der" }).subarray(12);
@@ -87,6 +96,7 @@ function loadOrCreateDeviceIdentity(): DeviceIdentity {
   log.info({ deviceId: deviceId.slice(0, 8) }, "created new device identity");
   return identity;
 }
+
 
 function buildDeviceAuthPayload(params: {
   deviceId: string;
@@ -111,11 +121,13 @@ function buildDeviceAuthPayload(params: {
   ].join("|");
 }
 
+
 function signPayload(privateKeyPem: string, payload: string): string {
   const key = crypto.createPrivateKey(privateKeyPem);
   const sig = crypto.sign(null, Buffer.from(payload, "utf8"), key);
   return base64UrlEncode(sig);
 }
+
 
 // ─── Chat event types ───────────────────────────────────────────────
 
@@ -133,6 +145,7 @@ interface ChatEventPayload {
   stopReason?: string;
 }
 
+
 // ─── Agent management types ─────────────────────────────────────────
 
 interface AgentSummary {
@@ -147,6 +160,7 @@ interface AgentSummary {
   };
 }
 
+
 interface AgentsListResult {
   defaultId: string;
   mainKey: string;
@@ -154,12 +168,14 @@ interface AgentsListResult {
   agents: AgentSummary[];
 }
 
+
 interface AgentsCreateResult {
   ok: true;
   agentId: string;
   name: string;
   workspace: string;
 }
+
 
 interface AgentFileEntry {
   name: string;
@@ -169,6 +185,7 @@ interface AgentFileEntry {
   updatedAtMs?: number;
   content?: string;
 }
+
 
 // ─── Zod schemas for runtime validation of gateway responses ────────
 
@@ -264,8 +281,10 @@ function parsePayload<T>(schema: z.ZodType<T>, payload: unknown, method: string)
     const issues = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join(", ");
     throw new Error(`[Gateway] ${method} response validation failed: ${issues}`);
   }
+
   return result.data;
 }
+
 
 // ─── Run handler for streaming ──────────────────────────────────────
 
@@ -276,14 +295,31 @@ type RunHandler = {
   lastSeq: number;
 };
 
+// ─── Early event buffer ─────────────────────────────────────────────
+// Events that arrive before onRun() registers a handler are buffered here
+// and replayed when the handler is attached. TTL prevents memory leaks.
+
+interface BufferedEvent {
+  state: "delta" | "final" | "aborted" | "error";
+  text: string;
+  message?: Record<string, unknown>;
+  errorMessage?: string;
+  seq: number;
+  bufferedAt: number;
+}
+
+const EARLY_EVENT_BUFFER_TTL_MS = 30_000; // 30s — enough for SSE handler to connect
+
 // ─── Gateway Relay ──────────────────────────────────────────────────
 
 export class GatewayRelay {
   private ws: WebSocket | null = null;
   private pendingRuns = new Map<string, RunHandler>();
+  private earlyEvents = new Map<string, BufferedEvent[]>();
   private pendingRequests = new Map<
     string,
     { resolve: (frame: ResponseFrame) => void }
+
   >();
   private reqId = 0;
   private _connected = false;
@@ -291,6 +327,7 @@ export class GatewayRelay {
   private token = "";
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private _reconnecting = false;
   private serverInfo: { version: string; connId: string } | null = null;
   private device = loadOrCreateDeviceIdentity();
 
@@ -304,9 +341,16 @@ export class GatewayRelay {
     this.lastActivityAt = new Date();
   }
 
+
   get isConnected(): boolean {
     return this._connected;
   }
+
+  /** True while the relay is in a backoff-reconnect cycle. */
+  get reconnecting(): boolean {
+    return this._reconnecting;
+  }
+
 
   async connect(url: string, token: string): Promise<HelloOk> {
     this.lastActivityAt = new Date();
@@ -314,7 +358,12 @@ export class GatewayRelay {
     this.token = token;
 
     return new Promise((resolve, reject) => {
-      this.ws = new WebSocket(url);
+      this.ws = new WebSocket(url, {
+        headers: {
+          // Required for ngrok free tier to skip browser warning page
+          "ngrok-skip-browser-warning": "true",
+        },
+      });
 
       this.ws.on("error", (err) => {
         if (!this._connected) {
@@ -322,6 +371,7 @@ export class GatewayRelay {
         } else {
           log.error({ err: err.message }, "websocket error");
         }
+
       });
 
       let handshakeDone = false;
@@ -384,6 +434,7 @@ export class GatewayRelay {
             return;
           }
 
+
           // Step 2: hello-ok comes as a response to the connect request
           if (!handshakeDone && frame.type === "res" && frame.ok) {
             const p = frame.payload as Record<string, unknown> | undefined;
@@ -397,7 +448,9 @@ export class GatewayRelay {
               resolve(helloOk);
               return;
             }
+
           }
+
 
           // Step 2b: auth rejected
           if (!handshakeDone && frame.type === "res" && !frame.ok) {
@@ -409,12 +462,15 @@ export class GatewayRelay {
             return;
           }
 
+
           if (handshakeDone) {
             this.handleFrame(frame as GatewayFrame);
           }
+
         } catch {
           log.error("failed to parse gateway message");
         }
+
       });
 
       this.ws.on("close", () => {
@@ -423,6 +479,7 @@ export class GatewayRelay {
         if (handshakeDone) {
           this.scheduleReconnect();
         }
+
       });
 
       // Timeout handshake after 15s
@@ -431,28 +488,50 @@ export class GatewayRelay {
           this.ws?.close();
           reject(new Error("Handshake timeout"));
         }
+
       }, 15_000);
     });
   }
+
 
   disconnect(): void {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+
     this.ws?.close();
     this.ws = null;
     this._connected = false;
+    this._reconnecting = false;
     this.serverInfo = null;
+    this.earlyEvents.clear();
   }
+
 
   // ─── Chat methods ───────────────────────────────────────────────
 
-  async chatSend(sessionKey: string, message: string): Promise<string> {
+  async chatSend(
+    sessionKey: string,
+    message: string,
+    attachments?: Array<{ fileId: number; url: string; mimeType: string; filename: string }>,
+  ): Promise<string> {
     const idempotencyKey = crypto.randomUUID();
+    
+    // Build message with attachments prepended as MEDIA: directives
+    // OpenClaw understands MEDIA:<url> format for inline media
+    let fullMessage = message;
+    if (attachments?.length) {
+      const mediaLines = attachments.map(att => {
+        // Use MEDIA: prefix which OpenClaw media pipeline understands
+        return `[Attached: ${att.filename} (${att.mimeType})]\nMEDIA:${att.url}`;
+      }).join('\n\n');
+      fullMessage = `${mediaLines}\n\n${message}`;
+    }
+
     const response = await this.sendRequest("chat.send", {
       sessionKey,
-      message,
+      message: fullMessage,
       idempotencyKey,
     });
     if (!response.ok) {
@@ -468,6 +547,7 @@ export class GatewayRelay {
     await this.sendRequest("chat.abort", { sessionKey, runId });
   }
 
+
   async chatHistory(
     sessionKey: string,
     limit = 50,
@@ -479,8 +559,10 @@ export class GatewayRelay {
     if (!response.ok) {
       throw new Error(response.error?.message ?? "chat.history failed");
     }
+
     return parsePayload(ChatHistoryPayloadSchema, response.payload, "chat.history");
   }
+
 
   // ─── Agent management methods ─────────────────────────────────
 
@@ -489,8 +571,10 @@ export class GatewayRelay {
     if (!response.ok) {
       throw new Error(response.error?.message ?? "agents.list failed");
     }
+
     return parsePayload(AgentsListPayloadSchema, response.payload, "agents.list");
   }
+
 
   async agentsCreate(params: {
     name: string;
@@ -502,8 +586,10 @@ export class GatewayRelay {
     if (!response.ok) {
       throw new Error(response.error?.message ?? "agents.create failed");
     }
+
     return parsePayload(AgentsCreatePayloadSchema, response.payload, "agents.create");
   }
+
 
   async agentsUpdate(params: {
     agentId: string;
@@ -516,7 +602,9 @@ export class GatewayRelay {
     if (!response.ok) {
       throw new Error(response.error?.message ?? "agents.update failed");
     }
+
   }
+
 
   async agentsDelete(
     agentId: string,
@@ -529,7 +617,9 @@ export class GatewayRelay {
     if (!response.ok) {
       throw new Error(response.error?.message ?? "agents.delete failed");
     }
+
   }
+
 
   async agentsFilesList(
     agentId: string,
@@ -538,8 +628,10 @@ export class GatewayRelay {
     if (!response.ok) {
       throw new Error(response.error?.message ?? "agents.files.list failed");
     }
+
     return parsePayload(AgentsFilesListPayloadSchema, response.payload, "agents.files.list");
   }
+
 
   async agentsFilesGet(
     agentId: string,
@@ -552,9 +644,11 @@ export class GatewayRelay {
     if (!response.ok) {
       throw new Error(response.error?.message ?? "agents.files.get failed");
     }
+
     const result = parsePayload(AgentsFileResultPayloadSchema, response.payload, "agents.files.get");
     return result.file;
   }
+
 
   async agentsFilesSet(
     agentId: string,
@@ -569,21 +663,66 @@ export class GatewayRelay {
     if (!response.ok) {
       throw new Error(response.error?.message ?? "agents.files.set failed");
     }
+
     const result = parsePayload(AgentsFileResultPayloadSchema, response.payload, "agents.files.set");
     return result.file;
   }
+
 
   // ─── Run handlers for streaming ───────────────────────────────
 
   onRun(runId: string, handlers: Omit<RunHandler, "lastSeq">): void {
     this.lastActivityAt = new Date();
-    this.pendingRuns.set(runId, { ...handlers, lastSeq: -1 });
+    const handler: RunHandler = { ...handlers, lastSeq: -1 };
+    this.pendingRuns.set(runId, handler);
+
+    // Replay any events that arrived before the handler was registered
+    const buffered = this.earlyEvents.get(runId);
+    if (buffered && buffered.length > 0) {
+      this.earlyEvents.delete(runId);
+      log.info({ runId, count: buffered.length }, "replaying buffered early events");
+      for (const evt of buffered) {
+        if (evt.seq < handler.lastSeq || (evt.seq === handler.lastSeq && evt.state === "delta")) continue;
+        handler.lastSeq = evt.seq;
+
+        if (evt.state === "delta") {
+          handler.onDelta(evt.text, evt.message);
+        } else if (evt.state === "final" || evt.state === "aborted") {
+          handler.onFinal(evt.text, evt.message);
+          this.pendingRuns.delete(runId);
+          return;
+        } else if (evt.state === "error") {
+          handler.onError(evt.errorMessage ?? "unknown error");
+          this.pendingRuns.delete(runId);
+          return;
+        }
+      }
+    }
   }
+
 
   offRun(runId: string): void {
     this.lastActivityAt = new Date();
     this.pendingRuns.delete(runId);
+    this.earlyEvents.delete(runId);
   }
+
+  /** Check if a handler or buffered events exist for a runId. */
+  hasRun(runId: string): boolean {
+    return this.pendingRuns.has(runId) || this.earlyEvents.has(runId);
+  }
+
+  /** Remove early event buffers older than TTL to prevent memory leaks. */
+  cleanStaleBuffers(): void {
+    const cutoff = Date.now() - EARLY_EVENT_BUFFER_TTL_MS;
+    for (const [runId, events] of this.earlyEvents) {
+      if (events.length > 0 && events[0].bufferedAt < cutoff) {
+        this.earlyEvents.delete(runId);
+        log.debug({ runId }, "cleaned stale early event buffer");
+      }
+    }
+  }
+
 
   // ─── Internal frame handling ──────────────────────────────────
 
@@ -595,44 +734,106 @@ export class GatewayRelay {
         this.pendingRequests.delete(frame.id);
         pending.resolve(frame);
       }
+
       return;
     }
 
+
     // Event broadcast
     if (frame.type === "event" && frame.event === "chat") {
+      log.debug({ payload: frame.payload }, "chat event received");
       const parsed = ChatEventPayloadSchema.safeParse(frame.payload);
       if (!parsed.success) {
         log.warn({ err: parsed.error.message }, "chat event validation failed");
         return;
       }
+
       const { runId, seq, state, message, errorMessage } = parsed.data;
+      const text = this.extractText(message);
       const handler = this.pendingRuns.get(runId);
-      if (!handler) return;
+
+      if (!handler) {
+        // No handler yet — buffer the event for replay when onRun() is called
+        const buf = this.earlyEvents.get(runId) ?? [];
+        buf.push({
+          state,
+          text,
+          message: message as Record<string, unknown> | undefined,
+          errorMessage,
+          seq,
+          bufferedAt: Date.now(),
+        });
+        this.earlyEvents.set(runId, buf);
+        log.info({ runId, state, seq, buffered: buf.length }, "buffered early event (no handler yet)");
+
+        // Also persist to Redis Stream so SSE can replay even if in-memory buffer is lost
+        const redis = getRedis();
+        if (redis) {
+          const streamKey = `rs:${runId}`;
+          const type = state === "delta" ? "d" : state === "final" ? "f" : state === "aborted" ? "a" : "e";
+          const fields = type === "e"
+            ? ["t", type, "msg", errorMessage ?? "unknown", "seq", String(seq)]
+            : ["t", type, "text", text, "seq", String(seq)];
+          redis.xadd(streamKey, "*", ...fields)
+            .then(() => { if (state !== "delta") return redis.expire(streamKey, 600); })
+            .catch(err => log.debug({ err: String(err) }, "redis stream early event write failed"));
+        }
+
+        return;
+      }
 
       // Deduplicate by seq — skip events we've already seen
-      if (seq <= handler.lastSeq) return;
+      // Dedupe: skip if seq already processed, BUT allow final event with same seq as last delta
+      if (seq < handler.lastSeq || (seq === handler.lastSeq && state === "delta")) return;
       handler.lastSeq = seq;
 
-      // Extract text from message content blocks
-      const text = this.extractText(message);
+      // Write to Redis Stream (fire-and-forget for persistence/replay)
+      const redis = getRedis();
+      const streamKey = `rs:${runId}`;
 
       if (state === "delta") {
         handler.onDelta(text, message as Record<string, unknown>);
+        if (redis) {
+          redis.xadd(streamKey, "*", "t", "d", "text", text, "seq", String(seq))
+            .catch(err => log.debug({ err: String(err) }, "redis stream delta write failed"));
+        }
       }
+
+      log.debug({ state, runId }, "chat event state");
       if (state === "final") {
         handler.onFinal(text, message as Record<string, unknown>);
         this.pendingRuns.delete(runId);
+        if (redis) {
+          redis.xadd(streamKey, "*", "t", "f", "text", text, "seq", String(seq))
+            .then(() => redis.expire(streamKey, 600))
+            .catch(err => log.debug({ err: String(err) }, "redis stream final write failed"));
+        }
       }
+
       if (state === "aborted") {
         handler.onFinal(text, message as Record<string, unknown>);
         this.pendingRuns.delete(runId);
+        if (redis) {
+          redis.xadd(streamKey, "*", "t", "a", "text", text, "seq", String(seq))
+            .then(() => redis.expire(streamKey, 600))
+            .catch(err => log.debug({ err: String(err) }, "redis stream aborted write failed"));
+        }
       }
+
       if (state === "error") {
         handler.onError(errorMessage ?? "unknown error");
         this.pendingRuns.delete(runId);
+        if (redis) {
+          redis.xadd(streamKey, "*", "t", "e", "msg", errorMessage ?? "unknown", "seq", String(seq))
+            .then(() => redis.expire(streamKey, 600))
+            .catch(err => log.debug({ err: String(err) }, "redis stream error write failed"));
+        }
       }
+
     }
+
   }
+
 
   private extractText(
     message?: { content?: Array<{ type?: string; text?: string }> },
@@ -643,6 +844,7 @@ export class GatewayRelay {
       .map((block) => block.text ?? "")
       .join("");
   }
+
 
   private sendRequest(
     method: string,
@@ -659,6 +861,7 @@ export class GatewayRelay {
         });
         return;
       }
+
 
       const id = String(++this.reqId);
 
@@ -683,11 +886,19 @@ export class GatewayRelay {
             error: { code: "TIMEOUT", message: `${method} timed out` },
           });
         }
+
       }, 30_000);
     });
   }
 
+
   private scheduleReconnect(): void {
+    // Preserve run handlers across reconnect — active streams survive WS drops.
+    // When WS reconnects, OpenClaw resends pending events or the handler
+    // times out naturally via the SSE stream timeout on the client side.
+    log.warn({ activeRuns: this.pendingRuns.size }, "WS disconnected — preserving run handlers for reconnect");
+    this._reconnecting = true;
+
     const delay = Math.min(
       1000 * Math.pow(2, this.reconnectAttempt),
       30_000,
@@ -698,14 +909,18 @@ export class GatewayRelay {
     this.reconnectTimer = setTimeout(async () => {
       try {
         await this.connect(this.url, this.token);
+        this._reconnecting = false;
         log.info("reconnected");
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         log.error({ err: msg }, "reconnect failed");
       }
+
     }, delay);
   }
+
 }
+
 
 // Backward-compat singleton — will be replaced by GatewayPool in OPS-22
 export const gateway = new GatewayRelay();

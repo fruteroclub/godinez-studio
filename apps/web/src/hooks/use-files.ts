@@ -12,13 +12,17 @@ interface StorageQuota {
   usedPercent: number;
 }
 
+interface FileWithConversation extends FileRecord {
+  conversationTitle: string | null;
+}
+
 export function useFiles(workspaceId: number | undefined) {
   const { getToken } = useAuth();
   return useQuery({
     queryKey: ["files", workspaceId],
     queryFn: async () => {
       const token = await getToken();
-      const res = await apiFetch<{ items: FileRecord[]; nextCursor: number | null }>(
+      const res = await apiFetch<{ items: FileWithConversation[]; nextCursor: number | null }>(
         `/api/workspaces/${workspaceId}/files`,
         { token },
       );
@@ -63,6 +67,32 @@ export function useUploadFile(workspaceId: number) {
       qc.invalidateQueries({ queryKey: ["storage-quota", workspaceId] });
       toast.success(content.toast.fileUploaded);
       trackEvent("file_uploaded");
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Error al subir archivo");
+    },
+  });
+}
+
+export function useDeleteFile(workspaceId: number) {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (fileId: number) => {
+      const token = await getToken();
+      return apiFetch<{ deleted: boolean }>(`/api/files/${fileId}`, {
+        method: "DELETE",
+        token,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["files", workspaceId] });
+      qc.invalidateQueries({ queryKey: ["storage-quota", workspaceId] });
+      toast.success("Archivo eliminado");
+      trackEvent("file_deleted");
+    },
+    onError: () => {
+      toast.error("Error al eliminar archivo");
     },
   });
 }
