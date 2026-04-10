@@ -245,65 +245,10 @@ app.patch("/:id", async (c) => {
   }
 
   if (body.isGlobal !== undefined) {
-
-  if (body.conversationId !== undefined) {
-    updates.conversationId = body.conversationId;
-  }
-
-  if (body.isGlobalChat !== undefined) {
-    updates.isGlobalChat = body.isGlobalChat;
-    if (body.isGlobalChat) {
-      updates.conversationId = null;
-    }
-  }
     updates.isGlobal = body.isGlobal;
-
-  if (body.conversationId !== undefined) {
-    updates.conversationId = body.conversationId;
-  }
-
-  if (body.isGlobalChat !== undefined) {
-    updates.isGlobalChat = body.isGlobalChat;
-    if (body.isGlobalChat) {
-      updates.conversationId = null;
-    }
-  }
     if (body.isGlobal) {
-
-  if (body.conversationId !== undefined) {
-    updates.conversationId = body.conversationId;
-  }
-
-  if (body.isGlobalChat !== undefined) {
-    updates.isGlobalChat = body.isGlobalChat;
-    if (body.isGlobalChat) {
-      updates.conversationId = null;
-    }
-  }
       updates.projectId = null; // Global files don't have a specific project
-
-  if (body.conversationId !== undefined) {
-    updates.conversationId = body.conversationId;
-  }
-
-  if (body.isGlobalChat !== undefined) {
-    updates.isGlobalChat = body.isGlobalChat;
-    if (body.isGlobalChat) {
-      updates.conversationId = null;
     }
-  }
-    }
-
-  if (body.conversationId !== undefined) {
-    updates.conversationId = body.conversationId;
-  }
-
-  if (body.isGlobalChat !== undefined) {
-    updates.isGlobalChat = body.isGlobalChat;
-    if (body.isGlobalChat) {
-      updates.conversationId = null;
-    }
-  }
   }
 
   if (body.conversationId !== undefined) {

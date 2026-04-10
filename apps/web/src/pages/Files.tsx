@@ -87,34 +87,7 @@ export default function Files() {
   const [fileToDelete, setFileToDelete] = useState<FileItem | null>(null);
 
 
-  // Highlight file from project
-  useEffect(() => {
-    if (highlightProjectId && files) {
-      const projectFiles = files.filter(f => f.projectId === Number(highlightProjectId));
-      if (projectFiles.length > 0) {
-        const sorted = [...projectFiles].sort((a, b) => {
-          const dateA = new Date(a.createdAt).getTime();
-          const dateB = new Date(b.createdAt).getTime();
-          return dateB - dateA;
-        });
-        const mostRecent = sorted[0];
-        setHighlightedFileId(mostRecent.id);
-        setTimeout(() => {
-          const el = document.getElementById(`file-${mostRecent.id}`);
-          if (el) {
-            el.scrollIntoView({ behavior: "smooth", block: "center" });
-          }
-        }, 100);
-        setTimeout(() => {
-          setSearchParams({});
-          setHighlightedFileId(null);
-        }, 600);
-      }
-    }
-  }, [highlightProjectId, files, setSearchParams]);
-
-
-  // Highlight file from project
+  // Highlight file from project (includes global files)
   useEffect(() => {
     if (highlightProjectId && files) {
       const projectFiles = files.filter(f => f.projectId === Number(highlightProjectId) || (f.isGlobal && workspace?.id));
