@@ -1,9 +1,115 @@
 {
-  "id": "6b327680-6f98-4316-84c5-285e00f12e9c",
-  "prevId": "24e814c9-5fde-445d-b8bc-1c1c090da0f0",
+  "id": "0b840256-2b15-4367-8325-dd28f4778c0f",
+  "prevId": "6794f513-8597-4137-87cc-49d9fba4b94b",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.accounts": {
+      "name": "accounts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "owner_id": {
+          "name": "owner_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "stripe_customer_id": {
+          "name": "stripe_customer_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "subscription_id": {
+          "name": "subscription_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "subscription_status": {
+          "name": "subscription_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'free'"
+        },
+        "subscription_tier": {
+          "name": "subscription_tier",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "current_period_end": {
+          "name": "current_period_end",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "accounts_owner_id_users_id_fk": {
+          "name": "accounts_owner_id_users_id_fk",
+          "tableFrom": "accounts",
+          "tableTo": "users",
+          "columnsFrom": [
+            "owner_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "accounts_owner_id_unique": {
+          "name": "accounts_owner_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "owner_id"
+          ]
+        },
+        "accounts_stripe_customer_id_unique": {
+          "name": "accounts_stripe_customer_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "stripe_customer_id"
+          ]
+        },
+        "accounts_subscription_id_unique": {
+          "name": "accounts_subscription_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "subscription_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.agent_logs": {
       "name": "agent_logs",
       "schema": "",
@@ -255,13 +361,6 @@
         },
         "is_hackathon": {
           "name": "is_hackathon",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
-        },
-        "is_starred": {
-          "name": "is_starred",
           "type": "boolean",
           "primaryKey": false,
           "notNull": true,
@@ -554,20 +653,6 @@
           "type": "integer",
           "primaryKey": false,
           "notNull": false
-        },
-        "is_global": {
-          "name": "is_global",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": false
-        },
-        "is_global_chat": {
-          "name": "is_global_chat",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": false,
-          "default": false
         },
         "conversation_id": {
           "name": "conversation_id",
@@ -1076,21 +1161,6 @@
           "concurrently": false,
           "method": "btree",
           "with": {}
-        },
-        "messages_workspace_id_idx": {
-          "name": "messages_workspace_id_idx",
-          "columns": [
-            {
-              "expression": "workspace_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -1380,23 +1450,7 @@
           "default": "now()"
         }
       },
-      "indexes": {
-        "run_contexts_created_at_idx": {
-          "name": "run_contexts_created_at_idx",
-          "columns": [
-            {
-              "expression": "created_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
+      "indexes": {},
       "foreignKeys": {
         "run_contexts_conversation_id_conversations_id_fk": {
           "name": "run_contexts_conversation_id_conversations_id_fk",
@@ -1679,24 +1733,6 @@
         "business_description": {
           "name": "business_description",
           "type": "varchar(255)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "project_type": {
-          "name": "project_type",
-          "type": "varchar(20)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "project_subtype": {
-          "name": "project_subtype",
-          "type": "varchar(30)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "deadline": {
-          "name": "deadline",
-          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false
         },
