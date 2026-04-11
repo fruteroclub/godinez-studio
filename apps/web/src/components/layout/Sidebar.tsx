@@ -10,7 +10,6 @@ import {
   FileText, 
   BarChart3, 
   Trophy, 
-  Bot, 
   Users, 
   Settings,
   Lock,
@@ -102,7 +101,6 @@ function getNavSections(slug: string): NavSection[] {
 
 function getConfigItems(slug: string): NavItem[] {
   return [
-    { label: sidebar.agent, href: `/studio/${slug}/agents`, icon: Bot },
     { label: sidebar.team, subtitle: "Próximamente", href: `/studio/${slug}/team`, icon: Users, disabled: true },
     { label: sidebar.settings, href: `/studio/${slug}/settings`, icon: Settings },
   ];
@@ -203,7 +201,7 @@ export default function Sidebar({
 
         {/* Bottom section */}
         <div className="flex flex-col items-center gap-1 border-t border-[hsl(var(--sidebar-border))] py-1">
-          {configItems.slice(0, 2).map((item) => {
+          {configItems.map((item) => {
             const Icon = item.icon;
             return (
               <Link
@@ -267,9 +265,9 @@ export default function Sidebar({
         </Link>
       </div>
       {/* Main Navigation */}
-      <nav className="overflow-hidden px-2 py-1">
+      <nav className="flex-1 overflow-y-auto px-2 py-1">
         {sections.map((section) => (
-          <div key={section.title} className="mb-4">
+          <div key={section.title} className="mb-2">
             <div className="px-3 py-1 text-[10px] font-semibold tracking-wider text-[hsl(var(--sidebar-foreground))]/[0.27] uppercase">
               {section.title}
             </div>
@@ -311,8 +309,8 @@ export default function Sidebar({
         ))}
       </nav>
 
-      {/* Configuration Section */}
-      <nav className="border-t border-[hsl(var(--sidebar-border))] px-2 py-1">
+      {/* Configuration Section - anchored to bottom */}
+      <nav className="mt-auto border-t border-[hsl(var(--sidebar-border))] px-2 py-1">
         <div className="px-3 py-1 text-[10px] font-semibold tracking-wider text-[hsl(var(--sidebar-foreground))]/[0.27] uppercase">
           CONFIGURACIÓN
         </div>
@@ -332,14 +330,7 @@ export default function Sidebar({
               }`}
             >
               <Icon className="w-4 h-4 stroke-[1.5]" />
-              <div className="flex flex-col">
-                <span>{item.label}</span>
-                {item.subtitle && (
-                  <span className="text-[10px] text-[hsl(var(--sidebar-foreground))]/[0.27]">
-                    {item.subtitle}
-                  </span>
-                )}
-              </div>
+              <span>{item.label}</span>
             </Link>
           );
         })}

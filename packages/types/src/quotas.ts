@@ -8,7 +8,7 @@ export interface TierLimits {
 export const TIER_LIMITS: Record<string, TierLimits> = {
   beta_tester: {
     monthlyTokens: 500_000,
-    storageBytes: 1 * 1024 * 1024 * 1024, // 1 GB
+    storageBytes: 500 * 1024 * 1024, // 500 MB
     maxAgents: 1,
     maxMembers: 5,
   },

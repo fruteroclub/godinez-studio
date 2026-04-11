@@ -70,13 +70,10 @@ function getPageTitle(
     };
   }
   
-  // Otras páginas
+  const PAGE_TITLES: Record<string, string> = { chat: "Chat", projects: "Proyectos", tasks: "Tareas", files: "Archivos", activity: "Actividad", team: "Equipo", settings: "Configuración", hackathon: "Hackathon", lab: "Lab", agents: "Agente" };
   const lastSegment = segments[segments.length - 1] || "Inicio";
-  return {
-    title: lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1)
-  };
+  return { title: PAGE_TITLES[lastSegment] || (lastSegment.charAt(0).toUpperCase() + lastSegment.slice(1)) };
 }
-
 const connectionConfig = {
   offline: {
     icon: WifiOff,

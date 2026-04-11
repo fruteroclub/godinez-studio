@@ -19,6 +19,8 @@ export function useTasks(workspaceId: number | undefined) {
       return res.items;
     },
     enabled: !!workspaceId,
+    staleTime: 0,
+    refetchOnMount: true,
   });
 }
 
@@ -148,6 +150,40 @@ export function useUpdateTaskStatus(workspaceId: number) {
       if (context?.previous) {
         qc.setQueryData(["tasks", workspaceId], context.previous);
       }
+    },
+    onSettled: () =>
+      qc.invalidateQueries({ queryKey: ["tasks", workspaceId] }),
+  });
+}
+
+export function useDeleteTask(workspaceId: number) {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (taskId: number) => {
+      const token = await getToken();
+      return apiFetch<{ deleted: boolean }>(`/api/tasks/${taskId}`, {
+        method: "DELETE",
+        token,
+      });
+    },
+    onMutate: async (taskId) => {
+      await qc.cancelQueries({ queryKey: ["tasks", workspaceId] });
+      const previous = qc.getQueryData<Task[]>(["tasks", workspaceId]);
+      qc.setQueryData<Task[]>(["tasks", workspaceId], (old) =>
+        old?.filter((t) => t.id !== taskId),
+      );
+      return { previous };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previous) {
+        qc.setQueryData(["tasks", workspaceId], context.previous);
+      }
+      toast.error("Error al eliminar tarea");
+    },
+    onSuccess: () => {
+      toast.success("Tarea eliminada");
+      trackEvent("task_deleted");
     },
     onSettled: () =>
       qc.invalidateQueries({ queryKey: ["tasks", workspaceId] }),

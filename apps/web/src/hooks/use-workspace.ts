@@ -41,6 +41,9 @@ export function useDashboard(workspaceId: number | undefined) {
   const { getToken } = useAuth();
   return useQuery({
     queryKey: ["dashboard", workspaceId],
+    refetchInterval: 5000,
+    staleTime: 0,
+    refetchOnMount: true,
     queryFn: async () => {
       const token = await getToken();
       return apiFetch<DashboardStats>(
