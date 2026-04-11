@@ -32,9 +32,9 @@ export default function Dashboard() {
   }
 
   const statCards = [
+    { label: dashboard.recentMessages, value: stats?.totalMessages ?? 0, path: `/studio/${slug}/chat` },
     { label: dashboard.activeProjects, value: stats?.activeProjects ?? 0, path: `/studio/${slug}/projects` },
     { label: dashboard.pendingTasks, value: stats?.pendingTasks ?? 0, path: `/studio/${slug}/tasks` },
-    { label: dashboard.recentMessages, value: stats?.totalMessages ?? 0, path: `/studio/${slug}/chat` },
   ];
 
   const status = CONNECTION_STATUS[connectionState];
@@ -46,7 +46,7 @@ export default function Dashboard() {
           {dashboard.title}
         </h1>
         <p className="text-[hsl(var(--muted-foreground))]">
-          {dashboard.welcome}, {workspace?.name}
+          {dashboard.welcome}
         </p>
       </div>
 
@@ -55,7 +55,7 @@ export default function Dashboard() {
           <div
             key={stat.label}
             onClick={() => navigate(stat.path)}
-            className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 cursor-pointer transition-all hover:border-magenta/50 hover:bg-[hsl(var(--card))]/80"
+            className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 cursor-pointer transition-all hover:border-magenta/50 hover:bg-[hsl(var(--card))]/80 text-center"
           >
             <p className="text-sm text-[hsl(var(--muted-foreground))]">
               {stat.label}
@@ -69,7 +69,7 @@ export default function Dashboard() {
 
       {stats?.agent && (
         <div 
-          onClick={() => navigate(`/studio/${slug}/agents`)} 
+          onClick={() => navigate(`/studio/${slug}/settings?tab=agente`)} 
           className="rounded-lg cursor-pointer transition-all hover:border-magenta/50 border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4"
         >
           <div className="flex items-center gap-3">
@@ -92,7 +92,7 @@ export default function Dashboard() {
       )}
 
       {usage && (
-        <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 space-y-3">
+        <div onClick={() => navigate(`/studio/${slug}/settings?tab=uso`)} className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 space-y-3 cursor-pointer transition-all hover:border-magenta/50">
           <p className="text-sm font-medium text-[hsl(var(--foreground))]">
             Uso del mes
           </p>

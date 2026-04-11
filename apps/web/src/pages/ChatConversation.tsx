@@ -503,7 +503,7 @@ export default function ChatConversation() {
                     <span className="w-2 h-2 bg-magenta rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
                     <span className="w-2 h-2 bg-magenta rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                   </div>
-                  <p className="text-xs text-magenta font-medium">Creando tu proyecto...</p>
+                  <p className="text-xs text-magenta font-medium">Escribiendo...</p>
                 </div>
               </div>
             )}

@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   pgTable,
@@ -22,6 +23,8 @@ export const files = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: "cascade" }),
     projectId: integer("project_id").references(() => projects.id, { onDelete: "set null" }),
+    isGlobal: boolean("is_global").default(false), // true = available to all projects
+    isGlobalChat: boolean("is_global_chat").default(false), // true = available to all chats
     conversationId: integer("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
     storageKey: text("storage_key").notNull(),
     url: text("url").notNull(),

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useWorkspaces } from "@/hooks/use-workspace";
 import { Navigate, Link } from "react-router-dom";
 import {
   LineChart,
@@ -1034,10 +1035,12 @@ type TabKey = (typeof TABS)[number]["key"];
 
 export default function Admin() {
   const { data: user, isLoading } = useCurrentUser();
+  const { data: workspaces } = useWorkspaces();
+  const firstWorkspace = workspaces?.[0];
   const [tab, setTab] = useState<TabKey>("overview");
 
   if (isLoading) return <PageSkeleton />;
-  if (user?.role !== "admin") return <Navigate to="/studio" replace />;
+  if (user?.role !== "admin") return <Navigate to={`/studio/${firstWorkspace?.slug ?? ""}`} replace />;
 
   return (
     <div className="min-h-screen bg-[hsl(var(--background))]">
@@ -1047,7 +1050,7 @@ export default function Admin() {
             {admin.title}
           </h1>
           <Link
-            to="/studio"
+            to={`/studio/${firstWorkspace?.slug ?? ""}`}
             className="rounded-md px-3 py-1.5 text-sm text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--muted))] transition-colors"
           >
             ← Studio

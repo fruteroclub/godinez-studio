@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { Trash2 } from "lucide-react";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
-import { useProjects, useCreateProject } from "@/hooks/use-projects";
+import { useProjects, useCreateProject, useDeleteProject } from "@/hooks/use-projects";
 import { content } from "@/lib/content";
 import EmptyState from "@/components/ui/EmptyState";
 import { ListSkeleton } from "@/components/ui/Skeleton";
@@ -18,8 +19,10 @@ export default function Projects() {
   const { workspace, slug } = useWorkspace();
   const { data: projects, isLoading } = useProjects(workspace?.id);
   const createProject = useCreateProject(workspace?.id ?? 0);
+  const deleteProject = useDeleteProject(workspace?.id ?? 0);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
@@ -30,6 +33,11 @@ export default function Projects() {
     });
     setName("");
     setDescription("");
+  }
+
+  async function handleDelete(projectId: number) {
+    await deleteProject.mutateAsync(projectId);
+    setConfirmDelete(null);
   }
 
   return (
@@ -74,12 +82,14 @@ export default function Projects() {
       ) : (
         <div className="space-y-2">
           {projects.map((project) => (
-            <Link
+            <div
               key={project.id}
-              to={`/studio/${slug}/projects/${project.id}`}
               className="flex items-center justify-between rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 transition-colors hover:border-magenta/30"
             >
-              <div className="min-w-0 flex-1">
+              <Link
+                to={`/studio/${slug}/projects/${project.id}`}
+                className="min-w-0 flex-1"
+              >
                 <p className="font-medium text-[hsl(var(--foreground))]">
                   {project.name}
                 </p>
@@ -88,13 +98,43 @@ export default function Projects() {
                     {project.description}
                   </p>
                 )}
+              </Link>
+              <div className="flex items-center gap-3 ml-3">
+                <span
+                  className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColors[project.status] ?? statusColors.archived}`}
+                >
+                  {project.status}
+                </span>
+                {confirmDelete === project.id ? (
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleDelete(project.id)}
+                      disabled={deleteProject.isPending}
+                      className="rounded px-2 py-1 text-xs font-medium text-red-400 bg-red-500/20 hover:bg-red-500/30 transition-colors"
+                    >
+                      Confirmar
+                    </button>
+                    <button
+                      onClick={() => setConfirmDelete(null)}
+                      className="rounded px-2 py-1 text-xs font-medium text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setConfirmDelete(project.id);
+                    }}
+                    className="p-1.5 rounded text-[hsl(var(--muted-foreground))] hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    title="Eliminar proyecto"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                )}
               </div>
-              <span
-                className={`ml-3 rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColors[project.status] ?? statusColors.archived}`}
-              >
-                {project.status}
-              </span>
-            </Link>
+            </div>
           ))}
         </div>
       )}
