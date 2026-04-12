@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { MoreHorizontal, Star, Pencil, Trash2, X, Check } from "lucide-react";
 import { useWorkspace } from "@/providers/WorkspaceProvider";
 import {
@@ -9,6 +9,8 @@ import {
   useUpdateConversation,
 } from "@/hooks/use-conversations";
 import { useProjects } from "@/hooks/use-projects";
+import { useFiles } from "@/hooks/use-files";
+import { FileText } from "lucide-react";
 import { content } from "@/lib/content";
 import EmptyState from "@/components/ui/EmptyState";
 import { ListSkeleton } from "@/components/ui/Skeleton";
@@ -34,17 +36,50 @@ export default function Chat() {
   const { workspace, slug } = useWorkspace();
   const { data: conversations, isLoading } = useConversations(workspace?.id);
   const { data: projects } = useProjects(workspace?.id);
+  const { data: files } = useFiles(workspace?.id);
   const createConversation = useCreateConversation(workspace?.id ?? 0);
   const deleteConversation = useDeleteConversation(workspace?.id ?? 0);
   const updateConversation = useUpdateConversation(workspace?.id ?? 0);
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const highlightProjectId = searchParams.get("highlight");
+  const [highlightedConvId, setHighlightedConvId] = useState<number | null>(null);
   const [convToDelete, setConvToDelete] = useState<ConversationToDelete | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [menuState, setMenuState] = useState<MenuState>({ conversationId: null, position: { x: 0, y: 0 } });
   const [renameState, setRenameState] = useState<RenameState>({ conversationId: null, title: "" });
   const menuRef = useRef<HTMLDivElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
+
+  // Highlight conversation from project
+  useEffect(() => {
+    if (highlightProjectId && conversations) {
+      const projectConvs = conversations.filter(c => c.projectId === Number(highlightProjectId));
+      if (projectConvs.length > 0) {
+        // Sort by lastMessageAt or createdAt, get most recent
+        const sorted = [...projectConvs].sort((a, b) => {
+          const dateA = new Date(a.lastMessageAt || a.createdAt).getTime();
+          const dateB = new Date(b.lastMessageAt || b.createdAt).getTime();
+          return dateB - dateA;
+        });
+        const mostRecent = sorted[0];
+        setHighlightedConvId(mostRecent.id);
+        // Scroll to element
+        setTimeout(() => {
+          const el = document.getElementById(`conv-${mostRecent.id}`);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "center" });
+          }
+        }, 100);
+        // Clear highlight param after 3s
+        setTimeout(() => {
+          setSearchParams({});
+          setHighlightedConvId(null);
+        }, 600);
+      }
+    }
+  }, [highlightProjectId, conversations, setSearchParams]);
 
   // Close menu on click outside
   useEffect(() => {
@@ -148,11 +183,15 @@ export default function Chat() {
   const renderConversationItem = (conv: NonNullable<typeof conversations>[number]) => {
     const projName = conv.projectId ? projectMap.get(conv.projectId) : undefined;
     const isRenaming = renameState.conversationId === conv.id;
+    // Get most recent file for this conversation
+    const convFiles = files?.filter(f => f.conversationId === conv.id) ?? [];
+    const latestFile = convFiles.length > 0 ? convFiles.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0] : null;
 
     return (
       <div
         key={conv.id}
-        className="group flex items-center justify-between rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 transition-colors hover:border-magenta/30"
+        id={`conv-${conv.id}`}
+        className={`group flex items-center justify-between rounded-lg border p-4 transition-all duration-500 ${highlightedConvId === conv.id ? "border-magenta ring-2 ring-magenta/50 bg-magenta/5" : "border-[hsl(var(--border))] bg-[hsl(var(--card))] hover:border-magenta/30"}`}
       >
         <button
           onClick={() => !isRenaming && navigate(`/studio/${slug}/chat/${conv.id}`)}
@@ -205,6 +244,12 @@ export default function Chat() {
                     {projName}
                   </span>
                 )}
+                {latestFile && (
+                  <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-[10px] font-medium text-cyan-400 flex items-center gap-1">
+                    <FileText className="w-3 h-3" />
+                    {latestFile.filename.length > 15 ? latestFile.filename.slice(0, 12) + "..." : latestFile.filename}
+                  </span>
+                )}
                 <span className="text-xs text-[hsl(var(--muted-foreground))]">
                   {conv.channel}
                 </span>
@@ -220,7 +265,7 @@ export default function Chat() {
           )}
           <button
             onClick={(e) => handleMenuClick(conv, e)}
-            className="rounded p-1.5 text-[hsl(var(--muted-foreground))] opacity-0 group-hover:opacity-100 hover:bg-zinc-700 transition-all"
+            className="rounded p-1.5 text-[hsl(var(--muted-foreground))] opacity-0 group-hover:opacity-100 hover:bg-zinc-700 transition-all duration-500"
             title="Opciones"
           >
             <MoreHorizontal className="w-4 h-4" />

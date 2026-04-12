@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { eq, and, count } from "drizzle-orm";
+import { eq, and, or, count } from "drizzle-orm";
 import { tasks, conversations, files, projects as projectsTable } from "@godinez/db";
 import type { AuthEnv } from "../types";
 import { requireAuth } from "../middleware/auth";
@@ -54,7 +54,7 @@ app.get("/:id", async (c) => {
         .where(and(eq(tasks.projectId, id), eq(tasks.status, "completed"))),
       db.select({ count: count() }).from(conversations)
         .where(eq(conversations.projectId, id)),
-      db.select({ count: count() }).from(files).where(eq(files.projectId, id)),
+      db.select({ count: count() }).from(files).where(or(eq(files.projectId, id), and(eq(files.workspaceId, project.workspaceId), eq(files.isGlobal, true)))),
     ]);
 
   return c.json({

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { eq, and, desc, lt } from "drizzle-orm";
+import { eq, and, or, desc, lt } from "drizzle-orm";
 import { files as filesTable, projects as projectsTable } from "@godinez/db";
 import type { AuthEnv } from "../types";
 import { requireAuth } from "../middleware/auth";
@@ -195,8 +195,82 @@ projectFiles.get("/:id/files", async (c) => {
     return c.json({ error: "Not a workspace member" }, 403);
   }
   const files = await db.query.files.findMany({
-    where: eq(filesTable.projectId, projectId),
+    where: or(eq(filesTable.projectId, projectId), and(eq(filesTable.workspaceId, project.workspaceId), eq(filesTable.isGlobal, true))),
     orderBy: filesTable.createdAt,
   });
   return c.json(files);
+});
+
+// PATCH /api/files/:id — Update file (rename, associate to project)
+app.patch("/:id", async (c) => {
+  const userId = c.get("userId");
+  const id = parseInt(c.req.param("id"));
+  const body = await c.req.json<{ filename?: string; projectId?: number | null; isGlobal?: boolean; conversationId?: number | null; isGlobalChat?: boolean }>();
+
+  const file = await db.query.files.findFirst({
+    where: eq(filesTable.id, id),
+  });
+  if (!file) return c.json({ error: "File not found" }, 404);
+  if (!(await verifyWorkspaceAccess(userId, file.workspaceId))) {
+    return c.json({ error: "Not a workspace member" }, 403);
+  }
+
+  const updates: Partial<typeof file> = {};
+  
+  if (body.filename !== undefined && body.filename.trim() !== file.filename) {
+    // Check for duplicate filename
+    const existing = await db.query.files.findFirst({
+      where: and(
+        eq(filesTable.workspaceId, file.workspaceId),
+        eq(filesTable.filename, body.filename.trim())
+      ),
+    });
+    if (existing && existing.id !== id) {
+      return c.json({ error: "Ya existe un archivo con ese nombre" }, 409);
+    }
+    updates.filename = body.filename.trim();
+  }
+
+  if (body.projectId !== undefined) {
+    if (body.projectId !== null) {
+      // Verify project exists and belongs to same workspace
+      const project = await db.query.projects.findFirst({
+        where: eq(projectsTable.id, body.projectId),
+      });
+      if (!project || project.workspaceId !== file.workspaceId) {
+        return c.json({ error: "Project not found" }, 404);
+      }
+    }
+    updates.projectId = body.projectId;
+  }
+
+  if (body.isGlobal !== undefined) {
+    updates.isGlobal = body.isGlobal;
+    if (body.isGlobal) {
+      updates.projectId = null; // Global files don't have a specific project
+    }
+  }
+
+  if (body.conversationId !== undefined) {
+    updates.conversationId = body.conversationId;
+  }
+
+  if (body.isGlobalChat !== undefined) {
+    updates.isGlobalChat = body.isGlobalChat;
+    if (body.isGlobalChat) {
+      updates.conversationId = null;
+    }
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return c.json(file);
+  }
+
+  const [updated] = await db
+    .update(filesTable)
+    .set(updates)
+    .where(eq(filesTable.id, id))
+    .returning();
+
+  return c.json(updated);
 });

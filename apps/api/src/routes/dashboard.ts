@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { eq, and, count } from "drizzle-orm";
-import { projects, tasks, messages, agents, workspaces } from "@godinez/db";
+import { projects, tasks, conversations, agents, workspaces } from "@godinez/db";
 import { getTierLimits } from "@godinez/types";
 import type { AuthEnv } from "../types";
 import { requireAuth } from "../middleware/auth";
@@ -17,14 +17,14 @@ app.use("*", requireAuth, resolveUser);
 app.get("/:id/dashboard", requireWorkspaceMember, async (c) => {
   const workspaceId = parseInt(c.req.param("id"));
 
-  const [[activeProjects], [pendingTasks], [totalMessages], workspace] =
+  const [[activeProjects], [pendingTasks], [totalConversations], workspace] =
     await Promise.all([
       db.select({ count: count() }).from(projects)
         .where(and(eq(projects.workspaceId, workspaceId), eq(projects.status, "active"))),
       db.select({ count: count() }).from(tasks)
         .where(and(eq(tasks.workspaceId, workspaceId), eq(tasks.status, "pending"))),
-      db.select({ count: count() }).from(messages)
-        .where(eq(messages.workspaceId, workspaceId)),
+      db.select({ count: count() }).from(conversations)
+        .where(eq(conversations.workspaceId, workspaceId)),
       db.query.workspaces.findFirst({ where: eq(workspaces.id, workspaceId) }),
     ]);
 
@@ -41,7 +41,7 @@ app.get("/:id/dashboard", requireWorkspaceMember, async (c) => {
   return c.json({
     activeProjects: activeProjects.count,
     pendingTasks: pendingTasks.count,
-    totalMessages: totalMessages.count,
+    totalMessages: totalConversations.count, // Now counts conversations, not messages
     agent,
   });
 });
