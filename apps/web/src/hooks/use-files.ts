@@ -13,6 +13,8 @@ interface StorageQuota {
 }
 
 interface FileWithConversation extends FileRecord {
+  isGlobal: boolean | null;
+  isGlobalChat: boolean | null;
   conversationTitle: string | null;
 }
 
@@ -93,6 +95,52 @@ export function useDeleteFile(workspaceId: number) {
     },
     onError: () => {
       toast.error("Error al eliminar archivo");
+    },
+  });
+}
+
+export function useRenameFile(workspaceId: number) {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ fileId, filename }: { fileId: number; filename: string }) => {
+      const token = await getToken();
+      return apiFetch<FileRecord>(`/api/files/${fileId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ filename }),
+        token,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["files", workspaceId] });
+      toast.success("Archivo renombrado");
+      trackEvent("file_renamed");
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Error al renombrar");
+    },
+  });
+}
+
+export function useAssociateFile(workspaceId: number) {
+  const { getToken } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ fileId, projectId, isGlobal, conversationId, isGlobalChat }: { fileId: number; projectId?: number | null; isGlobal?: boolean; conversationId?: number | null; isGlobalChat?: boolean }) => {
+      const token = await getToken();
+      return apiFetch<FileRecord>(`/api/files/${fileId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ projectId, isGlobal, conversationId, isGlobalChat }),
+        token,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["files", workspaceId] });
+      toast.success("Asociación actualizada");
+      trackEvent("file_project_changed");
+    },
+    onError: () => {
+      toast.error("Error al asociar");
     },
   });
 }
