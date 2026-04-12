@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   DndContext,
   DragOverlay,
@@ -19,6 +20,7 @@ import {
   useUpdateTask,
   useUpdateTaskStatus,
   useUpdateTaskProject,
+  useDeleteTask,
 } from "@/hooks/use-tasks";
 import { useProjects } from "@/hooks/use-projects";
 import { content } from "@/lib/content";
@@ -165,7 +167,7 @@ function TaskCard({
             }}
             className="h-[18px] appearance-none rounded-full bg-violet-500/20 py-0 pl-2 pr-4 text-[10px] font-medium leading-[18px] text-violet-400 border-none outline-none cursor-pointer hover:bg-violet-500/30 transition-colors"
           >
-            <option value="">Sin proyecto</option>
+            <option value="" disabled hidden>Asignar a proyecto</option>
             {projects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
@@ -211,7 +213,9 @@ function TaskEditModal({
   task,
   projects,
   onSave,
+  onDelete,
   onClose,
+  isDeleting,
   isSaving,
 }: {
   task: Task;
@@ -223,7 +227,9 @@ function TaskEditModal({
     priority: string;
     projectId: number | null;
   }) => void;
+  onDelete: (taskId: number) => void;
   onClose: () => void;
+  isDeleting: boolean;
   isSaving: boolean;
 }) {
   const [title, setTitle] = useState(task.title);
@@ -297,7 +303,8 @@ function TaskEditModal({
                 onChange={(e) => setPriority(e.target.value as TaskPriority)}
                 className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
               >
-                <option value="low">Baja</option>
+                <option value="" disabled hidden>Prioridad</option>
+            <option value="low">Baja</option>
                 <option value="medium">Media</option>
                 <option value="high">Alta</option>
                 <option value="urgent">Urgente</option>
@@ -316,7 +323,7 @@ function TaskEditModal({
                 }
                 className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
               >
-                <option value="">Sin proyecto</option>
+                <option value="" disabled hidden>Asignar a proyecto</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -347,7 +354,16 @@ function TaskEditModal({
         </div>
 
         {/* Actions */}
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-6 flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => onDelete(task.id)}
+            disabled={isDeleting}
+            className="rounded-md border border-red-500/30 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors disabled:opacity-50"
+          >
+            Eliminar
+          </button>
+          <div className="flex-1" />
           <button
             type="button"
             onClick={onClose}
@@ -378,11 +394,14 @@ export default function Tasks() {
   const updateTask = useUpdateTask(workspace?.id ?? 0);
   const updateStatus = useUpdateTaskStatus(workspace?.id ?? 0);
   const updateProject = useUpdateTaskProject(workspace?.id ?? 0);
+  const deleteTask = useDeleteTask(workspace?.id ?? 0);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState<TaskPriority>("medium");
+  const [priority, setPriority] = useState<TaskPriority | "">("");
   const [projectId, setProjectId] = useState<number | undefined>(undefined);
-  const [filterProjectId, setFilterProjectId] = useState<string>("all");
+  const [searchParams] = useSearchParams();
+  const initialProject = searchParams.get("project") || "all";
+  const [filterProjectId, setFilterProjectId] = useState<string>(initialProject);
   const [activeTask, setActiveTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
 
@@ -419,7 +438,7 @@ export default function Tasks() {
     });
     setTitle("");
     setDescription("");
-    setPriority("medium");
+    setPriority("");
   }
 
   function handleProjectChange(taskId: number, projectId: number | null) {
@@ -457,8 +476,8 @@ export default function Tasks() {
           onChange={(e) => setFilterProjectId(e.target.value)}
           className="rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-1.5 text-sm text-[hsl(var(--foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
         >
-          <option value="all">Todos los proyectos</option>
-          <option value="none">Sin proyecto</option>
+          <option value="all">Filtrar por proyecto</option>
+          <option value="none">Tareas sin proyecto</option>
           {(projects ?? []).map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
@@ -469,7 +488,7 @@ export default function Tasks() {
 
       <form
         onSubmit={handleCreate}
-        className="flex items-center gap-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4"
+        className="flex flex-col gap-3 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--card))] p-4 md:flex-row md:items-center"
       >
         <input
           type="text"
@@ -477,43 +496,47 @@ export default function Tasks() {
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Nombre de la tarea"
           required
-          className="w-48 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
+          className="w-full md:w-48 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
         />
         <input
           type="text"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Descripción (opcional)"
-          className="flex-1 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
+          className="w-full md:flex-1 rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
         />
-        <select
-          value={projectId ?? ""}
-          onChange={(e) =>
-            setProjectId(e.target.value ? Number(e.target.value) : undefined)
-          }
-          className="rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
-        >
-          <option value="">Sin proyecto</option>
-          {(projects ?? []).map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={priority}
-          onChange={(e) => setPriority(e.target.value as TaskPriority)}
-          className="rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
-        >
-          <option value="low">Baja</option>
-          <option value="medium">Media</option>
-          <option value="high">Alta</option>
-          <option value="urgent">Urgente</option>
-        </select>
+        {/* Proyecto + Prioridad: grid en móvil, inline en desktop */}
+        <div className="grid grid-cols-2 gap-2 w-full md:contents">
+          <select
+            value={projectId ?? ""}
+            onChange={(e) =>
+              setProjectId(e.target.value ? Number(e.target.value) : undefined)
+            }
+            className="w-full md:w-auto rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
+          >
+            <option value="" disabled hidden>Asignar a proyecto</option>
+            {(projects ?? []).map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={priority}
+            onChange={(e) => setPriority(e.target.value as TaskPriority)}
+            className="w-full md:w-auto rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
+          >
+            <option value="" disabled hidden>Prioridad</option>
+            <option value="low">Baja</option>
+            <option value="medium">Media</option>
+            <option value="high">Alta</option>
+            <option value="urgent">Urgente</option>
+          </select>
+        </div>
         <button
           type="submit"
           disabled={createTask.isPending}
-          className="rounded-md bg-magenta px-5 py-2 text-sm font-medium text-white hover:bg-magenta/90 transition-colors disabled:opacity-50"
+          className="w-full md:w-auto rounded-md bg-magenta px-5 py-2 text-sm font-medium text-white hover:bg-magenta/90 transition-colors disabled:opacity-50"
         >
           {tc.create}
         </button>
@@ -552,6 +575,12 @@ export default function Tasks() {
           task={editingTask}
           projects={projectList}
           onSave={handleEditSave}
+          onDelete={(taskId) => {
+            deleteTask.mutate(taskId, {
+              onSuccess: () => setEditingTask(null),
+            });
+          }}
+          isDeleting={deleteTask.isPending}
           onClose={() => setEditingTask(null)}
           isSaving={updateTask.isPending}
         />

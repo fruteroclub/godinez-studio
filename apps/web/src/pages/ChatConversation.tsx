@@ -18,7 +18,6 @@ import { ActionCard } from "@/components/chat/ActionCard";
 import { FileAttachmentButton, AttachmentPreview, MessageAttachment } from "@/components/chat/FileAttachment";
 import { DropZone } from "@/components/chat/DropZone";
 import { stripActionBlocks } from "@/lib/action-parser";
-import SubscriptionGate from "@/components/billing/SubscriptionGate";
 import { content } from "@/lib/content";
 
 const { chat } = content.studio;
@@ -134,7 +133,7 @@ export default function ChatConversation() {
     [qc, workspace?.id],
   );
 
-  const { messages, sendMessage, isStreaming, isLoading, agentOffline, subscriptionExpired, updateAction, connectionStatus } =
+  const { messages, sendMessage, isStreaming, isLoading, agentOffline, updateAction, connectionStatus } =
     useChat(Number(conversationId), workspace?.id ?? 0, { onComplete });
   
   // Sincronizar estado de conexión con el contexto global (para TopBar)
@@ -458,8 +457,7 @@ export default function ChatConversation() {
           </div>
         )}
 
-        {/* Subscription gate */}
-        {subscriptionExpired && <SubscriptionGate />}
+
 
         {/* Mobile banner when preview available */}
         {isMobile && previewUrl && (
@@ -505,7 +503,7 @@ export default function ChatConversation() {
                     <span className="w-2 h-2 bg-magenta rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
                     <span className="w-2 h-2 bg-magenta rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                   </div>
-                  <p className="text-xs text-magenta font-medium">Creando tu proyecto...</p>
+                  <p className="text-xs text-magenta font-medium">Escribiendo...</p>
                 </div>
               </div>
             )}

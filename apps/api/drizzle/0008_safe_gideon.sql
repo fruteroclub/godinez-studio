@@ -1,0 +1,1 @@
+ALTER TABLE "files" ADD COLUMN "is_global_chat" boolean DEFAULT false;
