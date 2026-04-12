@@ -394,12 +394,13 @@ function StepContextV3({
       {/* User name */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
-          ¿Cómo te llamas? <span className="text-magenta">*</span>
+          <span className="text-magenta">*</span> ¿Cómo te llamas?
         </label>
         <input
           type="text"
           value={userName}
-          onChange={(e) => setUserName(e.target.value)}
+          onChange={(e) => setUserName(e.target.value.slice(0, 45))}
+          maxLength={45}
           placeholder="Tu nombre"
           className={`w-full rounded-md border bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:outline-none focus:ring-2 focus:ring-magenta/20 ${
             showValidation && !userName.trim()
@@ -416,7 +417,7 @@ function StepContextV3({
       {/* User role */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
-          ¿A qué te dedicas? <span className="text-magenta">*</span>
+          <span className="text-magenta">*</span> ¿A qué te dedicas?
         </label>
         <div className="flex flex-wrap gap-2">
           {ROLE_IDS.map((id) => {
@@ -462,7 +463,7 @@ function StepContextV3({
       {/* Project type */}
       <div>
         <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
-          ¿Cómo vas a usar Godínez? <span className="text-magenta">*</span>
+          <span className="text-magenta">*</span> ¿Cómo vas a usar Godínez?
         </label>
         <div className="grid grid-cols-3 gap-3">
           {PROJECT_TYPES.map((type) => {
@@ -501,7 +502,7 @@ function StepContextV3({
       {projectType && subtypes.length > 0 && (
         <div className="animate-in fade-in slide-in-from-top-2 duration-300">
           <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
-            ¿Por dónde empezamos? <span className="text-magenta">*</span>
+            <span className="text-magenta">*</span> ¿Por dónde empezamos?
           </label>
           <div className={`grid gap-3 ${subtypes.length > 3 ? 'grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 sm:grid-cols-' + subtypes.length}`}>
             {subtypes.map((subtype) => {
@@ -541,7 +542,7 @@ function StepContextV3({
       )}
 
       {/* Role selector (only for profesional) */}
-      {projectType === "profesional" && projectSubtype && (
+      {false && projectType === "profesional" && projectSubtype && (
         <div className="animate-in fade-in slide-in-from-top-2 duration-300">
           <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
             ¿Cuál es tu rol?
@@ -712,7 +713,7 @@ function StepAgent({
 
       <div>
         <label className="mb-1.5 block text-sm font-medium text-[hsl(var(--foreground))]">
-          {onboarding.agentNameLabel} <span className="text-magenta">*</span>
+          <span className="text-magenta">*</span> {onboarding.agentNameLabel}
         </label>
         <input
           type="text"
@@ -734,7 +735,7 @@ function StepAgent({
 
       <div>
         <label className="mb-2 block text-sm font-medium text-[hsl(var(--foreground))]">
-          {onboarding.personalityLabel} <span className="text-magenta">*</span>
+          <span className="text-magenta">*</span> {onboarding.personalityLabel}
         </label>
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {PERSONALITY_IDS.map((id) => {
@@ -821,7 +822,8 @@ function StepWorkspaceLegacy({
           <input
             type="text"
             value={userName}
-            onChange={(e) => setUserName(e.target.value)}
+            onChange={(e) => setUserName(e.target.value.slice(0, 45))}
+          maxLength={45}
             placeholder={onboarding.userNamePlaceholder}
             className="w-full rounded-md border border-[hsl(var(--input))] bg-[hsl(var(--background))] px-3 py-2 text-sm text-[hsl(var(--foreground))] placeholder:text-[hsl(var(--muted-foreground))] focus:border-magenta focus:outline-none focus:ring-2 focus:ring-magenta/20"
           />

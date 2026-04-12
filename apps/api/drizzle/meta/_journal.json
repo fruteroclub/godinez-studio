@@ -50,6 +50,20 @@
       "when": 1775018726914,
       "tag": "0006_tense_pete_wisdom",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1775190384918,
+      "tag": "0007_curvy_white_tiger",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1775192709872,
+      "tag": "0008_safe_gideon",
+      "breakpoints": true
     }
   ]
 }

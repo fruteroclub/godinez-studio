@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { SignedIn, SignedOut, UserButton } from "@clerk/clerk-react";
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const location = useLocation();
+  const isOnboarding = location.pathname === "/studio/new" || location.pathname === "/studio";
 
   return (
     <nav className="sticky top-0 z-50 bg-[hsl(var(--background))]/95 backdrop-blur-lg border-b border-white/5">
@@ -29,13 +31,15 @@ export default function Navbar() {
           {/* Desktop right section */}
           <div className="hidden md:flex items-center gap-6">
             <SignedIn>
-              <Link
-                to="/studio"
-                className="text-[hsl(var(--foreground))]/50 hover:text-[hsl(var(--foreground))] transition-colors font-medium text-sm relative group"
-              >
-                Espacios de trabajo
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-magenta transition-all group-hover:w-full" />
-              </Link>
+              {!isOnboarding && (
+                <Link
+                  to="/studio"
+                  className="text-[hsl(var(--foreground))]/50 hover:text-[hsl(var(--foreground))] transition-colors font-medium text-sm relative group"
+                >
+                  Espacios de trabajo
+                  <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-magenta transition-all group-hover:w-full" />
+                </Link>
+              )}
               <UserButton
                 appearance={{ elements: { avatarBox: "h-8 w-8" } }}
               />
@@ -93,13 +97,15 @@ export default function Navbar() {
       {isOpen && (
         <div className="md:hidden bg-[hsl(var(--background))]/95 backdrop-blur-lg border-t border-white/5 py-3 px-4">
           <SignedIn>
-            <Link
-              to="/studio"
-              className="block py-3 text-[hsl(var(--foreground))]/75 hover:text-magenta transition-colors font-medium border-b border-white/5"
-              onClick={() => setIsOpen(false)}
-            >
-              Espacios de trabajo
-            </Link>
+            {!isOnboarding && (
+              <Link
+                to="/studio"
+                className="block py-3 text-[hsl(var(--foreground))]/75 hover:text-magenta transition-colors font-medium border-b border-white/5"
+                onClick={() => setIsOpen(false)}
+              >
+                Espacios de trabajo
+              </Link>
+            )}
           </SignedIn>
           <SignedOut>
             <Link
