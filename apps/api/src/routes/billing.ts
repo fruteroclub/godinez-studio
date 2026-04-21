@@ -11,6 +11,7 @@ import {
   updateAccountSubscription,
 } from "../dal/accounts";
 import { upsertUser } from "../dal/users";
+import { getWorkspacesByUserId } from "../dal/workspaces";
 import { logger } from "../lib/logger";
 
 const clerk = createClerkClient({
@@ -18,6 +19,36 @@ const clerk = createClerkClient({
 });
 
 const billing = new Hono<AuthEnv>();
+
+// ─── AUTH REQUIRED: Billing Status (for decision gate) ─────────────────────
+// Returns the user's current billing + workspace state so the frontend can
+// decide where to route: checkout, onboarding, studio, or paywall.
+billing.get(
+  "/status",
+  requireAuth,
+  resolveUser,
+  resolveAccount,
+  async (c) => {
+    const userId = c.get("userId");
+    const account = c.get("account");
+    const workspaces = await getWorkspacesByUserId(userId);
+    const firstWorkspace = workspaces[0];
+
+    const billingEnabled = process.env.BILLING_ENABLED === "true";
+    const subscriptionStatus = account.subscriptionStatus;
+    const hasActiveSubscription = !billingEnabled || subscriptionStatus === "active";
+
+    return c.json({
+      authenticated: true,
+      hasAccount: true,
+      subscriptionStatus,
+      hasActiveSubscription,
+      hasWorkspace: workspaces.length > 0,
+      workspaceSlug: firstWorkspace?.slug ?? null,
+      billingEnabled,
+    });
+  },
+);
 
 // ─── PUBLIC: Create Checkout Session ────────────────────────────────────────
 billing.post("/checkout", async (c) => {
