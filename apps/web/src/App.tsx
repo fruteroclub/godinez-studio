@@ -3,6 +3,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import PageLayout from "./components/layout/PageLayout";
 import Shell from "./components/layout/Shell";
+import { BillingGate } from "./components/billing/BillingGate";
 
 // Lazy load pages for code splitting
 const SignIn = lazy(() => import("./pages/SignIn"));
@@ -69,7 +70,9 @@ export const router = createBrowserRouter([
         path: "/studio",
         element: (
           <ProtectedRoute>
-            <LazyPage><WorkspaceSelector /></LazyPage>
+            <BillingGate>
+              <LazyPage><WorkspaceSelector /></LazyPage>
+            </BillingGate>
           </ProtectedRoute>
         ),
       },
@@ -77,7 +80,9 @@ export const router = createBrowserRouter([
         path: "/studio/new",
         element: (
           <ProtectedRoute>
-            <LazyPage><OnboardingWizard /></LazyPage>
+            <BillingGate>
+              <LazyPage><OnboardingWizard /></LazyPage>
+            </BillingGate>
           </ProtectedRoute>
         ),
       },
