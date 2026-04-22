@@ -24,6 +24,7 @@ import {
 import { pool } from "../services/gateway-pool";
 import { decrementUsedSlots } from "../dal/instances";
 import { ensureUniqueSlug } from "../lib/slug";
+import { resolveAccount } from "../middleware/resolve-account";
 
 const app = new Hono<AuthEnv>();
 
@@ -32,8 +33,23 @@ app.use("*", requireAuth, resolveUser);
 // POST /workspaces — Create workspace (max 1 per user)
 app.post(
   "/",
+  resolveAccount,
   zValidator("json", z.object({ name: z.string().min(1).max(255) })),
   async (c) => {
+    // Billing gate — block workspace creation without active subscription
+    if (process.env.BILLING_ENABLED === "true") {
+      const account = c.get("account");
+      if (account.subscriptionStatus !== "active") {
+        return c.json(
+          {
+            error: "SUBSCRIPTION_REQUIRED",
+            message: "Necesitas una suscripción activa para crear un workspace.",
+          },
+          402,
+        );
+      }
+    }
+
     const userId = c.get("userId");
     const existing = await getWorkspacesByUserId(userId);
     if (existing.length >= 1) {

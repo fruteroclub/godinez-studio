@@ -215,7 +215,10 @@ export default function OnboardingWizard() {
       navigate(`/studio/${ws.slug}/chat/${result.conversationId}`);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "";
-      if (msg.includes("CAPACITY_FULL")) {
+      if (msg.includes("SUBSCRIPTION_REQUIRED")) {
+        navigate("/billing/checkout");
+        return;
+      } else if (msg.includes("CAPACITY_FULL")) {
         setProvisionError(onboarding.capacityFull);
       } else if (msg.includes("GATEWAY_OFFLINE")) {
         setProvisionError(onboarding.gatewayOffline);
