@@ -89,6 +89,9 @@ Brand tokens defined in `apps/web/src/index.css` via Tailwind v4 `@theme inline`
 | `R2_SECRET_ACCESS_KEY` | No | R2 secret key |
 | `R2_PUBLIC_URL` | No | R2 public CDN URL |
 | `UPLOADS_DIR` | No | Local upload dir fallback (default: `./uploads`) |
+| `RESEND_API_KEY` | No | Resend API key for admin email sending (`/api/admin/email/send`) |
+| `RESEND_FROM_EMAIL` | No | Default from address (e.g. `Godínez.AI <invitaciones@godinez.ai>`) |
+| `STUDIO_SERVICE_KEY` | No | Shared secret for `X-Service-Key` header on service-to-service endpoints (also used by admin email) |
 
 ### `apps/web/.env`
 
@@ -217,6 +220,23 @@ All routes mounted in `apps/api/src/index.ts`:
 - `POST /api/referral-codes` — create code
 - `GET /api/referral-codes` — list (admin)
 - `POST /api/referral-codes/:code/redeem` — redeem
+
+### Admin Email (operational)
+- `POST /api/admin/email/send` — send custom email via Resend (auth: `X-Service-Key` header, same secret used by godinez-ai → Studio service-to-service calls)
+
+```bash
+curl -X POST https://dev-api.godinez.ai/api/admin/email/send \
+  -H "Content-Type: application/json" \
+  -H "X-Service-Key: $STUDIO_SERVICE_KEY" \
+  -d '{
+    "to": "user@example.com",
+    "subject": "Asunto custom",
+    "html": "<p>Hola...</p>",
+    "text": "Hola...",
+    "from": "Godínez.AI <invitaciones@godinez.ai>"
+  }'
+# → { "success": true, "id": "..." }
+```
 
 ### Webhooks
 - `POST /webhooks/clerk` — Clerk webhook handler (user.created, user.updated)

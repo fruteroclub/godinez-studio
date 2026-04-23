@@ -22,6 +22,7 @@ import conversations, {
 } from "./routes/conversations";
 import referralCodes from "./routes/referral-codes";
 import admin from "./routes/admin";
+import adminEmail from "./routes/admin-email";
 import users from "./routes/users";
 import hackathons from "./routes/hackathons";
 import errors from "./routes/errors";
@@ -77,6 +78,7 @@ app.route("/api/chat", chat);
 app.route("/api/conversations", conversations);
 app.route("/api/referral-codes", referralCodes);
 app.route("/api/admin/errors", errors); // before /api/admin to avoid admin middleware catch-all
+app.route("/api/admin/email", adminEmail); // before /api/admin — uses X-Admin-Password, not Clerk
 app.route("/api/admin", admin);
 app.route("/api/users", users);
 app.route("/api/hackathons", hackathons);
