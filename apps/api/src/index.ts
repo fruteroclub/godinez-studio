@@ -45,7 +45,7 @@ app.use(
   cors({
     origin: process.env.CORS_ORIGIN?.split(",") ?? [],
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowHeaders: ["Content-Type", "Authorization", "X-Service-Key", "X-Admin-Password"],
+    allowHeaders: ["Content-Type", "Authorization", "X-Service-Key"],
     exposeHeaders: ["Content-Type"],
     credentials: true,
     maxAge: 3600,

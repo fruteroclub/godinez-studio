@@ -2,12 +2,12 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { z } from "zod";
 import { Resend, type CreateEmailOptions } from "resend";
-import { requireAdminPassword } from "../middleware/require-admin-password";
+import { requireServiceKey } from "../middleware/require-service-key";
 import { logger } from "../lib/logger";
 
 const app = new Hono();
 
-app.use("*", requireAdminPassword);
+app.use("*", requireServiceKey);
 
 const DEFAULT_FROM = "Godínez.AI <invitaciones@godinez.ai>";
 

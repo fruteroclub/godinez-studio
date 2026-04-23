@@ -91,7 +91,7 @@ Brand tokens defined in `apps/web/src/index.css` via Tailwind v4 `@theme inline`
 | `UPLOADS_DIR` | No | Local upload dir fallback (default: `./uploads`) |
 | `RESEND_API_KEY` | No | Resend API key for admin email sending (`/api/admin/email/send`) |
 | `RESEND_FROM_EMAIL` | No | Default from address (e.g. `Godínez.AI <invitaciones@godinez.ai>`) |
-| `ADMIN_PASSWORD` | No | Shared secret for `X-Admin-Password` header on admin email endpoint |
+| `STUDIO_SERVICE_KEY` | No | Shared secret for `X-Service-Key` header on service-to-service endpoints (also used by admin email) |
 
 ### `apps/web/.env`
 
@@ -222,12 +222,12 @@ All routes mounted in `apps/api/src/index.ts`:
 - `POST /api/referral-codes/:code/redeem` — redeem
 
 ### Admin Email (operational)
-- `POST /api/admin/email/send` — send custom email via Resend (auth: `X-Admin-Password` header)
+- `POST /api/admin/email/send` — send custom email via Resend (auth: `X-Service-Key` header, same secret used by godinez-ai → Studio service-to-service calls)
 
 ```bash
 curl -X POST https://dev-api.godinez.ai/api/admin/email/send \
   -H "Content-Type: application/json" \
-  -H "X-Admin-Password: $ADMIN_PASSWORD" \
+  -H "X-Service-Key: $STUDIO_SERVICE_KEY" \
   -d '{
     "to": "user@example.com",
     "subject": "Asunto custom",
