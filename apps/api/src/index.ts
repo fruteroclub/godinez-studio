@@ -27,6 +27,8 @@ import hackathons from "./routes/hackathons";
 import errors from "./routes/errors";
 import watchdog from "./routes/watchdog";
 import billing from "./routes/billing";
+import agentcampCheckout from "./routes/agentcamp-checkout";
+import agentcampStripeWebhook from "./routes/agentcamp-stripe-webhook";
 import { logError } from "./dal/errors";
 import "./services/gateway-pool"; // initialize pool (lazy connections)
 import { initSentry, Sentry } from "./lib/sentry";
@@ -82,6 +84,8 @@ app.route("/api/admin", admin);
 app.route("/api/users", users);
 app.route("/api/hackathons", hackathons);
 app.route("/api/billing", billing);
+app.route("/api/agentcamp", agentcampCheckout);
+app.route("/api/agentcamp", agentcampStripeWebhook);
 app.route("/webhooks", webhooks);
 app.route("/api/watchdog", watchdog);
 app.route("/api/context", context);

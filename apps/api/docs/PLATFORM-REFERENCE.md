@@ -88,12 +88,24 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_PRICE_ID=price_...
 STRIPE_SUCCESS_URL=https://studio.godinez.ai/billing/success
 STRIPE_CANCEL_URL=https://studio.godinez.ai/billing/cancel
+AGENTCAMP_COHORT=agentcamp_2026_q2
+AGENTCAMP_EARLY_BIRD_PRICE_ID=price_...
+AGENTCAMP_REGULAR_PRICE_ID=price_...
+AGENTCAMP_EARLY_BIRD_CUTOFF_ISO=2026-05-15T23:59:59.000Z
+AGENTCAMP_MAX_CAPACITY=50
+AGENTCAMP_SALES_ENABLED=true
 ```
 
 Update `CORS_ORIGIN` in Railway `@godinez/api` production:
 
 ```
 CORS_ORIGIN=https://studio.godinez.ai,https://godinez.ai,https://dev.godinez.ai
+```
+
+For local AgentCamp landing integration, include:
+
+```
+CORS_ORIGIN=http://localhost:8080
 ```
 
 ---
