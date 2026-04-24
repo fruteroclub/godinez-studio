@@ -15,3 +15,4 @@ export * from "./relations";
 export { errors, feedback } from "./errors";
 export { runContexts } from "./run-contexts";
 export { accounts } from "./accounts";
+export { agentcampRegistrations } from "./agentcamp-registrations";
