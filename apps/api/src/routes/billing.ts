@@ -13,6 +13,7 @@ import {
 import { upsertUser } from "../dal/users";
 import { getWorkspacesByUserId } from "../dal/workspaces";
 import { logger } from "../lib/logger";
+import { hasStudioAccess } from "../lib/account-access";
 
 const clerk = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY!,
@@ -36,7 +37,7 @@ billing.get(
 
     const billingEnabled = process.env.BILLING_ENABLED === "true";
     const subscriptionStatus = account.subscriptionStatus;
-    const hasActiveSubscription = !billingEnabled || subscriptionStatus === "active";
+    const hasActiveSubscription = !billingEnabled || hasStudioAccess(account);
 
     return c.json({
       authenticated: true,
@@ -56,7 +57,7 @@ billing.post("/checkout", async (c) => {
 
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ["card"],
-    line_items: [{ price: process.env.STRIPE_PRICE_ID!, quantity: 1 }],
+    line_items: [{ price: process.env.STRIPE_GODINEZ_PERSONAL_PRICE_ID!, quantity: 1 }],
     mode: "subscription",
     success_url: process.env.STRIPE_SUCCESS_URL!,
     cancel_url: process.env.STRIPE_CANCEL_URL!,
@@ -93,6 +94,11 @@ billing.get(
 // Must receive raw body — do NOT add JSON parsing middleware before this route
 billing.post("/webhook", async (c) => {
   if (!stripe) return c.json({ error: "Billing not configured" }, 503);
+  const billingWebhookSecret =
+    process.env.STRIPE_BILLING_WEBHOOK_SECRET ?? process.env.STRIPE_WEBHOOK_SECRET;
+  if (!billingWebhookSecret) {
+    return c.json({ error: "Billing webhook secret not configured" }, 503);
+  }
 
   const sig = c.req.header("stripe-signature");
   if (!sig) return c.json({ error: "Missing signature" }, 400);
@@ -103,7 +109,7 @@ billing.post("/webhook", async (c) => {
     event = await stripe.webhooks.constructEventAsync(
       body,
       sig,
-      process.env.STRIPE_WEBHOOK_SECRET!,
+      billingWebhookSecret,
     );
   } catch (err) {
     console.error("Webhook signature verification failed:", err);
@@ -112,9 +118,16 @@ billing.post("/webhook", async (c) => {
 
   switch (event.type) {
     case "checkout.session.completed": {
-      await handleCheckoutCompleted(
-        event.data.object as Stripe.Checkout.Session,
-      );
+      const session = event.data.object as Stripe.Checkout.Session;
+      if (session.mode !== "subscription") {
+        logger.info(
+          { sessionId: session.id, mode: session.mode },
+          "ignoring non-subscription checkout completion on billing webhook",
+        );
+        break;
+      }
+
+      await handleCheckoutCompleted(session);
       break;
     }
 
@@ -154,9 +167,31 @@ billing.post("/webhook", async (c) => {
           : sub.customer?.id;
       if (customerId) {
         const periodEnd = sub.items.data[0]?.current_period_end;
+        const statusMap: Record<string, string> = {
+          active: "active",
+          trialing: "trialing",
+          past_due: "past_due",
+          canceled: "cancelled",
+          unpaid: "past_due",
+        };
+        const subscriptionStatus = statusMap[sub.status] ?? "past_due";
         await updateAccountSubscription(customerId, {
-          subscriptionStatus: sub.status === "active" ? "active" : "past_due",
+          subscriptionStatus,
           ...(periodEnd ? { currentPeriodEnd: new Date(periodEnd * 1000) } : {}),
+        });
+      }
+      break;
+    }
+
+    case "invoice.paid": {
+      const invoice = event.data.object as Stripe.Invoice;
+      const customerId =
+        typeof invoice.customer === "string"
+          ? invoice.customer
+          : invoice.customer?.id;
+      if (customerId) {
+        await updateAccountSubscription(customerId, {
+          subscriptionStatus: "active",
         });
       }
       break;
@@ -224,9 +259,16 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
   if (subscriptionId && stripe) {
     const subscription = await stripe.subscriptions.retrieve(subscriptionId);
     const periodEnd = subscription.items.data[0]?.current_period_end;
+    const statusMap: Record<string, string> = {
+      active: "active",
+      trialing: "trialing",
+      past_due: "past_due",
+      canceled: "cancelled",
+      unpaid: "past_due",
+    };
     await updateAccountSubscription(customerId, {
       subscriptionId: subscription.id,
-      subscriptionStatus: "active",
+      subscriptionStatus: statusMap[subscription.status] ?? "active",
       subscriptionTier: "godinez_personal",
       ...(periodEnd ? { currentPeriodEnd: new Date(periodEnd * 1000) } : {}),
     });

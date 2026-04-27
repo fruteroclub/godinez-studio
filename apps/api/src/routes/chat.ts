@@ -53,6 +53,7 @@ import { files as filesTable } from "@godinez/db";
 import { eq, and } from "drizzle-orm";
 import { requireQuota } from "../middleware/require-quota";
 import { resolveAccount } from "../middleware/resolve-account";
+import { hasStudioAccess } from "../lib/account-access";
 
 const app = new Hono<AuthEnv>();
 
@@ -95,7 +96,7 @@ app.post(
     // Billing gate (only enforced when BILLING_ENABLED=true)
     if (process.env.BILLING_ENABLED === "true") {
       const account = c.get("account");
-      if (account.subscriptionStatus !== "active") {
+      if (!hasStudioAccess(account)) {
         return c.json(
           {
             error: "SUBSCRIPTION_REQUIRED",
