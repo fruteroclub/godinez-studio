@@ -7,8 +7,10 @@ type AgentcampConfigDisabled = {
 
 type AgentcampConfigEnabled = {
   cohort: string;
+  conversionAt: Date;
   earlyBirdCutoff: Date;
   earlyBirdPriceId: string;
+  godinezPersonalPriceId: string;
   maxCapacity: number;
   regularPriceId: string;
   salesEnabled: true;
@@ -61,8 +63,10 @@ export function getAgentcampConfig(): AgentcampConfig {
 
   return {
     cohort,
+    conversionAt: readIsoDate("AGENTCAMP_CONVERSION_AT_ISO"),
     earlyBirdCutoff: readIsoDate("AGENTCAMP_EARLY_BIRD_CUTOFF_ISO"),
     earlyBirdPriceId: readRequired("AGENTCAMP_EARLY_BIRD_PRICE_ID"),
+    godinezPersonalPriceId: readRequired("STRIPE_GODINEZ_PERSONAL_PRICE_ID"),
     maxCapacity: readInteger("AGENTCAMP_MAX_CAPACITY"),
     regularPriceId: readRequired("AGENTCAMP_REGULAR_PRICE_ID"),
     salesEnabled: true,

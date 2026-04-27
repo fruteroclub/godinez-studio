@@ -1,6 +1,6 @@
 import { createClerkClient } from "@clerk/backend";
 import type Stripe from "stripe";
-import { createAccount } from "../dal/accounts";
+import { createAccount, updateAccountSubscription } from "../dal/accounts";
 import {
   attachAgentcampRegistrationToStudioAccount,
   markAgentcampRegistrationExpired,
@@ -8,6 +8,7 @@ import {
 } from "../dal/agentcamp-registrations";
 import { upsertUser } from "../dal/users";
 import { logger } from "../lib/logger";
+import { stripe } from "../lib/stripe";
 
 const clerk = createClerkClient({
   secretKey: process.env.CLERK_SECRET_KEY!,
@@ -101,6 +102,23 @@ export async function reconcileAgentcampCheckoutCompleted(
     studioAccountId: account.id,
     studioUserId: dbUser.id,
   });
+
+  // Persist subscription data from the checkout session
+  const subscriptionId =
+    typeof session.subscription === "string"
+      ? session.subscription
+      : (session.subscription as Stripe.Subscription | null)?.id ?? null;
+
+  if (subscriptionId && stripeCustomerId && stripe) {
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    const periodEnd = subscription.items.data[0]?.current_period_end;
+    await updateAccountSubscription(stripeCustomerId, {
+      subscriptionId: subscription.id,
+      subscriptionStatus: subscription.status === "trialing" ? "trialing" : subscription.status,
+      subscriptionTier: "godinez_personal",
+      ...(periodEnd ? { currentPeriodEnd: new Date(periodEnd * 1000) } : {}),
+    });
+  }
 
   logger.info(
     {

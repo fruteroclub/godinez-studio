@@ -4,22 +4,26 @@ const {
   createUser,
   getUserList,
   createAccount,
+  updateAccountSubscription,
   attachAgentcampRegistrationToStudioAccount,
   markAgentcampRegistrationExpired,
   markAgentcampRegistrationPaid,
   upsertUser,
   loggerError,
   loggerInfo,
+  retrieveSubscription,
 } = vi.hoisted(() => ({
   createUser: vi.fn(),
   getUserList: vi.fn(),
   createAccount: vi.fn(),
+  updateAccountSubscription: vi.fn(),
   attachAgentcampRegistrationToStudioAccount: vi.fn(),
   markAgentcampRegistrationExpired: vi.fn(),
   markAgentcampRegistrationPaid: vi.fn(),
   upsertUser: vi.fn(),
   loggerError: vi.fn(),
   loggerInfo: vi.fn(),
+  retrieveSubscription: vi.fn(),
 }));
 
 vi.mock("@clerk/backend", () => ({
@@ -33,6 +37,7 @@ vi.mock("@clerk/backend", () => ({
 
 vi.mock("../dal/accounts", () => ({
   createAccount,
+  updateAccountSubscription,
 }));
 
 vi.mock("../dal/agentcamp-registrations", () => ({
@@ -49,6 +54,14 @@ vi.mock("../lib/logger", () => ({
   logger: {
     error: loggerError,
     info: loggerInfo,
+  },
+}));
+
+vi.mock("../lib/stripe", () => ({
+  stripe: {
+    subscriptions: {
+      retrieve: retrieveSubscription,
+    },
   },
 }));
 
@@ -75,6 +88,13 @@ describe("reconcileAgentcampCheckoutCompleted", () => {
     createAccount.mockResolvedValueOnce({
       id: 8,
     });
+    retrieveSubscription.mockResolvedValueOnce({
+      id: "sub_test_123",
+      status: "trialing",
+      items: {
+        data: [{ current_period_end: 1752220800 }],
+      },
+    });
 
     await reconcileAgentcampCheckoutCompleted({
       id: "cs_test_agentcamp_paid",
@@ -84,6 +104,7 @@ describe("reconcileAgentcampCheckoutCompleted", () => {
         name: "Dev Frutero",
       },
       payment_intent: "pi_test_123",
+      subscription: "sub_test_123",
     } as never);
 
     expect(createUser).toHaveBeenCalledWith({
@@ -119,6 +140,68 @@ describe("reconcileAgentcampCheckoutCompleted", () => {
       },
       "agentcamp checkout reconciled",
     );
+  });
+
+  it("persists trialing subscription data after checkout", async () => {
+    createUser.mockResolvedValueOnce({
+      id: "user_clerk_456",
+      firstName: "Test",
+      lastName: "User",
+      imageUrl: null,
+    });
+    upsertUser.mockResolvedValueOnce({ id: 10 });
+    createAccount.mockResolvedValueOnce({ id: 11 });
+    retrieveSubscription.mockResolvedValueOnce({
+      id: "sub_trial_456",
+      status: "trialing",
+      items: {
+        data: [{ current_period_end: 1752220800 }],
+      },
+    });
+
+    await reconcileAgentcampCheckoutCompleted({
+      id: "cs_test_with_sub",
+      customer: "cus_test_456",
+      customer_details: {
+        email: "test@example.com",
+        name: "Test User",
+      },
+      payment_intent: null,
+      subscription: "sub_trial_456",
+    } as never);
+
+    expect(retrieveSubscription).toHaveBeenCalledWith("sub_trial_456");
+    expect(updateAccountSubscription).toHaveBeenCalledWith("cus_test_456", {
+      subscriptionId: "sub_trial_456",
+      subscriptionStatus: "trialing",
+      subscriptionTier: "godinez_personal",
+      currentPeriodEnd: new Date(1752220800 * 1000),
+    });
+  });
+
+  it("does not persist subscription data when session has no subscription", async () => {
+    createUser.mockResolvedValueOnce({
+      id: "user_clerk_789",
+      firstName: "No",
+      lastName: "Sub",
+      imageUrl: null,
+    });
+    upsertUser.mockResolvedValueOnce({ id: 12 });
+    createAccount.mockResolvedValueOnce({ id: 13 });
+
+    await reconcileAgentcampCheckoutCompleted({
+      id: "cs_test_no_sub",
+      customer: "cus_test_789",
+      customer_details: {
+        email: "nosub@example.com",
+        name: "No Sub",
+      },
+      payment_intent: "pi_test_789",
+      subscription: null,
+    } as never);
+
+    expect(retrieveSubscription).not.toHaveBeenCalled();
+    expect(updateAccountSubscription).not.toHaveBeenCalled();
   });
 
   it("does not create a Studio account when Stripe omits the customer email", async () => {

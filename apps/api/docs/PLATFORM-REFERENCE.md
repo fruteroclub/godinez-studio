@@ -86,7 +86,7 @@ Add to `apps/api/.env.example`:
 STRIPE_SECRET_KEY=sk_test_...
 STRIPE_BILLING_WEBHOOK_SECRET=whsec_...
 STRIPE_AGENTCAMP_WEBHOOK_SECRET=whsec_...
-STRIPE_PRICE_ID=price_...
+STRIPE_GODINEZ_PERSONAL_PRICE_ID=price_...
 STRIPE_SUCCESS_URL=https://studio.godinez.ai/billing/success
 STRIPE_CANCEL_URL=https://studio.godinez.ai/billing/cancel
 AGENTCAMP_COHORT=agentcamp_2026_q2
@@ -217,7 +217,7 @@ const billing = new Hono();
 billing.post("/checkout", async (c) => {
   const session = await stripe.checkout.sessions.create({
     payment_method_types: ["card"],
-    line_items: [{ price: process.env.STRIPE_PRICE_ID!, quantity: 1 }],
+    line_items: [{ price: process.env.STRIPE_GODINEZ_PERSONAL_PRICE_ID!, quantity: 1 }],
     mode: "subscription",
     success_url: process.env.STRIPE_SUCCESS_URL!,
     cancel_url: process.env.STRIPE_CANCEL_URL!,
@@ -483,7 +483,7 @@ Simple link, no API calls, no Clerk:
 ## 6. Stripe Dashboard setup (manual — Mel)
 
 1. **Create product:** `Godínez Personal` — $150 USD recurring monthly
-2. Copy `price_XXXXX` → env var `STRIPE_PRICE_ID`
+2. Copy `price_XXXXX` → env var `STRIPE_GODINEZ_PERSONAL_PRICE_ID`
 3. **Register webhook:**
    - URL: `https://api.godinez.ai/api/billing/webhook`
    - Events: `checkout.session.completed`, `invoice.payment_failed`, `customer.subscription.deleted`, `customer.subscription.updated`
