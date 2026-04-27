@@ -27,6 +27,20 @@ function resolveTier(cutoff: Date): AgentcampTier {
   return Date.now() < cutoff.getTime() ? "early_bird" : "regular";
 }
 
+function loadAgentcampConfig() {
+  try {
+    return getAgentcampConfig();
+  } catch (error) {
+    throw new AgentcampCheckoutError(
+      "not_configured",
+      error instanceof Error
+        ? `AgentCamp checkout is not configured: ${error.message}`
+        : "AgentCamp checkout is not configured.",
+      503,
+    );
+  }
+}
+
 async function resolvePrice(priceId: string) {
   if (!stripe) {
     throw new AgentcampCheckoutError(
@@ -63,7 +77,7 @@ export async function createAgentcampCheckoutSession(
     );
   }
 
-  const config = getAgentcampConfig();
+  const config = loadAgentcampConfig();
   if (!config.salesEnabled) {
     throw new AgentcampCheckoutError(
       "sold_out",

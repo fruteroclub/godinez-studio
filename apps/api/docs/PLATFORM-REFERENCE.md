@@ -84,7 +84,8 @@ Add to `apps/api/.env.example`:
 
 ```
 STRIPE_SECRET_KEY=sk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_BILLING_WEBHOOK_SECRET=whsec_...
+STRIPE_AGENTCAMP_WEBHOOK_SECRET=whsec_...
 STRIPE_PRICE_ID=price_...
 STRIPE_SUCCESS_URL=https://studio.godinez.ai/billing/success
 STRIPE_CANCEL_URL=https://studio.godinez.ai/billing/cancel
@@ -255,7 +256,7 @@ billing.post("/webhook", async (c) => {
     event = stripe.webhooks.constructEvent(
       body,
       sig,
-      process.env.STRIPE_WEBHOOK_SECRET!,
+      process.env.STRIPE_BILLING_WEBHOOK_SECRET ?? process.env.STRIPE_WEBHOOK_SECRET!,
     );
   } catch {
     return c.json({ error: "Invalid signature" }, 400);
@@ -486,7 +487,7 @@ Simple link, no API calls, no Clerk:
 3. **Register webhook:**
    - URL: `https://api.godinez.ai/api/billing/webhook`
    - Events: `checkout.session.completed`, `invoice.payment_failed`, `customer.subscription.deleted`, `customer.subscription.updated`
-4. Copy `whsec_XXXXX` → env var `STRIPE_WEBHOOK_SECRET`
+4. Copy the billing endpoint `whsec_XXXXX` → env var `STRIPE_BILLING_WEBHOOK_SECRET`
 5. Copy sandbox secret key → env var `STRIPE_SECRET_KEY`
 
 ---

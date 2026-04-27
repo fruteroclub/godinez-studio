@@ -12,6 +12,11 @@ app.post("/stripe/webhook", async (c) => {
   if (!stripe) {
     return c.json({ error: "Billing not configured" }, 503);
   }
+  const agentcampWebhookSecret =
+    process.env.STRIPE_AGENTCAMP_WEBHOOK_SECRET ?? process.env.STRIPE_WEBHOOK_SECRET;
+  if (!agentcampWebhookSecret) {
+    return c.json({ error: "AgentCamp webhook secret not configured" }, 503);
+  }
 
   const signature = c.req.header("stripe-signature");
   if (!signature) {
@@ -24,7 +29,7 @@ app.post("/stripe/webhook", async (c) => {
     event = await stripe.webhooks.constructEventAsync(
       payload,
       signature,
-      process.env.STRIPE_WEBHOOK_SECRET!,
+      agentcampWebhookSecret,
     );
   } catch {
     return c.json({ error: "Invalid signature" }, 400);

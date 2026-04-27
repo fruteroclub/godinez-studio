@@ -118,7 +118,9 @@ godinez-studio/
 | `PORT` | No | API port (default: 3001) |
 | `CORS_ORIGIN` | Yes | Allowed origins, comma-separated (fail-closed if unset) |
 | `STRIPE_SECRET_KEY` | No | Stripe secret key for billing and AgentCamp checkout |
-| `STRIPE_WEBHOOK_SECRET` | No | Stripe webhook signing secret |
+| `STRIPE_BILLING_WEBHOOK_SECRET` | No | Signing secret for `/api/billing/webhook` |
+| `STRIPE_AGENTCAMP_WEBHOOK_SECRET` | No | Signing secret for `/api/agentcamp/stripe/webhook` |
+| `STRIPE_WEBHOOK_SECRET` | No | Legacy fallback used only if the route-specific Stripe webhook secret is unset |
 | `AGENTCAMP_COHORT` | No | AgentCamp cohort slug (default: `agentcamp_2026_q2`) |
 | `AGENTCAMP_EARLY_BIRD_PRICE_ID` | No | Stripe price ID for early bird checkout |
 | `AGENTCAMP_REGULAR_PRICE_ID` | No | Stripe price ID for regular checkout |
