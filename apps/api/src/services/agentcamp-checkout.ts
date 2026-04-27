@@ -100,18 +100,25 @@ export async function createAgentcampCheckoutSession(
     tier === "early_bird" ? config.earlyBirdPriceId : config.regularPriceId;
   const selectedPrice = await resolvePrice(selectedPriceId);
 
+  const trialEndUnix = Math.floor(config.conversionAt.getTime() / 1000);
+
   const session = await stripe.checkout.sessions.create({
     cancel_url: payload.cancelUrl,
-    customer_creation: "always",
-    line_items: [{ price: selectedPrice.priceId, quantity: 1 }],
+    line_items: [
+      { price: selectedPrice.priceId, quantity: 1 },
+      { price: config.godinezPersonalPriceId, quantity: 1 },
+    ],
     metadata: {
       checkoutSource: payload.checkoutSource,
       cohort: config.cohort,
       locale: payload.locale,
       tier,
     },
-    mode: "payment",
+    mode: "subscription",
     payment_method_types: ["card"],
+    subscription_data: {
+      trial_end: trialEndUnix,
+    },
     success_url: payload.successUrl,
   });
 
@@ -133,10 +140,7 @@ export async function createAgentcampCheckoutSession(
     name: null,
     stripeCustomerId:
       typeof session.customer === "string" ? session.customer : session.customer?.id ?? null,
-    stripePaymentIntentId:
-      typeof session.payment_intent === "string"
-        ? session.payment_intent
-        : session.payment_intent?.id ?? null,
+    stripePaymentIntentId: null,
     stripeSessionId: session.id,
     tier,
   });

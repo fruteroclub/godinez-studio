@@ -25,6 +25,7 @@ import { pool } from "../services/gateway-pool";
 import { decrementUsedSlots } from "../dal/instances";
 import { ensureUniqueSlug } from "../lib/slug";
 import { resolveAccount } from "../middleware/resolve-account";
+import { hasStudioAccess } from "../lib/account-access";
 
 const app = new Hono<AuthEnv>();
 
@@ -39,7 +40,7 @@ app.post(
     // Billing gate — block workspace creation without active subscription
     if (process.env.BILLING_ENABLED === "true") {
       const account = c.get("account");
-      if (account.subscriptionStatus !== "active") {
+      if (!hasStudioAccess(account)) {
         return c.json(
           {
             error: "SUBSCRIPTION_REQUIRED",
