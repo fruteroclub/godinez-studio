@@ -152,14 +152,14 @@ app.post(
         runId = await relay.chatSend(sessionKey, enrichedContent, attachments);
         await saveRunContext({ runId, conversationId, workspaceId, instanceId: workspace!.instanceId });
 
-        // Save run intent in Redis so SSE handler can validate quickly
+        // Save run intent in Redis (fire-and-forget — SSE fallback only, not critical)
         const redis = getRedis();
         if (redis) {
-          await redis.set(
+          redis.set(
             `run-intent:${runId}`,
             JSON.stringify({ conversationId, workspaceId, instanceId: workspace!.instanceId }),
             { ex: 600 },
-          );
+          ).catch(() => {});
         }
       } catch (err) {
         const error = err instanceof Error ? err.message : "Gateway error";
