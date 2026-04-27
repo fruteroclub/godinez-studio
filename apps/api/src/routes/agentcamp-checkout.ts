@@ -36,13 +36,17 @@ app.post(
       }
 
       const message = error instanceof Error ? error.message : String(error);
+      const cause = error instanceof Error && error.cause
+        ? (error.cause instanceof Error ? error.cause.message : String(error.cause))
+        : undefined;
       const stack = error instanceof Error ? error.stack : undefined;
-      logger.error({ err: message, stack }, "agentcamp checkout unhandled error");
+      logger.error({ err: message, cause, stack }, "agentcamp checkout unhandled error");
 
       return c.json(
         {
           error: "checkout_failed",
           message: `Checkout error: ${message}`,
+          cause: cause ?? null,
         },
         500,
       );
