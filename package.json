@@ -10,6 +10,7 @@
     "typecheck": "turbo run typecheck",
     "db:push": "pnpm --filter @godinez/api db:push",
     "db:generate": "pnpm --filter @godinez/api db:generate",
+    "db:migrate": "pnpm --filter @godinez/api db:migrate",
     "db:studio": "pnpm --filter @godinez/api db:studio",
     "test": "turbo run test"
   },

@@ -11,6 +11,7 @@
     "db:generate": "set -a && . ./.env.local && set +a && drizzle-kit generate",
     "db:push": "set -a && . ./.env.local && set +a && drizzle-kit push",
     "db:push:dev": "set -a && . ./.env.development && set +a && drizzle-kit push",
+    "db:migrate": "set -a && . ./.env.production && set +a && drizzle-kit migrate",
     "db:studio": "set -a && . ./.env.local && set +a && drizzle-kit studio",
     "test": "vitest run"
   },
