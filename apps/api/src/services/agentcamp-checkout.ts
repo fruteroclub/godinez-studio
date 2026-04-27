@@ -1,5 +1,7 @@
+import Stripe from "stripe";
 import { createPendingAgentcampRegistration, countPaidAgentcampRegistrationsByCohort } from "../dal/agentcamp-registrations";
 import { getAgentcampConfig } from "../lib/agentcamp-config";
+import { logger } from "../lib/logger";
 import { stripe } from "../lib/stripe";
 
 export type AgentcampCheckoutPayload = {
@@ -41,6 +43,22 @@ function loadAgentcampConfig() {
   }
 }
 
+function wrapStripeError(error: unknown, context: string): never {
+  if (error instanceof Stripe.errors.StripeError) {
+    logger.error(
+      { stripeCode: error.code, stripeType: error.type, param: error.param, context },
+      `stripe error during ${context}: ${error.message}`,
+    );
+    throw new AgentcampCheckoutError(
+      "checkout_failed",
+      `Stripe error (${context}): ${error.message}`,
+      502,
+    );
+  }
+
+  throw error;
+}
+
 async function resolvePrice(priceId: string) {
   if (!stripe) {
     throw new AgentcampCheckoutError(
@@ -50,11 +68,17 @@ async function resolvePrice(priceId: string) {
     );
   }
 
-  const price = await stripe.prices.retrieve(priceId);
+  let price: Stripe.Price;
+  try {
+    price = await stripe.prices.retrieve(priceId);
+  } catch (error) {
+    throw wrapStripeError(error, `price.retrieve(${priceId})`);
+  }
+
   if (price.unit_amount == null || price.currency !== "mxn") {
     throw new AgentcampCheckoutError(
       "not_configured",
-      "AgentCamp pricing is not configured correctly.",
+      `AgentCamp pricing misconfigured: price ${priceId} has currency=${price.currency}, unit_amount=${price.unit_amount}`,
       503,
     );
   }
@@ -102,25 +126,30 @@ export async function createAgentcampCheckoutSession(
 
   const trialEndUnix = Math.floor(config.conversionAt.getTime() / 1000);
 
-  const session = await stripe.checkout.sessions.create({
-    cancel_url: payload.cancelUrl,
-    line_items: [
-      { price: selectedPrice.priceId, quantity: 1 },
-      { price: config.godinezPersonalPriceId, quantity: 1 },
-    ],
-    metadata: {
-      checkoutSource: payload.checkoutSource,
-      cohort: config.cohort,
-      locale: payload.locale,
-      tier,
-    },
-    mode: "subscription",
-    payment_method_types: ["card"],
-    subscription_data: {
-      trial_end: trialEndUnix,
-    },
-    success_url: payload.successUrl,
-  });
+  let session: Stripe.Checkout.Session;
+  try {
+    session = await stripe.checkout.sessions.create({
+      cancel_url: payload.cancelUrl,
+      line_items: [
+        { price: selectedPrice.priceId, quantity: 1 },
+        { price: config.godinezPersonalPriceId, quantity: 1 },
+      ],
+      metadata: {
+        checkoutSource: payload.checkoutSource,
+        cohort: config.cohort,
+        locale: payload.locale,
+        tier,
+      },
+      mode: "subscription",
+      payment_method_types: ["card"],
+      subscription_data: {
+        trial_end: trialEndUnix,
+      },
+      success_url: payload.successUrl,
+    });
+  } catch (error) {
+    throw wrapStripeError(error, "checkout.sessions.create");
+  }
 
   if (!session.url) {
     throw new AgentcampCheckoutError(
@@ -130,20 +159,28 @@ export async function createAgentcampCheckoutSession(
     );
   }
 
-  await createPendingAgentcampRegistration({
-    amount: selectedPrice.amount,
-    checkoutSource: payload.checkoutSource,
-    cohort: config.cohort,
-    currency: selectedPrice.currency,
-    email: null,
-    locale: payload.locale,
-    name: null,
-    stripeCustomerId:
-      typeof session.customer === "string" ? session.customer : session.customer?.id ?? null,
-    stripePaymentIntentId: null,
-    stripeSessionId: session.id,
-    tier,
-  });
+  try {
+    await createPendingAgentcampRegistration({
+      amount: selectedPrice.amount,
+      checkoutSource: payload.checkoutSource,
+      cohort: config.cohort,
+      currency: selectedPrice.currency,
+      email: null,
+      locale: payload.locale,
+      name: null,
+      stripeCustomerId:
+        typeof session.customer === "string" ? session.customer : session.customer?.id ?? null,
+      stripePaymentIntentId: null,
+      stripeSessionId: session.id,
+      tier,
+    });
+  } catch (error) {
+    logger.error(
+      { err: error instanceof Error ? error.message : String(error), sessionId: session.id },
+      "failed to save pending agentcamp registration (checkout session already created)",
+    );
+    // Don't block — the checkout session exists in Stripe; webhook will reconcile
+  }
 
   return { url: session.url };
 }
