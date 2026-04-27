@@ -117,6 +117,16 @@ godinez-studio/
 | `CLERK_WEBHOOK_SECRET` | No | Clerk webhook signing secret |
 | `PORT` | No | API port (default: 3001) |
 | `CORS_ORIGIN` | Yes | Allowed origins, comma-separated (fail-closed if unset) |
+| `STRIPE_SECRET_KEY` | No | Stripe secret key for billing and AgentCamp checkout |
+| `STRIPE_BILLING_WEBHOOK_SECRET` | No | Signing secret for `/api/billing/webhook` |
+| `STRIPE_AGENTCAMP_WEBHOOK_SECRET` | No | Signing secret for `/api/agentcamp/stripe/webhook` |
+| `STRIPE_WEBHOOK_SECRET` | No | Legacy fallback used only if the route-specific Stripe webhook secret is unset |
+| `AGENTCAMP_COHORT` | No | AgentCamp cohort slug (default: `agentcamp_2026_q2`) |
+| `AGENTCAMP_EARLY_BIRD_PRICE_ID` | No | Stripe price ID for early bird checkout |
+| `AGENTCAMP_REGULAR_PRICE_ID` | No | Stripe price ID for regular checkout |
+| `AGENTCAMP_EARLY_BIRD_CUTOFF_ISO` | No | ISO timestamp when pricing switches from early bird to regular |
+| `AGENTCAMP_MAX_CAPACITY` | No | Max paid registrations before checkout returns `sold_out` |
+| `AGENTCAMP_SALES_ENABLED` | No | Enables public AgentCamp checkout when set to `true` |
 | `OPENCLAW_GATEWAY_URL` | No | OpenClaw Gateway WebSocket URL |
 | `OPENCLAW_GATEWAY_TOKEN` | No | Gateway auth token |
 | `AGENT_MAX_SLOTS` | No | Max agent slots per instance (default: 15) |
@@ -135,6 +145,14 @@ godinez-studio/
 |---|---|---|
 | `VITE_CLERK_PUBLISHABLE_KEY` | Yes | Clerk frontend publishable key |
 | `VITE_API_URL` | No | API base URL (default: proxied via Vite in dev) |
+
+### Local AgentCamp Checkout
+
+To test the AgentCamp landing against a local API:
+
+- set `CORS_ORIGIN=http://localhost:8080`
+- add the `AGENTCAMP_*` env vars above in `apps/api/.env.local`
+- point the landing app at `http://localhost:3001/api/agentcamp/checkout`
 
 ## Services & Live URLs
 
