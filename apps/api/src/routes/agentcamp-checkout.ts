@@ -5,6 +5,7 @@ import {
   AgentcampCheckoutError,
   createAgentcampCheckoutSession,
 } from "../services/agentcamp-checkout";
+import { logger } from "../lib/logger";
 
 const app = new Hono();
 
@@ -34,7 +35,17 @@ app.post(
         );
       }
 
-      throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      const stack = error instanceof Error ? error.stack : undefined;
+      logger.error({ err: message, stack }, "agentcamp checkout unhandled error");
+
+      return c.json(
+        {
+          error: "checkout_failed",
+          message: `Checkout error: ${message}`,
+        },
+        500,
+      );
     }
   },
 );
