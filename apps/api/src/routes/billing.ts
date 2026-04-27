@@ -93,6 +93,11 @@ billing.get(
 // Must receive raw body — do NOT add JSON parsing middleware before this route
 billing.post("/webhook", async (c) => {
   if (!stripe) return c.json({ error: "Billing not configured" }, 503);
+  const billingWebhookSecret =
+    process.env.STRIPE_BILLING_WEBHOOK_SECRET ?? process.env.STRIPE_WEBHOOK_SECRET;
+  if (!billingWebhookSecret) {
+    return c.json({ error: "Billing webhook secret not configured" }, 503);
+  }
 
   const sig = c.req.header("stripe-signature");
   if (!sig) return c.json({ error: "Missing signature" }, 400);
@@ -103,7 +108,7 @@ billing.post("/webhook", async (c) => {
     event = await stripe.webhooks.constructEventAsync(
       body,
       sig,
-      process.env.STRIPE_WEBHOOK_SECRET!,
+      billingWebhookSecret,
     );
   } catch (err) {
     console.error("Webhook signature verification failed:", err);
@@ -112,9 +117,16 @@ billing.post("/webhook", async (c) => {
 
   switch (event.type) {
     case "checkout.session.completed": {
-      await handleCheckoutCompleted(
-        event.data.object as Stripe.Checkout.Session,
-      );
+      const session = event.data.object as Stripe.Checkout.Session;
+      if (session.mode !== "subscription") {
+        logger.info(
+          { sessionId: session.id, mode: session.mode },
+          "ignoring non-subscription checkout completion on billing webhook",
+        );
+        break;
+      }
+
+      await handleCheckoutCompleted(session);
       break;
     }
 

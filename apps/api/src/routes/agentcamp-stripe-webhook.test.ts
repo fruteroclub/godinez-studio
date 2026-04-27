@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Hono } from "hono";
 
 const {
@@ -26,6 +26,9 @@ vi.mock("../services/agentcamp-reconcile", () => ({
 
 import agentcampStripeWebhook from "./agentcamp-stripe-webhook";
 
+const originalAgentcampWebhookSecret = process.env.STRIPE_AGENTCAMP_WEBHOOK_SECRET;
+const originalLegacyWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
 function createTestApp() {
   const app = new Hono();
   app.route("/api/agentcamp", agentcampStripeWebhook);
@@ -35,6 +38,22 @@ function createTestApp() {
 describe("AgentCamp Stripe webhook route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.STRIPE_AGENTCAMP_WEBHOOK_SECRET = "whsec_agentcamp_test";
+    delete process.env.STRIPE_WEBHOOK_SECRET;
+  });
+
+  afterAll(() => {
+    if (originalAgentcampWebhookSecret === undefined) {
+      delete process.env.STRIPE_AGENTCAMP_WEBHOOK_SECRET;
+    } else {
+      process.env.STRIPE_AGENTCAMP_WEBHOOK_SECRET = originalAgentcampWebhookSecret;
+    }
+
+    if (originalLegacyWebhookSecret === undefined) {
+      delete process.env.STRIPE_WEBHOOK_SECRET;
+    } else {
+      process.env.STRIPE_WEBHOOK_SECRET = originalLegacyWebhookSecret;
+    }
   });
 
   it("returns 400 when the signature header is missing", async () => {

@@ -1,5 +1,21 @@
 const DEFAULT_COHORT = "agentcamp_2026_q2";
 
+type AgentcampConfigDisabled = {
+  cohort: string;
+  salesEnabled: false;
+};
+
+type AgentcampConfigEnabled = {
+  cohort: string;
+  earlyBirdCutoff: Date;
+  earlyBirdPriceId: string;
+  maxCapacity: number;
+  regularPriceId: string;
+  salesEnabled: true;
+};
+
+export type AgentcampConfig = AgentcampConfigDisabled | AgentcampConfigEnabled;
+
 function readRequired(name: string) {
   const value = process.env[name];
   if (!value) {
@@ -32,13 +48,23 @@ function readIsoDate(name: string) {
   return date;
 }
 
-export function getAgentcampConfig() {
+export function getAgentcampConfig(): AgentcampConfig {
+  const cohort = process.env.AGENTCAMP_COHORT || DEFAULT_COHORT;
+  const salesEnabled = readBoolean("AGENTCAMP_SALES_ENABLED");
+
+  if (!salesEnabled) {
+    return {
+      cohort,
+      salesEnabled: false,
+    };
+  }
+
   return {
-    cohort: process.env.AGENTCAMP_COHORT || DEFAULT_COHORT,
+    cohort,
     earlyBirdCutoff: readIsoDate("AGENTCAMP_EARLY_BIRD_CUTOFF_ISO"),
     earlyBirdPriceId: readRequired("AGENTCAMP_EARLY_BIRD_PRICE_ID"),
     maxCapacity: readInteger("AGENTCAMP_MAX_CAPACITY"),
     regularPriceId: readRequired("AGENTCAMP_REGULAR_PRICE_ID"),
-    salesEnabled: readBoolean("AGENTCAMP_SALES_ENABLED"),
+    salesEnabled: true,
   };
 }
