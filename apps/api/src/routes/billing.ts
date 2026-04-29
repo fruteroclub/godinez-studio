@@ -59,11 +59,42 @@ billing.post("/checkout", async (c) => {
     payment_method_types: ["card"],
     line_items: [{ price: process.env.STRIPE_GODINEZ_PERSONAL_PRICE_ID!, quantity: 1 }],
     mode: "subscription",
-    success_url: process.env.STRIPE_SUCCESS_URL!,
+    success_url: `${process.env.STRIPE_SUCCESS_URL}?session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: process.env.STRIPE_CANCEL_URL!,
   });
 
   return c.json({ url: session.url });
+});
+
+// ─── PUBLIC: Verify Stripe Session ──────────────────────────────────────────
+// Called from BillingSuccess page with the session_id from the success URL.
+// Retrieves the Stripe session, confirms payment, and ensures the DB is updated.
+// No auth required — the session_id itself is the proof of purchase.
+billing.get("/verify-session", async (c) => {
+  if (!stripe) return c.json({ error: "Billing not configured" }, 503);
+
+  const sessionId = c.req.query("session_id");
+  if (!sessionId) return c.json({ error: "Missing session_id" }, 400);
+
+  let session: Stripe.Checkout.Session;
+  try {
+    session = await stripe.checkout.sessions.retrieve(sessionId, {
+      expand: ["subscription"],
+    });
+  } catch (err) {
+    logger.error({ err, sessionId }, "Failed to retrieve Stripe session");
+    return c.json({ error: "Session not found" }, 404);
+  }
+
+  if (session.payment_status === "unpaid") {
+    return c.json({ verified: false, reason: "payment_pending" });
+  }
+
+  if (session.mode === "subscription") {
+    await handleCheckoutCompleted(session);
+  }
+
+  return c.json({ verified: true });
 });
 
 // ─── AUTH REQUIRED: Customer Portal ─────────────────────────────────────────
