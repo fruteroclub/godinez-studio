@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 
 const FALLBACK_TIMEOUT_MS = 10000;
@@ -7,6 +8,7 @@ const FALLBACK_TIMEOUT_MS = 10000;
 export default function BillingSuccess() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const queryClient = useQueryClient();
   const verifyFired = useRef(false);
   const fallbackFired = useRef(false);
 
@@ -27,6 +29,7 @@ export default function BillingSuccess() {
           `/api/billing/verify-session?session_id=${encodeURIComponent(sessionId)}`,
         );
         if (data.verified) {
+          queryClient.invalidateQueries({ queryKey: ["billing-status"] });
           navigate("/studio", { replace: true });
         }
         // If not verified yet (payment_pending), the fallback timeout will handle it
@@ -43,6 +46,7 @@ export default function BillingSuccess() {
     const timer = setTimeout(() => {
       if (!fallbackFired.current) {
         fallbackFired.current = true;
+        queryClient.invalidateQueries({ queryKey: ["billing-status"] });
         navigate("/studio", { replace: true });
       }
     }, FALLBACK_TIMEOUT_MS);
