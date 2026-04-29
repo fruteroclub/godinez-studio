@@ -10,7 +10,7 @@ import {
   createAccount,
   updateAccountSubscription,
 } from "../dal/accounts";
-import { upsertUser } from "../dal/users";
+import { upsertUser, getUserByEmail } from "../dal/users";
 import { getWorkspacesByUserId } from "../dal/workspaces";
 import { logger } from "../lib/logger";
 import { hasStudioAccess } from "../lib/account-access";
@@ -212,41 +212,44 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     return;
   }
 
-  // 1. Create Clerk user (Clerk sends magic link automatically)
-  let clerkUser;
-  try {
-    clerkUser = await clerk.users.createUser({
-      emailAddress: [email],
-      skipPasswordRequirement: true,
-    });
-  } catch (err: unknown) {
-    // If user already exists in Clerk, look them up
-    const clerkErr = err as { errors?: Array<{ code: string }> };
-    if (clerkErr.errors?.some((e) => e.code === "form_identifier_exists")) {
-      const existing = await clerk.users.getUserList({
+  // 1. Check if user already exists in DB by email (authenticated app flow)
+  let dbUser = await getUserByEmail(email);
+
+  if (!dbUser) {
+    // New user via landing page — create in Clerk then DB
+    let clerkUser;
+    try {
+      clerkUser = await clerk.users.createUser({
         emailAddress: [email],
+        skipPasswordRequirement: true,
       });
-      clerkUser = existing.data[0];
-    } else {
-      logger.error({ err, email }, "Failed to create Clerk user");
-      throw err;
+    } catch (err: unknown) {
+      const clerkErr = err as { errors?: Array<{ code: string }> };
+      if (clerkErr.errors?.some((e) => e.code === "form_identifier_exists")) {
+        const existing = await clerk.users.getUserList({
+          emailAddress: [email],
+        });
+        clerkUser = existing.data[0];
+      } else {
+        logger.error({ err, email }, "Failed to create Clerk user");
+        throw err;
+      }
     }
-  }
 
-  if (!clerkUser) {
-    logger.error({ email }, "Could not create or find Clerk user");
-    return;
-  }
+    if (!clerkUser) {
+      logger.error({ email }, "Could not create or find Clerk user");
+      return;
+    }
 
-  // 2. Upsert DB user (reuses existing DAL function)
-  const dbUser = await upsertUser({
-    clerkId: clerkUser.id,
-    email,
-    name:
-      [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
-      undefined,
-    avatarUrl: clerkUser.imageUrl ?? undefined,
-  });
+    dbUser = await upsertUser({
+      clerkId: clerkUser.id,
+      email,
+      name:
+        [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
+        undefined,
+      avatarUrl: clerkUser.imageUrl ?? undefined,
+    });
+  }
 
   // 3. Create account with active subscription
   await createAccount(dbUser.id, customerId);

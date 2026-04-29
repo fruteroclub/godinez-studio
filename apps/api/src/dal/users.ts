@@ -8,6 +8,12 @@ export async function getUserByClerkId(clerkId: string) {
   });
 }
 
+export async function getUserByEmail(email: string) {
+  return db.query.users.findFirst({
+    where: eq(users.email, email),
+  });
+}
+
 export async function getUserById(id: number) {
   return db.query.users.findFirst({
     where: eq(users.id, id),
