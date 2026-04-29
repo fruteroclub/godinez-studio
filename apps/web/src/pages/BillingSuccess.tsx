@@ -1,38 +1,44 @@
 import { useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@clerk/clerk-react";
-import { useQuery } from "@tanstack/react-query";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiFetch } from "@/lib/api";
-import type { BillingStatus } from "@/hooks/use-billing";
 
-const FALLBACK_TIMEOUT_MS = 5000;
+const FALLBACK_TIMEOUT_MS = 10000;
 
 export default function BillingSuccess() {
   const navigate = useNavigate();
-  const { getToken, isSignedIn } = useAuth();
+  const [searchParams] = useSearchParams();
+  const verifyFired = useRef(false);
   const fallbackFired = useRef(false);
 
-  const { data } = useQuery({
-    queryKey: ["billing-status-success"],
-    queryFn: async () => {
-      const token = await getToken();
-      return apiFetch<BillingStatus>("/api/billing/status", { token });
-    },
-    enabled: !!isSignedIn,
-    staleTime: 0,
-    refetchInterval: (query) =>
-      query.state.data?.hasActiveSubscription ? false : 2000,
-  });
-
-  // Navigate as soon as subscription is confirmed active
   useEffect(() => {
-    if (data?.hasActiveSubscription) {
-      navigate("/studio", { replace: true });
-    }
-  }, [data, navigate]);
+    if (verifyFired.current) return;
+    verifyFired.current = true;
 
-  // Fallback: if Clerk cookies are rejected or query stalls, go to /studio
-  // after a timeout — BillingGate there will handle the auth check
+    const sessionId = searchParams.get("session_id");
+
+    if (!sessionId) {
+      // No session_id — fallback handled by timeout below
+      return;
+    }
+
+    const verify = async () => {
+      try {
+        const data = await apiFetch<{ verified: boolean; reason?: string }>(
+          `/api/billing/verify-session?session_id=${encodeURIComponent(sessionId)}`,
+        );
+        if (data.verified) {
+          navigate("/studio", { replace: true });
+        }
+        // If not verified yet (payment_pending), the fallback timeout will handle it
+      } catch {
+        // Network/server error — fallback timeout will handle it
+      }
+    };
+
+    verify();
+  }, [searchParams, navigate]);
+
+  // Fallback: navigate anyway after timeout so user isn't stuck
   useEffect(() => {
     const timer = setTimeout(() => {
       if (!fallbackFired.current) {
