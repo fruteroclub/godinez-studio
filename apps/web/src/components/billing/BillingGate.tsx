@@ -12,9 +12,9 @@ import { useBillingStatus } from "@/hooks/use-billing";
  */
 export function BillingGate({ children }: { children: React.ReactNode }) {
   const location = useLocation();
-  const { data, isLoading, isError } = useBillingStatus();
+  const { data, isLoading, isError, isFetching } = useBillingStatus();
 
-  if (isLoading) {
+  if (isLoading || isFetching) {
     return (
       <div className="flex h-full min-h-[60vh] items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-magenta" />

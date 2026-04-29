@@ -22,7 +22,8 @@ export function useBillingStatus() {
       return apiFetch<BillingStatus>("/api/billing/status", { token });
     },
     enabled: !!isSignedIn,
-    staleTime: 30_000,
+    staleTime: 0,
+    gcTime: 0,
   });
 }
 
