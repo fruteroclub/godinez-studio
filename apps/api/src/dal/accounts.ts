@@ -23,7 +23,10 @@ export async function createAccount(
     .values({ ownerId, stripeCustomerId })
     .onConflictDoUpdate({
       target: accounts.ownerId,
-      set: stripeCustomerId ? { stripeCustomerId } : {},
+      set: {
+        updatedAt: new Date(),
+        ...(stripeCustomerId ? { stripeCustomerId } : {}),
+      },
     })
     .returning();
   return account;
