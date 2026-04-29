@@ -29,7 +29,7 @@ export default function BillingSuccess() {
           `/api/billing/verify-session?session_id=${encodeURIComponent(sessionId)}`,
         );
         if (data.verified) {
-          queryClient.invalidateQueries({ queryKey: ["billing-status"] });
+          queryClient.removeQueries({ queryKey: ["billing-status"] });
           navigate("/studio", { replace: true });
         }
         // If not verified yet (payment_pending), the fallback timeout will handle it
@@ -46,7 +46,7 @@ export default function BillingSuccess() {
     const timer = setTimeout(() => {
       if (!fallbackFired.current) {
         fallbackFired.current = true;
-        queryClient.invalidateQueries({ queryKey: ["billing-status"] });
+        queryClient.removeQueries({ queryKey: ["billing-status"] });
         navigate("/studio", { replace: true });
       }
     }, FALLBACK_TIMEOUT_MS);
