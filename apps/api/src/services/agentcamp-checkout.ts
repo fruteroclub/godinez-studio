@@ -8,6 +8,7 @@ export type AgentcampCheckoutPayload = {
   cancelUrl: string;
   checkoutSource: string;
   locale: "en" | "es";
+  referralCode?: string;
   successUrl: string;
 };
 
@@ -130,6 +131,7 @@ export async function createAgentcampCheckoutSession(
   try {
     session = await stripe.checkout.sessions.create({
       cancel_url: payload.cancelUrl,
+      client_reference_id: payload.referralCode ?? undefined,
       line_items: [
         { price: selectedPrice.priceId, quantity: 1 },
         { price: config.godinezPersonalPriceId, quantity: 1 },

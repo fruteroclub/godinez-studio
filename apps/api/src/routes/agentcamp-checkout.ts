@@ -13,6 +13,7 @@ const checkoutRequestSchema = z.object({
   cancelUrl: z.string().url(),
   checkoutSource: z.string().min(1),
   locale: z.enum(["en", "es"]),
+  referralCode: z.string().optional(),
   successUrl: z.string().url(),
 });
 
